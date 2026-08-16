@@ -1,0 +1,33 @@
+[
+  {
+    "id": 1,
+    "itemId": 1,
+    "itemName": "Laptop - Dell XPS 15",
+    "type": "receive",
+    "quantity": 10,
+    "unitPrice": 1299.99,
+    "supplier": "Dell Technologies",
+    "createdAt": "2024-01-15T10:30:00.000Z"
+  },
+  {
+    "id": 2,
+    "itemId": 2,
+    "itemName": "Wireless Mouse",
+    "type": "issue",
+    "quantity": 5,
+    "unitPrice": 29.99,
+    "issuedTo": "John Smith",
+    "department": "IT",
+    "createdAt": "2024-01-16T14:20:00.000Z"
+  },
+  {
+    "id": 3,
+    "itemId": 3,
+    "itemName": "USB-C Hub",
+    "type": "receive",
+    "quantity": 25,
+    "unitPrice": 49.99,
+    "supplier": "Tech Distributors Inc.",
+    "createdAt": "2024-01-17T09:15:00.000Z"
+  }
+]

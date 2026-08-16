@@ -1,0 +1,29 @@
+[
+  {
+    "id": 1,
+    "name": "Laptop - Dell XPS 15",
+    "category": "Electronics",
+    "quantity": 25,
+    "unitPrice": 1299.99,
+    "reorderLevel": 5,
+    "description": "High-performance laptop for development"
+  },
+  {
+    "id": 2,
+    "name": "Wireless Mouse",
+    "category": "Accessories",
+    "quantity": 150,
+    "unitPrice": 29.99,
+    "reorderLevel": 20,
+    "description": "Ergonomic wireless mouse"
+  },
+  {
+    "id": 3,
+    "name": "USB-C Hub",
+    "category": "Accessories",
+    "quantity": 75,
+    "unitPrice": 49.99,
+    "reorderLevel": 15,
+    "description": "7-in-1 USB-C hub"
+  }
+]
