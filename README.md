@@ -1,5 +1,5 @@
 # Stock Management System
-
+-----------------------------
 A full-stack web application for managing inventory, tracking stock movements, and handling warehouse operations.
 
 ## Tech Stack
