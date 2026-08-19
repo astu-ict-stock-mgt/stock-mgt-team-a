@@ -7,7 +7,10 @@
   "scripts": {
     "dev": "node --watch src/index.js",
     "start": "node src/index.js",
-    "install-deps": "npm install"
+    "type-check": "tsc --noEmit",
+    "lint": "eslint src/",
+    "format": "prettier --write src/",
+    "build": "tsc"
   },
   "dependencies": {
     "@prisma/client": "^5.8.0",
@@ -15,6 +18,9 @@
     "express": "^4.22.2"
   },
   "devDependencies": {
-    "prisma": "^5.8.0"
+    "eslint": "^8.56.0",
+    "prettier": "^3.2.4",
+    "prisma": "^5.8.0",
+    "typescript": "^5.9.3"
   }
 }

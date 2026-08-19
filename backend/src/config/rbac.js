@@ -270,7 +270,9 @@ export function getPermissionsForRole(roleCode) {
  * @returns {string[]} Deduplicated permission keys array
  */
 export function getPermissionsForUser(roles) {
-  if (!roles) return [];
+  if (!roles) {
+    return [];
+  }
   const userRoles = Array.isArray(roles) ? roles : [roles];
   const permissionSet = new Set();
 
@@ -289,7 +291,9 @@ export function getPermissionsForUser(roles) {
  * @returns {boolean} True if authorized
  */
 export function hasPermission(userRoles, requiredPermission) {
-  if (!userRoles || !requiredPermission) return false;
+  if (!userRoles || !requiredPermission) {
+    return false;
+  }
   const userPermissions = getPermissionsForUser(userRoles);
   return userPermissions.includes(requiredPermission);
 }
@@ -301,7 +305,9 @@ export function hasPermission(userRoles, requiredPermission) {
  * @returns {boolean}
  */
 export function hasAnyPermission(userRoles, requiredPermissionsList) {
-  if (!userRoles || !Array.isArray(requiredPermissionsList)) return false;
+  if (!userRoles || !Array.isArray(requiredPermissionsList)) {
+    return false;
+  }
   const userPermissions = getPermissionsForUser(userRoles);
   return requiredPermissionsList.some((perm) => userPermissions.includes(perm));
 }
@@ -313,7 +319,9 @@ export function hasAnyPermission(userRoles, requiredPermissionsList) {
  * @returns {boolean}
  */
 export function hasAllPermissions(userRoles, requiredPermissionsList) {
-  if (!userRoles || !Array.isArray(requiredPermissionsList)) return false;
-  const userPermissions = getPermissionsForUser(userRoles);
-  return requiredPermissionsList.every((perm) => userPermissions.includes(perm));
+  if (!userRoles || !Array.isArray(requiredPermissionsList)) {
+    return false
+  }
+  const userPermissions = getPermissionsForUser(userRoles)
+  return requiredPermissionsList.every((perm) => userPermissions.includes(perm))
 }

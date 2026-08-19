@@ -4,10 +4,10 @@
  */
 
 // In-memory / Prisma user repository abstraction
-export const findUserById = async (userId) => {
+export const findUserById = async (_userId) => {
   return null
 }
 
-export const findUserByEmail = async (email) => {
+export const findUserByEmail = async (_email) => {
   return null
 }

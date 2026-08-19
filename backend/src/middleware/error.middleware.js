@@ -3,7 +3,7 @@
  * Task: BE-006 & BE-015
  */
 
-export const notFoundHandler = (req, res, next) => {
+export const notFoundHandler = (req, res, _next) => {
   res.status(404).json({
     success: false,
     error: {
@@ -13,7 +13,7 @@ export const notFoundHandler = (req, res, next) => {
   })
 }
 
-export const errorHandler = (err, req, res, next) => {
+export const errorHandler = (err, req, res, _next) => {
   console.error('Unhandled Server Error:', err)
 
   const statusCode = err.status || err.statusCode || 500
