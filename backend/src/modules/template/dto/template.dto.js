@@ -1,15 +1,14 @@
 /**
- * Template DTO (Data Transfer Object) Reference
- * Task: BE-007 (Developer Reference Boilerplate)
+ * Template DTO (Data Transfer Object) Schema (Zod)
+ * Tasks: BE-007 & BE-014
  */
 
-export const validateCreateTemplateDto = (payload) => {
-  const errors = []
-  if (!payload || !payload.title) {
-    errors.push('title is required')
-  }
-  return {
-    isValid: errors.length === 0,
-    errors,
-  }
-}
+import { z } from 'zod'
+
+export const createTemplateSchema = z.object({
+  title: z
+    .string({
+      required_error: 'title is required',
+    })
+    .min(3, 'title must be at least 3 characters long'),
+})
