@@ -10,7 +10,10 @@
     "type-check": "tsc --noEmit",
     "lint": "eslint src/",
     "format": "prettier --write src/",
-    "build": "tsc"
+    "build": "tsc",
+    "migrate:dev": "prisma migrate dev",
+    "migrate:deploy": "prisma migrate deploy",
+    "migrate:status": "prisma migrate status"
   },
   "dependencies": {
     "@prisma/client": "^5.8.0",
