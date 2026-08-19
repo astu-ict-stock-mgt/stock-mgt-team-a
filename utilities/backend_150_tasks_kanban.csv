@@ -23,17 +23,17 @@ Day: 1","BE-001, BE-003",Dev-4,day-1;batch-0;setup;backend,Todo
 
 Depends on: BE-001–BE-004
 Batch: 0 - Requirements & Architecture Baseline
-Day: 1",BE-001–BE-004,Dev-5,day-1;batch-0;setup;backend,Todo
+Day: 1",BE-001–BE-004,Dev-8,day-1;batch-0;setup;backend,Todo
 1,Foundation & Infrastructure,BE-006,BE-006: Initialize Node.js/Express Backend,"`npx express-generator` or manual scaffold with TypeScript, Express, and a clean src/ layout. Confirm it boots and responds to a health-check route.
 
 Depends on: BE-001
 Batch: 1 - Foundation & Infrastructure
-Day: 1",BE-001,Dev-6,day-1;batch-1;setup;backend,Todo
+Day: 1",BE-001,Dev-5,day-1;batch-1;setup;backend,Todo
 1,Foundation & Infrastructure,BE-007,BE-007: Establish Backend Folder/Domain Architecture,"Create the domain-oriented folder structure (e.g. src/modules/<domain>/{controller,service,repository,routes,dto}) so every later module follows the same shape.
 
 Depends on: BE-006
 Batch: 1 - Foundation & Infrastructure
-Day: 1",BE-006,Dev-7,day-1;batch-1;setup;backend,Todo
+Day: 1",BE-006,Dev-6,day-1;batch-1;setup;backend,Todo
 1,Foundation & Infrastructure,BE-008,BE-008: Configure TypeScript and Coding Standards,"tsconfig.json (strict mode), ESLint + Prettier, and a shared style guide doc so 7 developers produce consistent code from day one.
 
 Depends on: BE-006
@@ -43,57 +43,57 @@ Day: 1",BE-006,Dev-1 (Platform Lead),day-1;batch-1;setup;backend,Todo
 
 Depends on: BE-006
 Batch: 1 - Foundation & Infrastructure
-Day: 1",BE-006,Dev-2 (Auth/RBAC),day-1;batch-1;setup;backend,Todo
+Day: 1",BE-006,Dev-7,day-1;batch-1;setup;backend,Todo
 1,Foundation & Infrastructure,BE-010,BE-010: Configure PostgreSQL Connection,"pg/TypeORM/Prisma client wired to PostgreSQL with connection pooling and a config-driven connection string.
 
 Depends on: BE-009
 Batch: 1 - Foundation & Infrastructure
-Day: 1",BE-009,Dev-3,day-1;batch-1;setup;backend,Todo
+Day: 1",BE-009,Dev-2 (Auth/RBAC),day-1;batch-1;setup;backend,Todo
 1,Foundation & Infrastructure,BE-011,BE-011: Configure Database Migration System,"Pick a migration tool (Prisma Migrate / TypeORM migrations / node-pg-migrate) and commit the first migration. No developer edits the schema by hand from here on.
 
 Depends on: BE-010
 Batch: 1 - Foundation & Infrastructure
-Day: 1",BE-010,Dev-4,day-1;batch-1;setup;backend,Todo
+Day: 1",BE-010,Dev-3,day-1;batch-1;setup;backend,Todo
 1,Foundation & Infrastructure,BE-012,BE-012: Configure Seed/Fixture System,"Deterministic seed script (roles, an admin user, a demo store) so any dev can reset to a known state locally and in CI.
 
 Depends on: BE-011
 Batch: 1 - Foundation & Infrastructure
-Day: 1",BE-011,Dev-5,day-1;batch-1;setup;backend,Todo
+Day: 1",BE-011,Dev-8,day-1;batch-1;setup;backend,Todo
 1,Foundation & Infrastructure,BE-013,BE-013: Build Application Bootstrap,"Wire express app, middleware order (helmet → cors → body-parser → routes → error handler), and a single app.listen entrypoint.
 
 Depends on: BE-006, BE-008, BE-009
 Batch: 1 - Foundation & Infrastructure
-Day: 1","BE-006, BE-008, BE-009",Dev-6,day-1;batch-1;setup;backend,Todo
+Day: 1","BE-006, BE-008, BE-009",Dev-4,day-1;batch-1;setup;backend,Todo
 1,Foundation & Infrastructure,BE-014,BE-014: Implement Request Validation Layer,"Central request-validation middleware (zod/celebrate/class-validator) so every route validates its DTO before hitting the controller.
 
 Depends on: BE-008, BE-013
 Batch: 1 - Foundation & Infrastructure
-Day: 1","BE-008, BE-013",Dev-2 (Auth/RBAC),day-1;batch-1;service;backend,Todo
+Day: 1","BE-008, BE-013",Dev-5,day-1;batch-1;service;backend,Todo
 1,Foundation & Infrastructure,BE-015,BE-015: Implement Global Error Handling,"One global error-handling middleware that maps domain errors to consistent HTTP status codes/JSON shape and never leaks stack traces.
 
 Depends on: BE-013, BE-014
 Batch: 1 - Foundation & Infrastructure
-Day: 1","BE-013, BE-014",Dev-3,day-1;batch-1;service;backend,Todo
+Day: 1","BE-013, BE-014",Dev-6,day-1;batch-1;service;backend,Todo
 1,Foundation & Infrastructure,BE-016,BE-016: Implement API Response/Status Standards,"Standard `{ success, data, error, meta }` response envelope and a shared HTTP-status helper used by every controller.
 
 Depends on: BE-013
 Batch: 1 - Foundation & Infrastructure
-Day: 1",BE-013,Dev-5,day-1;batch-1;api;backend,Todo
+Day: 1",BE-013,Dev-8,day-1;batch-1;api;backend,Todo
 1,Foundation & Infrastructure,BE-017,BE-017: Implement Logging Infrastructure,"Structured logger (pino/winston) with correlation/request IDs; never logs credentials or tokens.
 
 Depends on: BE-013, BE-009
 Batch: 1 - Foundation & Infrastructure
-Day: 1","BE-013, BE-009",Dev-4,day-1;batch-1;service;backend,Todo
+Day: 1","BE-013, BE-009",Dev-7,day-1;batch-1;service;backend,Todo
 1,Foundation & Infrastructure,BE-018,BE-018: Implement API Documentation/OpenAPI Baseline,"Swagger/OpenAPI baseline (swagger-jsdoc or similar) served at /docs so every subsequent API task adds to one living contract.
 
 Depends on: BE-016
 Batch: 1 - Foundation & Infrastructure
-Day: 1",BE-016,Dev-6,day-1;batch-1;api;backend,Todo
+Day: 1",BE-016,Dev-2 (Auth/RBAC),day-1;batch-1;api;backend,Todo
 1,Foundation & Infrastructure,BE-019,BE-019: Configure CORS and HTTP Security,"Helmet, strict CORS allow-list, rate limiting on auth routes, secure cookie flags.
 
 Depends on: BE-013, BE-009
 Batch: 1 - Foundation & Infrastructure
-Day: 1","BE-013, BE-009",Dev-7,day-1;batch-1;setup;backend,Todo
+Day: 1","BE-013, BE-009",Dev-3,day-1;batch-1;setup;backend,Todo
 1,Foundation & Infrastructure,BE-020,BE-020: Configure Backend Test Framework,"Jest/Vitest + supertest + a test database strategy (Docker/transaction rollback per test) so every later task can add real integration tests.
 
 Depends on: BE-008, BE-013
@@ -103,17 +103,17 @@ Day: 1","BE-008, BE-013",Dev-1 (Platform Lead),day-1;batch-1;setup;backend,Todo
 
 Depends on: BE-011, BE-002
 Batch: 2 - Database Core & Identity (Auth/RBAC)
-Day: 2","BE-011, BE-002",Dev-3,day-2;batch-2;schema;backend,Todo
+Day: 2","BE-011, BE-002",Dev-4,day-2;batch-2;schema;backend,Todo
 2,Database Core & Identity (Auth/RBAC),BE-022,BE-022: Create Roles Schema,"Design the Roles table(s) in PostgreSQL: columns, primary/foreign keys, unique & check constraints, indexes, created_at/updated_at. Write the migration and add seed/fixture data; unit-test valid and invalid inserts.
 
 Depends on: BE-021
 Batch: 2 - Database Core & Identity (Auth/RBAC)
-Day: 2",BE-021,Dev-4,day-2;batch-2;schema;backend,Todo
+Day: 2",BE-021,Dev-5,day-2;batch-2;schema;backend,Todo
 2,Database Core & Identity (Auth/RBAC),BE-023,BE-023: Create Permissions Schema,"Design the Permissions table(s) in PostgreSQL: columns, primary/foreign keys, unique & check constraints, indexes, created_at/updated_at. Write the migration and add seed/fixture data; unit-test valid and invalid inserts.
 
 Depends on: BE-022
 Batch: 2 - Database Core & Identity (Auth/RBAC)
-Day: 2",BE-022,Dev-5,day-2;batch-2;schema;backend,Todo
+Day: 2",BE-022,Dev-8,day-2;batch-2;schema;backend,Todo
 2,Database Core & Identity (Auth/RBAC),BE-024,BE-024: Create User-Role Relationships,"Design the User-Role table(s) in PostgreSQL: columns, primary/foreign keys, unique & check constraints, indexes, created_at/updated_at. Write the migration and add seed/fixture data; unit-test valid and invalid inserts.
 
 Depends on: BE-021, BE-022
@@ -138,32 +138,32 @@ Day: 2","BE-021, BE-026",Dev-2 (Auth/RBAC),day-2;batch-2;service;backend,Todo
 
 Depends on: BE-027
 Batch: 2 - Database Core & Identity (Auth/RBAC)
-Day: 2",BE-027,Dev-4,day-2;batch-2;api;backend,Todo
+Day: 2",BE-027,Dev-3,day-2;batch-2;api;backend,Todo
 2,Database Core & Identity (Auth/RBAC),BE-029,BE-029: Implement Session/Token Validation,"Verify/refresh token or session validity on each request; test expiry and tampering.
 
 Depends on: BE-027
 Batch: 2 - Database Core & Identity (Auth/RBAC)
-Day: 2",BE-027,Dev-3,day-2;batch-2;service;backend,Todo
+Day: 2",BE-027,Dev-4,day-2;batch-2;service;backend,Todo
 2,Database Core & Identity (Auth/RBAC),BE-030,BE-030: Implement Logout/Session Revocation,"Implement Logout/Session Revocation as a service: enforce business rules, call the RBAC middleware for permission checks, persist through the repository/data layer (DB transaction if it touches stock), return standard domain error codes. Keep the controller thin.
 
 Depends on: BE-029
 Batch: 2 - Database Core & Identity (Auth/RBAC)
-Day: 2",BE-029,Dev-4,day-2;batch-2;service;backend,Todo
+Day: 2",BE-029,Dev-5,day-2;batch-2;service;backend,Todo
 2,Database Core & Identity (Auth/RBAC),BE-031,BE-031: Implement Authentication Middleware,"Attaches req.user from a valid token/session; rejects unauthenticated requests before they reach any controller.
 
 Depends on: BE-029
 Batch: 2 - Database Core & Identity (Auth/RBAC)
-Day: 2",BE-029,Dev-5,day-2;batch-2;service;backend,Todo
+Day: 2",BE-029,Dev-6,day-2;batch-2;service;backend,Todo
 2,Database Core & Identity (Auth/RBAC),BE-032,BE-032: Implement RBAC Authorization Middleware,"Given req.user, load roles→permissions and deny-by-default unless the route's required permission is present. This one middleware gates almost every other protected endpoint built for the rest of the week — treat it as the week's single highest-priority task after Day 1 infra.
 
 Depends on: BE-024, BE-025, BE-031
 Batch: 2 - Database Core & Identity (Auth/RBAC)
-Day: 2","BE-024, BE-025, BE-031",Dev-6,day-2;batch-2;service;backend,Todo
+Day: 2","BE-024, BE-025, BE-031",Dev-7,day-2;batch-2;service;backend,Todo
 2,Database Core & Identity (Auth/RBAC),BE-033,BE-033: Implement Permission Checking Service,"Implement Permission Checking as a service: enforce business rules, call the RBAC middleware for permission checks, persist through the repository/data layer (DB transaction if it touches stock), return standard domain error codes. Keep the controller thin.
 
 Depends on: BE-032
 Batch: 2 - Database Core & Identity (Auth/RBAC)
-Day: 2",BE-032,Dev-7,day-2;batch-2;service;backend,Todo
+Day: 2",BE-032,Dev-8,day-2;batch-2;service;backend,Todo
 2,Database Core & Identity (Auth/RBAC),BE-034,BE-034: Implement User Management Service,"Implement User Management as a service: enforce business rules, call the RBAC middleware for permission checks, persist through the repository/data layer (DB transaction if it touches stock), return standard domain error codes. Keep the controller thin.
 
 Depends on: BE-021, BE-032
@@ -173,27 +173,27 @@ Day: 2","BE-021, BE-032",Dev-1 (Platform Lead),day-2;batch-2;service;backend,Tod
 
 Depends on: BE-034
 Batch: 2 - Database Core & Identity (Auth/RBAC)
-Day: 2",BE-034,Dev-5,day-2;batch-2;api;backend,Todo
+Day: 2",BE-034,Dev-2 (Auth/RBAC),day-2;batch-2;api;backend,Todo
 2,Database Core & Identity (Auth/RBAC),BE-036,BE-036: Implement Role Management APIs,"Expose REST endpoint(s) for Role Management: routes, request DTO validation, controller → service wiring, response envelope & status codes, OpenAPI docs. Add integration tests for success, validation errors and permission denial.
 
 Depends on: BE-022, BE-025, BE-032
 Batch: 2 - Database Core & Identity (Auth/RBAC)
-Day: 2","BE-022, BE-025, BE-032",Dev-6,day-2;batch-2;api;backend,Todo
+Day: 2","BE-022, BE-025, BE-032",Dev-3,day-2;batch-2;api;backend,Todo
 2,Database Core & Identity (Auth/RBAC),BE-037,BE-037: Implement Permission Management APIs,"Expose REST endpoint(s) for Permission Management: routes, request DTO validation, controller → service wiring, response envelope & status codes, OpenAPI docs. Add integration tests for success, validation errors and permission denial.
 
 Depends on: BE-023, BE-025, BE-032
 Batch: 2 - Database Core & Identity (Auth/RBAC)
-Day: 2","BE-023, BE-025, BE-032",Dev-7,day-2;batch-2;api;backend,Todo
+Day: 2","BE-023, BE-025, BE-032",Dev-8,day-2;batch-2;api;backend,Todo
 2,Database Core & Identity (Auth/RBAC),BE-038,BE-038: Implement Account Activation/Deactivation,"Implement Account Activation/Deactivation as a service: enforce business rules, call the RBAC middleware for permission checks, persist through the repository/data layer (DB transaction if it touches stock), return standard domain error codes. Keep the controller thin.
 
 Depends on: BE-035
 Batch: 2 - Database Core & Identity (Auth/RBAC)
-Day: 2",BE-035,Dev-2 (Auth/RBAC),day-2;batch-2;service;backend,Todo
+Day: 2",BE-035,Dev-4,day-2;batch-2;service;backend,Todo
 2,Database Core & Identity (Auth/RBAC),BE-039,BE-039: Implement Authentication Audit Events,"Implement Authentication Audit Events as a service: enforce business rules, call the RBAC middleware for permission checks, persist through the repository/data layer (DB transaction if it touches stock), return standard domain error codes. Keep the controller thin.
 
 Depends on: BE-017, BE-031
 Batch: 2 - Database Core & Identity (Auth/RBAC)
-Day: 2","BE-017, BE-031",Dev-3,day-2;batch-2;service;backend,Todo
+Day: 2","BE-017, BE-031",Dev-5,day-2;batch-2;service;backend,Todo
 2,Database Core & Identity (Auth/RBAC),BE-040,BE-040: Identity & Access Integration Tests,"Write integration tests for Identity & Access: happy path, validation failures, permission denials, workflow/state violations, and (where stock-affecting) transaction rollback / concurrency.
 
 Depends on: BE-028–BE-039
@@ -203,52 +203,52 @@ Day: 2",BE-028–BE-039,Dev-1 (Platform Lead),day-2;batch-2;tests;backend,Todo
 
 Depends on: BE-011
 Batch: 3 - Master Data & Organization
-Day: 3",BE-011,Dev-5,day-3;batch-3;schema;backend,Todo
+Day: 3",BE-011,Dev-6,day-3;batch-3;schema;backend,Todo
 3,Master Data & Organization,BE-042,BE-042: Create Departments/Store Departments Schema,"Design the Departments/Store Departments table(s) in PostgreSQL: columns, primary/foreign keys, unique & check constraints, indexes, created_at/updated_at. Write the migration and add seed/fixture data; unit-test valid and invalid inserts.
 
 Depends on: BE-041
 Batch: 3 - Master Data & Organization
-Day: 3",BE-041,Dev-6,day-3;batch-3;schema;backend,Todo
+Day: 3",BE-041,Dev-7,day-3;batch-3;schema;backend,Todo
 3,Master Data & Organization,BE-043,BE-043: Create Categories Schema,"Design the Categories table(s) in PostgreSQL: columns, primary/foreign keys, unique & check constraints, indexes, created_at/updated_at. Write the migration and add seed/fixture data; unit-test valid and invalid inserts.
 
 Depends on: BE-011
 Batch: 3 - Master Data & Organization
-Day: 3",BE-011,Dev-7,day-3;batch-3;schema;backend,Todo
+Day: 3",BE-011,Dev-8,day-3;batch-3;schema;backend,Todo
 3,Master Data & Organization,BE-044,BE-044: Create Units of Measure Schema,"Design the Units of Measure table(s) in PostgreSQL: columns, primary/foreign keys, unique & check constraints, indexes, created_at/updated_at. Write the migration and add seed/fixture data; unit-test valid and invalid inserts.
 
 Depends on: BE-011
 Batch: 3 - Master Data & Organization
-Day: 3",BE-011,Dev-1 (Platform Lead),day-3;batch-3;schema;backend,Todo
+Day: 3",BE-011,Dev-2 (Auth/RBAC),day-3;batch-3;schema;backend,Todo
 3,Master Data & Organization,BE-045,BE-045: Create Items Schema,"Design the Items table(s) in PostgreSQL: columns, primary/foreign keys, unique & check constraints, indexes, created_at/updated_at. Write the migration and add seed/fixture data; unit-test valid and invalid inserts.
 
 Depends on: BE-043, BE-044
 Batch: 3 - Master Data & Organization
-Day: 3","BE-043, BE-044",Dev-2 (Auth/RBAC),day-3;batch-3;schema;backend,Todo
+Day: 3","BE-043, BE-044",Dev-3,day-3;batch-3;schema;backend,Todo
 3,Master Data & Organization,BE-046,BE-046: Create Suppliers/Donors Schema,"Design the Suppliers/Donors table(s) in PostgreSQL: columns, primary/foreign keys, unique & check constraints, indexes, created_at/updated_at. Write the migration and add seed/fixture data; unit-test valid and invalid inserts.
 
 Depends on: BE-011
 Batch: 3 - Master Data & Organization
-Day: 3",BE-011,Dev-3,day-3;batch-3;schema;backend,Todo
+Day: 3",BE-011,Dev-4,day-3;batch-3;schema;backend,Todo
 3,Master Data & Organization,BE-047,BE-047: Create Locations Hierarchy Schema,"Design the Locations Hierarchy table(s) in PostgreSQL: columns, primary/foreign keys, unique & check constraints, indexes, created_at/updated_at. Write the migration and add seed/fixture data; unit-test valid and invalid inserts.
 
 Depends on: BE-041
 Batch: 3 - Master Data & Organization
-Day: 3",BE-041,Dev-4,day-3;batch-3;schema;backend,Todo
+Day: 3",BE-041,Dev-5,day-3;batch-3;schema;backend,Todo
 3,Master Data & Organization,BE-048,BE-048: Implement Store Service,"Implement Store as a service: enforce business rules, call the RBAC middleware for permission checks, persist through the repository/data layer (DB transaction if it touches stock), return standard domain error codes. Keep the controller thin.
 
 Depends on: BE-041, BE-032
 Batch: 3 - Master Data & Organization
-Day: 3","BE-041, BE-032",Dev-5,day-3;batch-3;service;backend,Todo
+Day: 3","BE-041, BE-032",Dev-6,day-3;batch-3;service;backend,Todo
 3,Master Data & Organization,BE-049,BE-049: Implement Department Service,"Implement Department as a service: enforce business rules, call the RBAC middleware for permission checks, persist through the repository/data layer (DB transaction if it touches stock), return standard domain error codes. Keep the controller thin.
 
 Depends on: BE-042, BE-032
 Batch: 3 - Master Data & Organization
-Day: 3","BE-042, BE-032",Dev-6,day-3;batch-3;service;backend,Todo
+Day: 3","BE-042, BE-032",Dev-7,day-3;batch-3;service;backend,Todo
 3,Master Data & Organization,BE-050,BE-050: Implement Category Service,"Implement Category as a service: enforce business rules, call the RBAC middleware for permission checks, persist through the repository/data layer (DB transaction if it touches stock), return standard domain error codes. Keep the controller thin.
 
 Depends on: BE-043, BE-032
 Batch: 3 - Master Data & Organization
-Day: 3","BE-043, BE-032",Dev-7,day-3;batch-3;service;backend,Todo
+Day: 3","BE-043, BE-032",Dev-8,day-3;batch-3;service;backend,Todo
 3,Master Data & Organization,BE-051,BE-051: Implement Unit Service,"Implement Unit as a service: enforce business rules, call the RBAC middleware for permission checks, persist through the repository/data layer (DB transaction if it touches stock), return standard domain error codes. Keep the controller thin.
 
 Depends on: BE-044, BE-032
@@ -273,12 +273,12 @@ Day: 3","BE-047, BE-032",Dev-4,day-3;batch-3;service;backend,Todo
 
 Depends on: BE-048, BE-049
 Batch: 3 - Master Data & Organization
-Day: 3","BE-048, BE-049",Dev-6,day-3;batch-3;api;backend,Todo
+Day: 3","BE-048, BE-049",Dev-5,day-3;batch-3;api;backend,Todo
 3,Master Data & Organization,BE-056,BE-056: Implement Category/Unit APIs,"Expose REST endpoint(s) for Category/Unit: routes, request DTO validation, controller → service wiring, response envelope & status codes, OpenAPI docs. Add integration tests for success, validation errors and permission denial.
 
 Depends on: BE-050, BE-051
 Batch: 3 - Master Data & Organization
-Day: 3","BE-050, BE-051",Dev-7,day-3;batch-3;api;backend,Todo
+Day: 3","BE-050, BE-051",Dev-8,day-3;batch-3;api;backend,Todo
 3,Master Data & Organization,BE-057,BE-057: Implement Item Master APIs,"Expose REST endpoint(s) for Item Master: routes, request DTO validation, controller → service wiring, response envelope & status codes, OpenAPI docs. Add integration tests for success, validation errors and permission denial.
 
 Depends on: BE-052
@@ -288,37 +288,37 @@ Day: 3",BE-052,Dev-1 (Platform Lead),day-3;batch-3;api;backend,Todo
 
 Depends on: BE-053
 Batch: 3 - Master Data & Organization
-Day: 3",BE-053,Dev-2 (Auth/RBAC),day-3;batch-3;api;backend,Todo
+Day: 3",BE-053,Dev-6,day-3;batch-3;api;backend,Todo
 3,Master Data & Organization,BE-059,BE-059: Implement Location/Hierarchy APIs,"Expose REST endpoint(s) for Location/Hierarchy: routes, request DTO validation, controller → service wiring, response envelope & status codes, OpenAPI docs. Add integration tests for success, validation errors and permission denial.
 
 Depends on: BE-054
 Batch: 3 - Master Data & Organization
-Day: 3",BE-054,Dev-3,day-3;batch-3;api;backend,Todo
+Day: 3",BE-054,Dev-7,day-3;batch-3;api;backend,Todo
 3,Master Data & Organization,BE-060,BE-060: Implement Master Data Search/Filter APIs,"Expose REST endpoint(s) for Master Data Search/Filter: routes, request DTO validation, controller → service wiring, response envelope & status codes, OpenAPI docs. Add integration tests for success, validation errors and permission denial.
 
 Depends on: BE-055–BE-059
 Batch: 3 - Master Data & Organization
-Day: 3",BE-055–BE-059,Dev-4,day-3;batch-3;api;backend,Todo
+Day: 3",BE-055–BE-059,Dev-2 (Auth/RBAC),day-3;batch-3;api;backend,Todo
 3,Master Data & Organization,BE-061,BE-061: Implement Master Data Validation Rules,"Implement Master Data Validation as a service: enforce business rules, call the RBAC middleware for permission checks, persist through the repository/data layer (DB transaction if it touches stock), return standard domain error codes. Keep the controller thin.
 
 Depends on: BE-055–BE-059
 Batch: 3 - Master Data & Organization
-Day: 3",BE-055–BE-059,Dev-5,day-3;batch-3;service;backend,Todo
+Day: 3",BE-055–BE-059,Dev-8,day-3;batch-3;service;backend,Todo
 3,Master Data & Organization,BE-062,BE-062: Master Data Integration Tests,"Write integration tests for Master Data: happy path, validation failures, permission denials, workflow/state violations, and (where stock-affecting) transaction rollback / concurrency.
 
 Depends on: BE-060, BE-061
 Batch: 3 - Master Data & Organization
-Day: 3","BE-060, BE-061",Dev-5,day-3;batch-3;tests;backend,Todo
+Day: 3","BE-060, BE-061",Dev-8,day-3;batch-3;tests;backend,Todo
 4,Receiving & Technical Evaluation,BE-063,BE-063: Create Goods Receipt Schema,"Design the Goods Receipt table(s) in PostgreSQL: columns, primary/foreign keys, unique & check constraints, indexes, created_at/updated_at. Write the migration and add seed/fixture data; unit-test valid and invalid inserts.
 
 Depends on: BE-045, BE-046, BE-041, BE-047
 Batch: 4 - Receiving & Technical Evaluation
-Day: 4","BE-045, BE-046, BE-041, BE-047",Dev-7,day-4;batch-4;schema;backend,Todo
+Day: 4","BE-045, BE-046, BE-041, BE-047",Dev-3,day-4;batch-4;schema;backend,Todo
 4,Receiving & Technical Evaluation,BE-064,BE-064: Create Goods Receipt Lines Schema,"Design the Goods Receipt Lines table(s) in PostgreSQL: columns, primary/foreign keys, unique & check constraints, indexes, created_at/updated_at. Write the migration and add seed/fixture data; unit-test valid and invalid inserts.
 
 Depends on: BE-063, BE-045
 Batch: 4 - Receiving & Technical Evaluation
-Day: 4","BE-063, BE-045",Dev-1 (Platform Lead),day-4;batch-4;schema;backend,Todo
+Day: 4","BE-063, BE-045",Dev-4,day-4;batch-4;schema;backend,Todo
 4,Receiving & Technical Evaluation,BE-065,BE-065: Implement Goods Receipt Service,"Implement Goods Receipt as a service: enforce business rules, call the RBAC middleware for permission checks, persist through the repository/data layer (DB transaction if it touches stock), return standard domain error codes. Keep the controller thin.
 
 Depends on: BE-063, BE-064, BE-032
@@ -328,27 +328,27 @@ Day: 4","BE-063, BE-064, BE-032",Dev-1 (Platform Lead),day-4;batch-4;service;bac
 
 Depends on: BE-065
 Batch: 4 - Receiving & Technical Evaluation
-Day: 4",BE-065,Dev-2 (Auth/RBAC),day-4;batch-4;api;backend,Todo
+Day: 4",BE-065,Dev-5,day-4;batch-4;api;backend,Todo
 4,Receiving & Technical Evaluation,BE-067,BE-067: Implement Goods Receipt List/Detail APIs,"Expose REST endpoint(s) for Goods Receipt List/Detail: routes, request DTO validation, controller → service wiring, response envelope & status codes, OpenAPI docs. Add integration tests for success, validation errors and permission denial.
 
 Depends on: BE-065
 Batch: 4 - Receiving & Technical Evaluation
-Day: 4",BE-065,Dev-3,day-4;batch-4;api;backend,Todo
+Day: 4",BE-065,Dev-6,day-4;batch-4;api;backend,Todo
 4,Receiving & Technical Evaluation,BE-068,BE-068: Implement Goods Receipt Status Transitions,"Implement Goods Receipt Status Transitions as a service: enforce business rules, call the RBAC middleware for permission checks, persist through the repository/data layer (DB transaction if it touches stock), return standard domain error codes. Keep the controller thin.
 
 Depends on: BE-003, BE-065
 Batch: 4 - Receiving & Technical Evaluation
-Day: 4","BE-003, BE-065",Dev-2 (Auth/RBAC),day-4;batch-4;service;backend,Todo
+Day: 4","BE-003, BE-065",Dev-7,day-4;batch-4;service;backend,Todo
 4,Receiving & Technical Evaluation,BE-069,BE-069: Implement Receipt Attachment References,"Implement Receipt Attachment References as a service: enforce business rules, call the RBAC middleware for permission checks, persist through the repository/data layer (DB transaction if it touches stock), return standard domain error codes. Keep the controller thin.
 
 Depends on: BE-063 + storage design
 Batch: 4 - Receiving & Technical Evaluation
-Day: 4",BE-063 + storage design,Dev-3,day-4;batch-4;service;backend,Todo
+Day: 4",BE-063 + storage design,Dev-2 (Auth/RBAC),day-4;batch-4;service;backend,Todo
 4,Receiving & Technical Evaluation,BE-070,BE-070: Create Technical Evaluation Schema,"Design the Technical Evaluation table(s) in PostgreSQL: columns, primary/foreign keys, unique & check constraints, indexes, created_at/updated_at. Write the migration and add seed/fixture data; unit-test valid and invalid inserts.
 
 Depends on: BE-063
 Batch: 4 - Receiving & Technical Evaluation
-Day: 4",BE-063,Dev-2 (Auth/RBAC),day-4;batch-4;schema;backend,Todo
+Day: 4",BE-063,Dev-3,day-4;batch-4;schema;backend,Todo
 4,Receiving & Technical Evaluation,BE-071,BE-071: Implement Technical Evaluation Service,"Implement Technical Evaluation as a service: enforce business rules, call the RBAC middleware for permission checks, persist through the repository/data layer (DB transaction if it touches stock), return standard domain error codes. Keep the controller thin.
 
 Depends on: BE-070, BE-032
@@ -358,27 +358,27 @@ Day: 4","BE-070, BE-032",Dev-4,day-4;batch-4;service;backend,Todo
 
 Depends on: BE-071, BE-068
 Batch: 4 - Receiving & Technical Evaluation
-Day: 4","BE-071, BE-068",Dev-4,day-4;batch-4;api;backend,Todo
+Day: 4","BE-071, BE-068",Dev-5,day-4;batch-4;api;backend,Todo
 4,Receiving & Technical Evaluation,BE-073,BE-073: Implement Evaluation Decision API,"Expose REST endpoint(s) for Evaluation Decision: routes, request DTO validation, controller → service wiring, response envelope & status codes, OpenAPI docs. Add integration tests for success, validation errors and permission denial.
 
 Depends on: BE-071, BE-003
 Batch: 4 - Receiving & Technical Evaluation
-Day: 4","BE-071, BE-003",Dev-5,day-4;batch-4;api;backend,Todo
+Day: 4","BE-071, BE-003",Dev-6,day-4;batch-4;api;backend,Todo
 4,Receiving & Technical Evaluation,BE-074,BE-074: Implement Evaluation Evidence References,"Implement Evaluation Evidence References as a service: enforce business rules, call the RBAC middleware for permission checks, persist through the repository/data layer (DB transaction if it touches stock), return standard domain error codes. Keep the controller thin.
 
 Depends on: BE-070 + storage design
 Batch: 4 - Receiving & Technical Evaluation
-Day: 4",BE-070 + storage design,Dev-5,day-4;batch-4;service;backend,Todo
+Day: 4",BE-070 + storage design,Dev-8,day-4;batch-4;service;backend,Todo
 4,Receiving & Technical Evaluation,BE-075,BE-075: Implement Evaluation History,"Implement Evaluation History as a service: enforce business rules, call the RBAC middleware for permission checks, persist through the repository/data layer (DB transaction if it touches stock), return standard domain error codes. Keep the controller thin.
 
 Depends on: BE-071, BE-017
 Batch: 4 - Receiving & Technical Evaluation
-Day: 4","BE-071, BE-017",Dev-6,day-4;batch-4;service;backend,Todo
+Day: 4","BE-071, BE-017",Dev-7,day-4;batch-4;service;backend,Todo
 4,Receiving & Technical Evaluation,BE-076,BE-076: Receiving/Evaluation Integration Tests,"Write integration tests for Receiving/Evaluation: happy path, validation failures, permission denials, workflow/state violations, and (where stock-affecting) transaction rollback / concurrency.
 
 Depends on: BE-066–BE-075
 Batch: 4 - Receiving & Technical Evaluation
-Day: 4",BE-066–BE-075,Dev-3,day-4;batch-4;tests;backend,Todo
+Day: 4",BE-066–BE-075,Dev-2 (Auth/RBAC),day-4;batch-4;tests;backend,Todo
 4,GRN & Inventory Ledger (critical path),BE-077,BE-077: Create GRN Schema,"Design the GRN table(s) in PostgreSQL: columns, primary/foreign keys, unique & check constraints, indexes, created_at/updated_at. Write the migration and add seed/fixture data; unit-test valid and invalid inserts.
 
 Depends on: BE-063, BE-070
@@ -388,12 +388,12 @@ Day: 4","BE-063, BE-070",Dev-3,day-4;batch-5;schema;backend,Todo
 
 Depends on: BE-077, BE-073
 Batch: 5 - GRN & Inventory Ledger (critical path)
-Day: 4","BE-077, BE-073",Dev-7,day-4;batch-5;service;backend,Todo
+Day: 4","BE-077, BE-073",Dev-4,day-4;batch-5;service;backend,Todo
 4,GRN & Inventory Ledger (critical path),BE-079,BE-079: Implement GRN Create/Finalize APIs,"Expose REST endpoint(s) for GRN Create/Finalize: routes, request DTO validation, controller → service wiring, response envelope & status codes, OpenAPI docs. Add integration tests for success, validation errors and permission denial.
 
 Depends on: BE-078
 Batch: 5 - GRN & Inventory Ledger (critical path)
-Day: 4",BE-078,Dev-6,day-4;batch-5;api;backend,Todo
+Day: 4",BE-078,Dev-5,day-4;batch-5;api;backend,Todo
 4,GRN & Inventory Ledger (critical path),BE-080,BE-080: Implement GRN Document Data/Numbering,"Implement GRN Document Data/Numbering as a service: enforce business rules, call the RBAC middleware for permission checks, persist through the repository/data layer (DB transaction if it touches stock), return standard domain error codes. Keep the controller thin.
 
 Depends on: BE-078 + numbering policy
@@ -403,42 +403,42 @@ Day: 4",BE-078 + numbering policy,Dev-1 (Platform Lead),day-4;batch-5;service;ba
 
 Depends on: BE-045, BE-041
 Batch: 5 - GRN & Inventory Ledger (critical path)
-Day: 4","BE-045, BE-041",Dev-4,day-4;batch-5;schema;backend,Todo
+Day: 4","BE-045, BE-041",Dev-6,day-4;batch-5;schema;backend,Todo
 4,GRN & Inventory Ledger (critical path),BE-082,BE-082: Create Stock Card Transaction Schema,"Design the Stock Card Transaction table(s) in PostgreSQL: columns, primary/foreign keys, unique & check constraints, indexes, created_at/updated_at. Write the migration and add seed/fixture data; unit-test valid and invalid inserts.
 
 Depends on: BE-081
 Batch: 5 - GRN & Inventory Ledger (critical path)
-Day: 4",BE-081,Dev-5,day-4;batch-5;schema;backend,Todo
+Day: 4",BE-081,Dev-8,day-4;batch-5;schema;backend,Todo
 4,GRN & Inventory Ledger (critical path),BE-083,BE-083: Create Bin Card Schema,"Design the Bin Card table(s) in PostgreSQL: columns, primary/foreign keys, unique & check constraints, indexes, created_at/updated_at. Write the migration and add seed/fixture data; unit-test valid and invalid inserts.
 
 Depends on: BE-047, BE-045
 Batch: 5 - GRN & Inventory Ledger (critical path)
-Day: 4","BE-047, BE-045",Dev-6,day-4;batch-5;schema;backend,Todo
+Day: 4","BE-047, BE-045",Dev-7,day-4;batch-5;schema;backend,Todo
 4,GRN & Inventory Ledger (critical path),BE-084,BE-084: Create Bin Transaction Schema,"Design the Bin Transaction table(s) in PostgreSQL: columns, primary/foreign keys, unique & check constraints, indexes, created_at/updated_at. Write the migration and add seed/fixture data; unit-test valid and invalid inserts.
 
 Depends on: BE-083
 Batch: 5 - GRN & Inventory Ledger (critical path)
-Day: 4",BE-083,Dev-7,day-4;batch-5;schema;backend,Todo
+Day: 4",BE-083,Dev-2 (Auth/RBAC),day-4;batch-5;schema;backend,Todo
 4,GRN & Inventory Ledger (critical path),BE-085,BE-085: Implement Inventory Ledger Service,"Implement Inventory Ledger as a service: enforce business rules, call the RBAC middleware for permission checks, persist through the repository/data layer (DB transaction if it touches stock), return standard domain error codes. Keep the controller thin.
 
 Depends on: BE-081–BE-084
 Batch: 5 - GRN & Inventory Ledger (critical path)
-Day: 4",BE-081–BE-084,Dev-2 (Auth/RBAC),day-4;batch-5;service;backend,Todo
+Day: 4",BE-081–BE-084,Dev-3,day-4;batch-5;service;backend,Todo
 4,GRN & Inventory Ledger (critical path),BE-086,BE-086: Implement Transaction Posting Engine,"The transactional posting engine: begin a DB transaction, validate quantities/balances, write the movement record, update the derived balance, commit — or roll back entirely on any failure. Every receipt, issue, return, transfer, and adjustment task from Day 4 onward calls this, never writes balances directly.
 
 Depends on: BE-004, BE-085
 Batch: 5 - GRN & Inventory Ledger (critical path)
-Day: 4","BE-004, BE-085",Dev-3,day-4;batch-5;service;backend,Todo
+Day: 4","BE-004, BE-085",Dev-4,day-4;batch-5;service;backend,Todo
 4,GRN & Inventory Ledger (critical path),BE-087,BE-087: Implement Receipt Stock Posting,"Implement Receipt Stock Posting as a service: enforce business rules, call the RBAC middleware for permission checks, persist through the repository/data layer (DB transaction if it touches stock), return standard domain error codes. Keep the controller thin.
 
 Depends on: BE-079, BE-086
 Batch: 5 - GRN & Inventory Ledger (critical path)
-Day: 4","BE-079, BE-086",Dev-4,day-4;batch-5;service;backend,Todo
+Day: 4","BE-079, BE-086",Dev-5,day-4;batch-5;service;backend,Todo
 4,GRN & Inventory Ledger (critical path),BE-088,BE-088: Implement Stock Balance Calculation,"Implement Stock Balance Calculation as a service: enforce business rules, call the RBAC middleware for permission checks, persist through the repository/data layer (DB transaction if it touches stock), return standard domain error codes. Keep the controller thin.
 
 Depends on: BE-085, BE-086
 Batch: 5 - GRN & Inventory Ledger (critical path)
-Day: 4","BE-085, BE-086",Dev-5,day-4;batch-5;service;backend,Todo
+Day: 4","BE-085, BE-086",Dev-8,day-4;batch-5;service;backend,Todo
 4,GRN & Inventory Ledger (critical path),BE-089,BE-089: Implement Bin Balance Calculation,"Implement Bin Balance Calculation as a service: enforce business rules, call the RBAC middleware for permission checks, persist through the repository/data layer (DB transaction if it touches stock), return standard domain error codes. Keep the controller thin.
 
 Depends on: BE-084, BE-086
@@ -453,52 +453,52 @@ Day: 4","BE-088, BE-002",Dev-7,day-4;batch-5;service;backend,Todo
 
 Depends on: BE-085
 Batch: 5 - GRN & Inventory Ledger (critical path)
-Day: 4",BE-085,Dev-7,day-4;batch-5;api;backend,Todo
+Day: 4",BE-085,Dev-2 (Auth/RBAC),day-4;batch-5;api;backend,Todo
 4,GRN & Inventory Ledger (critical path),BE-092,BE-092: Implement Stock Card APIs,"Expose REST endpoint(s) for Stock Card: routes, request DTO validation, controller → service wiring, response envelope & status codes, OpenAPI docs. Add integration tests for success, validation errors and permission denial.
 
 Depends on: BE-081, BE-082, BE-085
 Batch: 5 - GRN & Inventory Ledger (critical path)
-Day: 4","BE-081, BE-082, BE-085",Dev-1 (Platform Lead),day-4;batch-5;api;backend,Todo
+Day: 4","BE-081, BE-082, BE-085",Dev-3,day-4;batch-5;api;backend,Todo
 4,GRN & Inventory Ledger (critical path),BE-093,BE-093: Implement Bin Card APIs,"Expose REST endpoint(s) for Bin Card: routes, request DTO validation, controller → service wiring, response envelope & status codes, OpenAPI docs. Add integration tests for success, validation errors and permission denial.
 
 Depends on: BE-083, BE-084, BE-085
 Batch: 5 - GRN & Inventory Ledger (critical path)
-Day: 4","BE-083, BE-084, BE-085",Dev-2 (Auth/RBAC),day-4;batch-5;api;backend,Todo
+Day: 4","BE-083, BE-084, BE-085",Dev-4,day-4;batch-5;api;backend,Todo
 4,GRN & Inventory Ledger (critical path),BE-094,BE-094: Implement FIFO Valuation Service,"FIFO cost-layer tracking for valuation (SRS BR-25/C-13 — confirm with Accountant whether FIFO also governs *which* physical lot is issued, or valuation only, before finalizing).
 
 Depends on: BE-086 + valuation policy
 Batch: 5 - GRN & Inventory Ledger (critical path)
-Day: 4",BE-086 + valuation policy,Dev-1 (Platform Lead),day-4;batch-5;service;backend,Todo
+Day: 4",BE-086 + valuation policy,Dev-5,day-4;batch-5;service;backend,Todo
 4,GRN & Inventory Ledger (critical path),BE-095,BE-095: GRN/Inventory Transaction Tests,"Write integration tests for GRN/Inventory Transaction Tests: happy path, validation failures, permission denials, workflow/state violations, and (where stock-affecting) transaction rollback / concurrency.
 
 Depends on: BE-079, BE-087–BE-094
 Batch: 5 - GRN & Inventory Ledger (critical path)
-Day: 4","BE-079, BE-087–BE-094",Dev-4,day-4;batch-5;tests;backend,Todo
+Day: 4","BE-079, BE-087–BE-094",Dev-6,day-4;batch-5;tests;backend,Todo
 5,"Requisition, SIV/ISIV & Issue",BE-096,BE-096: Create Requisition Schema,"Design the Requisition table(s) in PostgreSQL: columns, primary/foreign keys, unique & check constraints, indexes, created_at/updated_at. Write the migration and add seed/fixture data; unit-test valid and invalid inserts.
 
 Depends on: BE-042, BE-045
 Batch: 6 - Requisition, SIV/ISIV & Issue
-Day: 5","BE-042, BE-045",Dev-2 (Auth/RBAC),day-5;batch-6;schema;backend,Todo
+Day: 5","BE-042, BE-045",Dev-7,day-5;batch-6;schema;backend,Todo
 5,"Requisition, SIV/ISIV & Issue",BE-097,BE-097: Create Requisition Lines Schema,"Design the Requisition Lines table(s) in PostgreSQL: columns, primary/foreign keys, unique & check constraints, indexes, created_at/updated_at. Write the migration and add seed/fixture data; unit-test valid and invalid inserts.
 
 Depends on: BE-096, BE-045
 Batch: 6 - Requisition, SIV/ISIV & Issue
-Day: 5","BE-096, BE-045",Dev-3,day-5;batch-6;schema;backend,Todo
+Day: 5","BE-096, BE-045",Dev-2 (Auth/RBAC),day-5;batch-6;schema;backend,Todo
 5,"Requisition, SIV/ISIV & Issue",BE-098,BE-098: Implement Requisition Service,"Implement Requisition as a service: enforce business rules, call the RBAC middleware for permission checks, persist through the repository/data layer (DB transaction if it touches stock), return standard domain error codes. Keep the controller thin.
 
 Depends on: BE-096, BE-097, BE-032
 Batch: 6 - Requisition, SIV/ISIV & Issue
-Day: 5","BE-096, BE-097, BE-032",Dev-6,day-5;batch-6;service;backend,Todo
+Day: 5","BE-096, BE-097, BE-032",Dev-3,day-5;batch-6;service;backend,Todo
 5,"Requisition, SIV/ISIV & Issue",BE-099,BE-099: Implement Requisition Create API,"Expose REST endpoint(s) for Requisition Create: routes, request DTO validation, controller → service wiring, response envelope & status codes, OpenAPI docs. Add integration tests for success, validation errors and permission denial.
 
 Depends on: BE-098
 Batch: 6 - Requisition, SIV/ISIV & Issue
-Day: 5",BE-098,Dev-5,day-5;batch-6;api;backend,Todo
+Day: 5",BE-098,Dev-4,day-5;batch-6;api;backend,Todo
 5,"Requisition, SIV/ISIV & Issue",BE-100,BE-100: Implement Requisition Approval Routing,"On requisition submit, resolve the configured approval authority (Department Head / PAO) and route for decision; persist decision, reason, and timestamp.
 
 Depends on: BE-098, BE-003
 Batch: 6 - Requisition, SIV/ISIV & Issue
-Day: 5","BE-098, BE-003",Dev-7,day-5;batch-6;service;backend,Todo
+Day: 5","BE-098, BE-003",Dev-5,day-5;batch-6;service;backend,Todo
 5,"Requisition, SIV/ISIV & Issue",BE-101,BE-101: Implement Requisition Approve/Reject APIs,"Expose REST endpoint(s) for Requisition Approve/Reject: routes, request DTO validation, controller → service wiring, response envelope & status codes, OpenAPI docs. Add integration tests for success, validation errors and permission denial.
 
 Depends on: BE-100
@@ -508,42 +508,42 @@ Day: 5",BE-100,Dev-6,day-5;batch-6;api;backend,Todo
 
 Depends on: BE-098, BE-017
 Batch: 6 - Requisition, SIV/ISIV & Issue
-Day: 5","BE-098, BE-017",Dev-1 (Platform Lead),day-5;batch-6;service;backend,Todo
+Day: 5","BE-098, BE-017",Dev-7,day-5;batch-6;service;backend,Todo
 5,"Requisition, SIV/ISIV & Issue",BE-103,BE-103: Create SIV/ISIV Schema,"Design the SIV/ISIV table(s) in PostgreSQL: columns, primary/foreign keys, unique & check constraints, indexes, created_at/updated_at. Write the migration and add seed/fixture data; unit-test valid and invalid inserts.
 
 Depends on: BE-096, BE-041
 Batch: 6 - Requisition, SIV/ISIV & Issue
-Day: 5","BE-096, BE-041",Dev-4,day-5;batch-6;schema;backend,Todo
+Day: 5","BE-096, BE-041",Dev-2 (Auth/RBAC),day-5;batch-6;schema;backend,Todo
 5,"Requisition, SIV/ISIV & Issue",BE-104,BE-104: Create SIV/ISIV Lines Schema,"Design the SIV/ISIV Lines table(s) in PostgreSQL: columns, primary/foreign keys, unique & check constraints, indexes, created_at/updated_at. Write the migration and add seed/fixture data; unit-test valid and invalid inserts.
 
 Depends on: BE-103, BE-045
 Batch: 6 - Requisition, SIV/ISIV & Issue
-Day: 5","BE-103, BE-045",Dev-5,day-5;batch-6;schema;backend,Todo
+Day: 5","BE-103, BE-045",Dev-3,day-5;batch-6;schema;backend,Todo
 5,"Requisition, SIV/ISIV & Issue",BE-105,BE-105: Implement SIV/ISIV Service,"Implement SIV/ISIV as a service: enforce business rules, call the RBAC middleware for permission checks, persist through the repository/data layer (DB transaction if it touches stock), return standard domain error codes. Keep the controller thin.
 
 Depends on: BE-103, BE-104, BE-032
 Batch: 6 - Requisition, SIV/ISIV & Issue
-Day: 5","BE-103, BE-104, BE-032",Dev-2 (Auth/RBAC),day-5;batch-6;service;backend,Todo
+Day: 5","BE-103, BE-104, BE-032",Dev-4,day-5;batch-6;service;backend,Todo
 5,"Requisition, SIV/ISIV & Issue",BE-106,BE-106: Implement Preliminary SIV/ISIV API,"Expose REST endpoint(s) for Preliminary SIV/ISIV: routes, request DTO validation, controller → service wiring, response envelope & status codes, OpenAPI docs. Add integration tests for success, validation errors and permission denial.
 
 Depends on: BE-101, BE-105
 Batch: 6 - Requisition, SIV/ISIV & Issue
-Day: 5","BE-101, BE-105",Dev-7,day-5;batch-6;api;backend,Todo
+Day: 5","BE-101, BE-105",Dev-5,day-5;batch-6;api;backend,Todo
 5,"Requisition, SIV/ISIV & Issue",BE-107,BE-107: Implement SIV/ISIV Amendment API,"Expose REST endpoint(s) for SIV/ISIV Amendment: routes, request DTO validation, controller → service wiring, response envelope & status codes, OpenAPI docs. Add integration tests for success, validation errors and permission denial.
 
 Depends on: BE-105, BE-003
 Batch: 6 - Requisition, SIV/ISIV & Issue
-Day: 5","BE-105, BE-003",Dev-1 (Platform Lead),day-5;batch-6;api;backend,Todo
+Day: 5","BE-105, BE-003",Dev-6,day-5;batch-6;api;backend,Todo
 5,"Requisition, SIV/ISIV & Issue",BE-108,BE-108: Implement SIV/ISIV Approval API,"Expose REST endpoint(s) for SIV/ISIV Approval: routes, request DTO validation, controller → service wiring, response envelope & status codes, OpenAPI docs. Add integration tests for success, validation errors and permission denial.
 
 Depends on: BE-105, BE-032
 Batch: 6 - Requisition, SIV/ISIV & Issue
-Day: 5","BE-105, BE-032",Dev-2 (Auth/RBAC),day-5;batch-6;api;backend,Todo
+Day: 5","BE-105, BE-032",Dev-7,day-5;batch-6;api;backend,Todo
 5,"Requisition, SIV/ISIV & Issue",BE-109,BE-109: Implement SIV/ISIV Finalization API,"Convert an approved SIV/ISIV into its final, immutable document/reference number and mark it ready for issue posting.
 
 Depends on: BE-108, BE-086
 Batch: 6 - Requisition, SIV/ISIV & Issue
-Day: 5","BE-108, BE-086",Dev-3,day-5;batch-6;api;backend,Todo
+Day: 5","BE-108, BE-086",Dev-2 (Auth/RBAC),day-5;batch-6;api;backend,Todo
 5,"Requisition, SIV/ISIV & Issue",BE-110,BE-110: Implement Issue Posting Service,"Calls the posting engine (BE-086) to reduce stock exactly once when a SIV/ISIV is finalized; must be idempotent against duplicate calls.
 
 Depends on: BE-109, BE-086
@@ -558,72 +558,72 @@ Day: 5","BE-110, BE-032",Dev-4,day-5;batch-6;api;backend,Todo
 
 Depends on: BE-110, BE-017
 Batch: 6 - Requisition, SIV/ISIV & Issue
-Day: 5","BE-110, BE-017",Dev-4,day-5;batch-6;service;backend,Todo
+Day: 5","BE-110, BE-017",Dev-5,day-5;batch-6;service;backend,Todo
 5,"Requisition, SIV/ISIV & Issue",BE-113,BE-113: Requisition/Issue Integration Tests,"Write integration tests for Requisition/Issue: happy path, validation failures, permission denials, workflow/state violations, and (where stock-affecting) transaction rollback / concurrency.
 
 Depends on: BE-099–BE-112
 Batch: 6 - Requisition, SIV/ISIV & Issue
-Day: 5",BE-099–BE-112,Dev-5,day-5;batch-6;tests;backend,Todo
+Day: 5",BE-099–BE-112,Dev-6,day-5;batch-6;tests;backend,Todo
 6,Returns & Transfers,BE-114,BE-114: Create Return Schema,"Design the Return table(s) in PostgreSQL: columns, primary/foreign keys, unique & check constraints, indexes, created_at/updated_at. Write the migration and add seed/fixture data; unit-test valid and invalid inserts.
 
 Depends on: BE-103, BE-045
 Batch: 7 - Returns & Transfers
-Day: 6","BE-103, BE-045",Dev-4,day-6;batch-7;schema;backend,Todo
+Day: 6","BE-103, BE-045",Dev-7,day-6;batch-7;schema;backend,Todo
 6,Returns & Transfers,BE-115,BE-115: Create Return Lines Schema,"Design the Return Lines table(s) in PostgreSQL: columns, primary/foreign keys, unique & check constraints, indexes, created_at/updated_at. Write the migration and add seed/fixture data; unit-test valid and invalid inserts.
 
 Depends on: BE-114, BE-045
 Batch: 7 - Returns & Transfers
-Day: 6","BE-114, BE-045",Dev-5,day-6;batch-7;schema;backend,Todo
+Day: 6","BE-114, BE-045",Dev-2 (Auth/RBAC),day-6;batch-7;schema;backend,Todo
 6,Returns & Transfers,BE-116,BE-116: Implement Return Service,"Implement Return as a service: enforce business rules, call the RBAC middleware for permission checks, persist through the repository/data layer (DB transaction if it touches stock), return standard domain error codes. Keep the controller thin.
 
 Depends on: BE-114, BE-115, BE-032
 Batch: 7 - Returns & Transfers
-Day: 6","BE-114, BE-115, BE-032",Dev-4,day-6;batch-7;service;backend,Todo
+Day: 6","BE-114, BE-115, BE-032",Dev-3,day-6;batch-7;service;backend,Todo
 6,Returns & Transfers,BE-117,BE-117: Implement Return Request APIs,"Expose REST endpoint(s) for Return Request: routes, request DTO validation, controller → service wiring, response envelope & status codes, OpenAPI docs. Add integration tests for success, validation errors and permission denial.
 
 Depends on: BE-116
 Batch: 7 - Returns & Transfers
-Day: 6",BE-116,Dev-6,day-6;batch-7;api;backend,Todo
+Day: 6",BE-116,Dev-4,day-6;batch-7;api;backend,Todo
 6,Returns & Transfers,BE-118,BE-118: Implement Return Evaluation APIs,"Expose REST endpoint(s) for Return Evaluation: routes, request DTO validation, controller → service wiring, response envelope & status codes, OpenAPI docs. Add integration tests for success, validation errors and permission denial.
 
 Depends on: BE-116, BE-071
 Batch: 7 - Returns & Transfers
-Day: 6","BE-116, BE-071",Dev-7,day-6;batch-7;api;backend,Todo
+Day: 6","BE-116, BE-071",Dev-5,day-6;batch-7;api;backend,Todo
 6,Returns & Transfers,BE-119,BE-119: Implement Return Approval/Disposition APIs,"Expose REST endpoint(s) for Return Approval/Disposition: routes, request DTO validation, controller → service wiring, response envelope & status codes, OpenAPI docs. Add integration tests for success, validation errors and permission denial.
 
 Depends on: BE-118, BE-003
 Batch: 7 - Returns & Transfers
-Day: 6","BE-118, BE-003",Dev-1 (Platform Lead),day-6;batch-7;api;backend,Todo
+Day: 6","BE-118, BE-003",Dev-6,day-6;batch-7;api;backend,Todo
 6,Returns & Transfers,BE-120,BE-120: Implement Return Stock Posting,"Return stock increases only after approval + known disposition (restock/quarantine/disposal) — never on request creation (SRS BR-13).
 
 Depends on: BE-119, BE-086
 Batch: 7 - Returns & Transfers
-Day: 6","BE-119, BE-086",Dev-5,day-6;batch-7;service;backend,Todo
+Day: 6","BE-119, BE-086",Dev-7,day-6;batch-7;service;backend,Todo
 6,Returns & Transfers,BE-121,BE-121: Create Transfer Request Schema,"Design the Transfer Request table(s) in PostgreSQL: columns, primary/foreign keys, unique & check constraints, indexes, created_at/updated_at. Write the migration and add seed/fixture data; unit-test valid and invalid inserts.
 
 Depends on: BE-047, BE-045
 Batch: 7 - Returns & Transfers
-Day: 6","BE-047, BE-045",Dev-6,day-6;batch-7;schema;backend,Todo
+Day: 6","BE-047, BE-045",Dev-2 (Auth/RBAC),day-6;batch-7;schema;backend,Todo
 6,Returns & Transfers,BE-122,BE-122: Create Transfer Lines Schema,"Design the Transfer Lines table(s) in PostgreSQL: columns, primary/foreign keys, unique & check constraints, indexes, created_at/updated_at. Write the migration and add seed/fixture data; unit-test valid and invalid inserts.
 
 Depends on: BE-121, BE-045
 Batch: 7 - Returns & Transfers
-Day: 6","BE-121, BE-045",Dev-7,day-6;batch-7;schema;backend,Todo
+Day: 6","BE-121, BE-045",Dev-3,day-6;batch-7;schema;backend,Todo
 6,Returns & Transfers,BE-123,BE-123: Implement Transfer Service,"Implement Transfer as a service: enforce business rules, call the RBAC middleware for permission checks, persist through the repository/data layer (DB transaction if it touches stock), return standard domain error codes. Keep the controller thin.
 
 Depends on: BE-121, BE-122, BE-032
 Batch: 7 - Returns & Transfers
-Day: 6","BE-121, BE-122, BE-032",Dev-6,day-6;batch-7;service;backend,Todo
+Day: 6","BE-121, BE-122, BE-032",Dev-4,day-6;batch-7;service;backend,Todo
 6,Returns & Transfers,BE-124,BE-124: Implement Transfer Request APIs,"Expose REST endpoint(s) for Transfer Request: routes, request DTO validation, controller → service wiring, response envelope & status codes, OpenAPI docs. Add integration tests for success, validation errors and permission denial.
 
 Depends on: BE-123
 Batch: 7 - Returns & Transfers
-Day: 6",BE-123,Dev-2 (Auth/RBAC),day-6;batch-7;api;backend,Todo
+Day: 6",BE-123,Dev-5,day-6;batch-7;api;backend,Todo
 6,Returns & Transfers,BE-125,BE-125: Implement Transfer Approval API,"Expose REST endpoint(s) for Transfer Approval: routes, request DTO validation, controller → service wiring, response envelope & status codes, OpenAPI docs. Add integration tests for success, validation errors and permission denial.
 
 Depends on: BE-123, BE-003
 Batch: 7 - Returns & Transfers
-Day: 6","BE-123, BE-003",Dev-3,day-6;batch-7;api;backend,Todo
+Day: 6","BE-123, BE-003",Dev-6,day-6;batch-7;api;backend,Todo
 6,Returns & Transfers,BE-126,BE-126: Implement Transfer Execution Posting,"Calls the posting engine for both the source (decrease) and destination (increase) legs of a transfer as one atomic operation (SRS BR-15).
 
 Depends on: BE-125, BE-086
@@ -633,32 +633,32 @@ Day: 6","BE-125, BE-086",Dev-7,day-6;batch-7;service;backend,Todo
 
 Depends on: BE-126, BE-088, BE-089
 Batch: 7 - Returns & Transfers
-Day: 6","BE-126, BE-088, BE-089",Dev-1 (Platform Lead),day-6;batch-7;service;backend,Todo
+Day: 6","BE-126, BE-088, BE-089",Dev-2 (Auth/RBAC),day-6;batch-7;service;backend,Todo
 6,Returns & Transfers,BE-128,BE-128: Return/Transfer Integration Tests,"Write integration tests for Return/Transfer: happy path, validation failures, permission denials, workflow/state violations, and (where stock-affecting) transaction rollback / concurrency.
 
 Depends on: BE-120, BE-124–BE-127
 Batch: 7 - Returns & Transfers
-Day: 6","BE-120, BE-124–BE-127",Dev-2 (Auth/RBAC),day-6;batch-7;tests;backend,Todo
+Day: 6","BE-120, BE-124–BE-127",Dev-3,day-6;batch-7;tests;backend,Todo
 6,"Assets, Shelf Life & Disposal",BE-129,BE-129: Create Fixed Assets Schema,"Design the Fixed Assets table(s) in PostgreSQL: columns, primary/foreign keys, unique & check constraints, indexes, created_at/updated_at. Write the migration and add seed/fixture data; unit-test valid and invalid inserts.
 
 Depends on: BE-077, BE-045, BE-047
 Batch: 8 - Assets, Shelf Life & Disposal
-Day: 6","BE-077, BE-045, BE-047",Dev-1 (Platform Lead),day-6;batch-8;schema;backend,Todo
+Day: 6","BE-077, BE-045, BE-047",Dev-4,day-6;batch-8;schema;backend,Todo
 6,"Assets, Shelf Life & Disposal",BE-130,BE-130: Implement Asset Registration Service/API,"Expose REST endpoint(s) for Asset Registration Service/API: routes, request DTO validation, controller → service wiring, response envelope & status codes, OpenAPI docs. Add integration tests for success, validation errors and permission denial.
 
 Depends on: BE-129, BE-032
 Batch: 8 - Assets, Shelf Life & Disposal
-Day: 6","BE-129, BE-032",Dev-4,day-6;batch-8;api;backend,Todo
+Day: 6","BE-129, BE-032",Dev-5,day-6;batch-8;api;backend,Todo
 6,"Assets, Shelf Life & Disposal",BE-131,BE-131: Implement Asset Lifecycle API,"Expose REST endpoint(s) for Asset Lifecycle: routes, request DTO validation, controller → service wiring, response envelope & status codes, OpenAPI docs. Add integration tests for success, validation errors and permission denial.
 
 Depends on: BE-130
 Batch: 8 - Assets, Shelf Life & Disposal
-Day: 6",BE-130,Dev-5,day-6;batch-8;api;backend,Todo
+Day: 6",BE-130,Dev-6,day-6;batch-8;api;backend,Todo
 6,"Assets, Shelf Life & Disposal",BE-132,BE-132: Create Shelf-Life Schema,"Design the Shelf-Life table(s) in PostgreSQL: columns, primary/foreign keys, unique & check constraints, indexes, created_at/updated_at. Write the migration and add seed/fixture data; unit-test valid and invalid inserts.
 
 Depends on: BE-045
 Batch: 8 - Assets, Shelf Life & Disposal
-Day: 6",BE-045,Dev-2 (Auth/RBAC),day-6;batch-8;schema;backend,Todo
+Day: 6",BE-045,Dev-7,day-6;batch-8;schema;backend,Todo
 6,"Assets, Shelf Life & Disposal",BE-133,BE-133: Implement Shelf-Life Monitoring Service,"Implement Shelf-Life Monitoring as a service: enforce business rules, call the RBAC middleware for permission checks, persist through the repository/data layer (DB transaction if it touches stock), return standard domain error codes. Keep the controller thin.
 
 Depends on: BE-132
@@ -678,7 +678,7 @@ Day: 6","BE-133, BE-134",Dev-4,day-6;batch-8;service;backend,Todo
 
 Depends on: BE-135
 Batch: 8 - Assets, Shelf Life & Disposal
-Day: 6",BE-135,Dev-3,day-6;batch-8;schema;backend,Todo
+Day: 6",BE-135,Dev-5,day-6;batch-8;schema;backend,Todo
 6,"Assets, Shelf Life & Disposal",BE-137,BE-137: Implement Disposal Request API,"Expose REST endpoint(s) for Disposal Request: routes, request DTO validation, controller → service wiring, response envelope & status codes, OpenAPI docs. Add integration tests for success, validation errors and permission denial.
 
 Depends on: BE-136, BE-032
@@ -693,59 +693,59 @@ Day: 6","BE-137, BE-003",Dev-7,day-6;batch-8;api;backend,Todo
 
 Depends on: BE-138, BE-086
 Batch: 8 - Assets, Shelf Life & Disposal
-Day: 6","BE-138, BE-086",Dev-5,day-6;batch-8;service;backend,Todo
+Day: 6","BE-138, BE-086",Dev-2 (Auth/RBAC),day-6;batch-8;service;backend,Todo
 6,"Assets, Shelf Life & Disposal",BE-140,BE-140: Implement Disposal Evidence/Completion API,"Expose REST endpoint(s) for Disposal Evidence/Completion: routes, request DTO validation, controller → service wiring, response envelope & status codes, OpenAPI docs. Add integration tests for success, validation errors and permission denial.
 
 Depends on: BE-139
 Batch: 8 - Assets, Shelf Life & Disposal
-Day: 6",BE-139,Dev-1 (Platform Lead),day-6;batch-8;api;backend,Todo
+Day: 6",BE-139,Dev-3,day-6;batch-8;api;backend,Todo
 6,"Assets, Shelf Life & Disposal",BE-141,BE-141: Asset/Shelf-Life/Disposal Integration Tests,"Write integration tests for Asset/Shelf-Life/Disposal: happy path, validation failures, permission denials, workflow/state violations, and (where stock-affecting) transaction rollback / concurrency.
 
 Depends on: BE-130–BE-140
 Batch: 8 - Assets, Shelf Life & Disposal
-Day: 6",BE-130–BE-140,Dev-3,day-6;batch-8;tests;backend,Todo
+Day: 6",BE-130–BE-140,Dev-4,day-6;batch-8;tests;backend,Todo
 7,"Stock Taking, Reports, Notifications & Final Integration",BE-142,BE-142: Create Stock-Taking Schema,"Design the Stock-Taking table(s) in PostgreSQL: columns, primary/foreign keys, unique & check constraints, indexes, created_at/updated_at. Write the migration and add seed/fixture data; unit-test valid and invalid inserts.
 
 Depends on: BE-047, BE-081
 Batch: 9 - Stock Taking, Reports, Notifications & Final Integration
-Day: 7","BE-047, BE-081",Dev-6,day-7;batch-9;schema;backend,Todo
+Day: 7","BE-047, BE-081",Dev-5,day-7;batch-9;schema;backend,Todo
 7,"Stock Taking, Reports, Notifications & Final Integration",BE-143,BE-143: Create Stock-Taking Lines Schema,"Design the Stock-Taking Lines table(s) in PostgreSQL: columns, primary/foreign keys, unique & check constraints, indexes, created_at/updated_at. Write the migration and add seed/fixture data; unit-test valid and invalid inserts.
 
 Depends on: BE-142, BE-045
 Batch: 9 - Stock Taking, Reports, Notifications & Final Integration
-Day: 7","BE-142, BE-045",Dev-7,day-7;batch-9;schema;backend,Todo
+Day: 7","BE-142, BE-045",Dev-6,day-7;batch-9;schema;backend,Todo
 7,"Stock Taking, Reports, Notifications & Final Integration",BE-144,BE-144: Implement Stock-Taking Service/API,"Expose REST endpoint(s) for Stock-Taking Service/API: routes, request DTO validation, controller → service wiring, response envelope & status codes, OpenAPI docs. Add integration tests for success, validation errors and permission denial.
 
 Depends on: BE-142, BE-143, BE-032
 Batch: 9 - Stock Taking, Reports, Notifications & Final Integration
-Day: 7","BE-142, BE-143, BE-032",Dev-5,day-7;batch-9;api;backend,Todo
+Day: 7","BE-142, BE-143, BE-032",Dev-7,day-7;batch-9;api;backend,Todo
 7,"Stock Taking, Reports, Notifications & Final Integration",BE-145,BE-145: Implement Physical Count and Variance Calculation,"Stock-take session captures physical counts per line; compute variance = physical − system; require authorized reconciliation before any adjustment posts (SRS BR-19).
 
 Depends on: BE-144, BE-088
 Batch: 9 - Stock Taking, Reports, Notifications & Final Integration
-Day: 7","BE-144, BE-088",Dev-1 (Platform Lead),day-7;batch-9;service;backend,Todo
+Day: 7","BE-144, BE-088",Dev-2 (Auth/RBAC),day-7;batch-9;service;backend,Todo
 7,"Stock Taking, Reports, Notifications & Final Integration",BE-146,BE-146: Implement Reconciliation Approval API,"Expose REST endpoint(s) for Reconciliation Approval: routes, request DTO validation, controller → service wiring, response envelope & status codes, OpenAPI docs. Add integration tests for success, validation errors and permission denial.
 
 Depends on: BE-145, BE-003
 Batch: 9 - Stock Taking, Reports, Notifications & Final Integration
-Day: 7","BE-145, BE-003",Dev-6,day-7;batch-9;api;backend,Todo
+Day: 7","BE-145, BE-003",Dev-3,day-7;batch-9;api;backend,Todo
 7,"Stock Taking, Reports, Notifications & Final Integration",BE-147,BE-147: Implement Inventory Adjustment Posting,"Approved variances post through the transaction posting engine (BE-086) as authorized adjustment records — never a direct UPDATE on balances.
 
 Depends on: BE-146, BE-086
 Batch: 9 - Stock Taking, Reports, Notifications & Final Integration
-Day: 7","BE-146, BE-086",Dev-2 (Auth/RBAC),day-7;batch-9;service;backend,Todo
+Day: 7","BE-146, BE-086",Dev-4,day-7;batch-9;service;backend,Todo
 7,"Stock Taking, Reports, Notifications & Final Integration",BE-148,BE-148: Implement Inventory Valuation API,"Expose REST endpoint(s) for Inventory Valuation: routes, request DTO validation, controller → service wiring, response envelope & status codes, OpenAPI docs. Add integration tests for success, validation errors and permission denial.
 
 Depends on: BE-094, BE-085
 Batch: 9 - Stock Taking, Reports, Notifications & Final Integration
-Day: 7","BE-094, BE-085",Dev-7,day-7;batch-9;api;backend,Todo
+Day: 7","BE-094, BE-085",Dev-5,day-7;batch-9;api;backend,Todo
 7,"Stock Taking, Reports, Notifications & Final Integration",BE-149,BE-149: Implement Reporting Service,"Cross-module reporting service (stock, movement, valuation, requisition/issue, returns, transfers, assets, disposal, stock-take) — pure read queries, no business-rule side effects.
 
 Depends on: BE-085, BE-098, BE-105, BE-116, BE-123, BE-130, BE-137, BE-144
 Batch: 9 - Stock Taking, Reports, Notifications & Final Integration
-Day: 7","BE-085, BE-098, BE-105, BE-116, BE-123, BE-130, BE-137, BE-144",Dev-3,day-7;batch-9;service;backend,Todo
+Day: 7","BE-085, BE-098, BE-105, BE-116, BE-123, BE-130, BE-137, BE-144",Dev-6,day-7;batch-9;service;backend,Todo
 7,"Stock Taking, Reports, Notifications & Final Integration",BE-150,"BE-150: Implement Notifications, Audit Reporting & Final Backend Integration","Wire notification events (approval pending, low stock, shelf-life, disposal) into the audit/notification tables, and do a full backend regression pass across every domain service before declaring Batch 9 done.
 
 Depends on: BE-149, BE-017, all completed domain services
 Batch: 9 - Stock Taking, Reports, Notifications & Final Integration
-Day: 7","BE-149, BE-017, all completed domain services",Dev-4,day-7;batch-9;service;backend,Todo
+Day: 7","BE-149, BE-017, all completed domain services",Dev-7,day-7;batch-9;service;backend,Todo

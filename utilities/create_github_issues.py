@@ -19,17 +19,18 @@ import sys
 # ---------------- CONFIG: edit these ----------------
 REPO = "astu-ict-stock-mgt/stock-mgt-team-a"     # owner/repo
 PROJECT_OWNER = "astu-ict-stock-mgt"              # org or user that owns the Project
-PROJECT_NUMBER = "1"                              # Project number, from its URL
+PROJECT_NUMBER = "3"                              # Project number, from its URL
 CSV_FILE = "backend_150_tasks_kanban.csv"
 
 OWNER_MAP = {
-    "Dev-1 (Platform Lead)": "github-username-1",
-    "Dev-2 (Auth/RBAC)": "github-username-2",
-    "Dev-3": "github-username-3",
-    "Dev-4": "github-username-4",
-    "Dev-5": "github-username-5",
-    "Dev-6": "github-username-6",
-    "Dev-7": "github-username-7",
+    "Dev-1 (Platform Lead)": "samgirma",
+    "Dev-2 (Auth/RBAC)": "abdulkadr53",
+    "Dev-3": "Ibsa10",
+    "Dev-4": "haabmikaa",
+    "Dev-5": "yenus462",
+    "Dev-6": "Dave-cse-21",
+    "Dev-7": "YeabkalTibebu",
+    "Dev-8": "dagim-hg",
 }
 # ------------------------------------------------------
 
@@ -69,8 +70,9 @@ def main():
                 "--repo", REPO,
                 "--title", title,
                 "--body", body,
-                "--label", labels,
             ]
+            for label in labels.split(";"):
+                cmd += ["--label", label.strip()]
             if gh_user:
                 cmd += ["--assignee", gh_user]
 
