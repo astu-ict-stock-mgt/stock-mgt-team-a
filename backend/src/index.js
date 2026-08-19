@@ -1,13 +1,13 @@
 /**
  * Backend Server Entrypoint
- * Task: BE-006 (Initialize Node.js/Express Backend)
+ * Tasks: BE-006 & BE-009 (Environment Management)
  */
 
+import { env } from './config/env.js'
 import app from './app.js'
 
-const PORT = process.env.PORT || 3001
-
-app.listen(PORT, () => {
-  console.log(`🚀 Stock Management System API running at http://localhost:${PORT}`)
-  console.log(`🏥 Health Check Endpoint: http://localhost:${PORT}/api/health`)
+app.listen(env.PORT, () => {
+  console.log(`🚀 Stock Management System API running in [${env.NODE_ENV}] mode`)
+  console.log(`📡 URL: http://localhost:${env.PORT}`)
+  console.log(`🏥 Health Check Endpoint: http://localhost:${env.PORT}/api/health`)
 })
