@@ -1,11 +1,16 @@
 /**
  * Health Check Domain Controller
- * Task: BE-007
+ * Tasks: BE-007 & BE-010
  */
 
 import { getSystemHealth } from './health.service.js'
 
-export const getHealth = (req, res) => {
-  const healthData = getSystemHealth()
-  res.status(200).json(healthData)
+export const getHealth = async (req, res, next) => {
+  try {
+    const healthData = await getSystemHealth()
+    const statusCode = healthData.status === 'ok' ? 200 : 503
+    res.status(statusCode).json(healthData)
+  } catch (err) {
+    next(err)
+  }
 }

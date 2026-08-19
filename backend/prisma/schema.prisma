@@ -1,3 +1,6 @@
+// Stock Management System (SMS) - Prisma Database Schema
+// Task: BE-010 (Configure PostgreSQL Connection)
+
 generator client {
   provider = "prisma-client-js"
 }
@@ -5,4 +8,15 @@ generator client {
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
+}
+
+// Initial System Health / Setting Model for Database Connectivity Verification
+model SystemSetting {
+  id        String   @id @default(uuid())
+  key       String   @unique
+  value     String
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("system_settings")
 }
