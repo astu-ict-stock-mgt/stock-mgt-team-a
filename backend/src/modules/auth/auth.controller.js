@@ -1,26 +1,32 @@
 /**
  * Auth & User Domain Controller
- * Task: BE-007
+ * Tasks: BE-007 & BE-016
  */
 
 import { fetchRoles, fetchPermissions, fetchMatrix, fetchRoleDetails } from './auth.service.js'
+import { sendSuccess } from '../../utils/response.js'
+import { NotFoundError } from '../../utils/errors.js'
 
 export const getRoles = (req, res) => {
-  res.json({ success: true, data: fetchRoles() })
+  sendSuccess(res, fetchRoles())
 }
 
 export const getPermissions = (req, res) => {
-  res.json({ success: true, data: fetchPermissions() })
+  sendSuccess(res, fetchPermissions())
 }
 
 export const getMatrix = (req, res) => {
-  res.json({ success: true, data: fetchMatrix() })
+  sendSuccess(res, fetchMatrix())
 }
 
-export const getRoleByCode = (req, res) => {
-  const details = fetchRoleDetails(req.params.roleCode)
-  if (!details) {
-    return res.status(404).json({ success: false, error: 'Role not found' })
+export const getRoleByCode = (req, res, next) => {
+  try {
+    const details = fetchRoleDetails(req.params.roleCode)
+    if (!details) {
+      throw new NotFoundError(`Role with code '${req.params.roleCode}' not found`)
+    }
+    sendSuccess(res, details)
+  } catch (err) {
+    next(err)
   }
-  res.json({ success: true, data: details })
 }
