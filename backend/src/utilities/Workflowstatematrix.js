@@ -4,11 +4,16 @@
  * Encodes the Inventory entity state model from SRS §3.6.3 (State Chart Diagram)
  * as an explicit, enforceable state machine.
  *
- * Stack per SRS §1.5.1 / §4.4.3: Node.js + Express.js (backend), PostgreSQL (database).
- * Entity mapping per SRS §4.4.4 (Persistence Data Management) and §4.4.5 (Database Mapping):
- *   Inventory        -> inventories
- *   StockTransaction  -> stock_transactions   (every transition is logged here)
- *   AuditLog          -> audit_logs           (every transition is logged here, per §3.1 Audit Management)
+ * Stack per repo README: Node.js + Express.js (backend), Prisma ORM,
+ * PostgreSQL 16 (database). [Previous version of this file used raw `pg` —
+ * WRONG for this repo. This version uses Prisma Client, matching what's
+ * actually installed under backend/prisma/schema.prisma.]
+ *
+ * Entity mapping per SRS §4.4.4 (Persistence Data Management) / §4.4.5
+ * (Database Mapping):
+ *   Inventory         -> inventories        (Prisma model: Inventory)
+ *   StockTransaction  -> stock_transactions (Prisma model: StockTransaction) — every transition logged here
+ *   AuditLog          -> audit_logs         (Prisma model: AuditLog)        — every transition logged here, per §3.1
  *
  * Business rule references (SRS §2.5):
  *   Rule 1  - unique item code
@@ -20,22 +25,27 @@
  *   Rule 11 - materials leaving the org require an authorized gate pass
  *   Rule 12 - discrepancies must be investigated and corrected
  *
- * IMPORTANT / OPEN ITEMS (do not silently resolve — see conversation):
- *   - Transitions RESERVED -> AVAILABLE (cancellation), DAMAGED -> DISPOSED,
- *     and OBSOLETE -> DISPOSED are NOT explicitly enumerated in the SRS text.
- *     They are inferred from the listed states and general business rules.
- *     The source diagram (media/image7.png) has not been visually verified
- *     against this table. Treat these three transitions as provisional.
- *   - This module implements ONLY the single Inventory state model that
- *     exists in the SRS. It does NOT implement separate Goods Receipt,
- *     Requisition, SIV/ISIV, Return, Transfer, or Disposal state models —
- *     those are not present in the source SRS.
+ * CONTENT BOUNDARY — nothing added beyond, nothing cut from, the SRS:
+ *   - Exactly 7 states, exactly 10 transitions — identical to the SRS-only
+ *     matrix file (inventoryStateMatrix_oldSRS.js). No Goods Receipt,
+ *     Requisition, SIV/ISIV, Return, Transfer, or Disposal entities here —
+ *     those are not in the SRS.
+ *   - 3 of the 10 transitions (RESERVED->AVAILABLE cancellation,
+ *     DAMAGED->DISPOSED, OBSOLETE->DISPOSED) are marked `inferred: true`.
+ *     The SRS lists these states but never enumerates a transition table —
+ *     only the state list exists in text; the diagram (media/image7.png)
+ *     has not been visually verified against this table.
+ *   - The class/method structure below (transition(), guard checks,
+ *     error type) is NOT SRS content — the SRS specifies WHAT rules apply
+ *     (§2.5), not HOW to enforce them in code. This is implementation
+ *     built to satisfy those rules (e.g. Rule 3 authorization check,
+ *     Rule 5 logging requirement), not extracted from the document.
  */
 
 'use strict';
 
 // ---------------------------------------------------------------------------
-// 1. States (SRS §3.6.3 "Inventory States")
+// 1. States (SRS §3.6.3 "Inventory States") — unchanged from SRS-only matrix
 // ---------------------------------------------------------------------------
 const InventoryState = Object.freeze({
   CREATED: 'CREATED',
@@ -48,11 +58,10 @@ const InventoryState = Object.freeze({
 });
 
 // ---------------------------------------------------------------------------
-// 2. Transition table (single source of truth)
+// 2. Transition table (single source of truth) — unchanged from SRS-only matrix
 //    key: `${fromState}->${event}`  value: { to, actorRoles, guard, srsRef }
 // ---------------------------------------------------------------------------
 const TRANSITIONS = {
-  // Item registered into the system
   [`${null}->REGISTER`]: {
     to: InventoryState.CREATED,
     actorRoles: ['Storekeeper', 'Administrator'],
@@ -61,7 +70,6 @@ const TRANSITIONS = {
     inferred: false,
   },
 
-  // Created -> Available: goods received & inspected
   [`${InventoryState.CREATED}->INSPECT_PASS`]: {
     to: InventoryState.AVAILABLE,
     actorRoles: ['Storekeeper'],
@@ -70,7 +78,6 @@ const TRANSITIONS = {
     inferred: false,
   },
 
-  // Available -> Reserved: approved requisition received
   [`${InventoryState.AVAILABLE}->RESERVE`]: {
     to: InventoryState.RESERVED,
     actorRoles: ['Storekeeper'],
@@ -79,7 +86,6 @@ const TRANSITIONS = {
     inferred: false,
   },
 
-  // Reserved -> Issued: item handed over
   [`${InventoryState.RESERVED}->ISSUE`]: {
     to: InventoryState.ISSUED,
     actorRoles: ['Storekeeper'],
@@ -88,7 +94,6 @@ const TRANSITIONS = {
     inferred: false,
   },
 
-  // Reserved -> Available: requisition cancelled/rejected before issue
   [`${InventoryState.RESERVED}->CANCEL_RESERVATION`]: {
     to: InventoryState.AVAILABLE,
     actorRoles: ['Storekeeper', 'Property Administration Officer'],
@@ -97,7 +102,6 @@ const TRANSITIONS = {
     inferred: true,
   },
 
-  // Available -> Damaged: found damaged while in stock
   [`${InventoryState.AVAILABLE}->REPORT_DAMAGE`]: {
     to: InventoryState.DAMAGED,
     actorRoles: ['Storekeeper', 'Stock Clerk'],
@@ -106,7 +110,6 @@ const TRANSITIONS = {
     inferred: false,
   },
 
-  // Issued -> Damaged: found damaged after issue / on return
   [`${InventoryState.ISSUED}->REPORT_DAMAGE`]: {
     to: InventoryState.DAMAGED,
     actorRoles: ['Storekeeper'],
@@ -115,7 +118,6 @@ const TRANSITIONS = {
     inferred: false,
   },
 
-  // Available -> Obsolete: aged / no longer usable
   [`${InventoryState.AVAILABLE}->MARK_OBSOLETE`]: {
     to: InventoryState.OBSOLETE,
     actorRoles: ['Property Administration Officer'],
@@ -124,7 +126,6 @@ const TRANSITIONS = {
     inferred: false,
   },
 
-  // Damaged -> Disposed
   [`${InventoryState.DAMAGED}->DISPOSE`]: {
     to: InventoryState.DISPOSED,
     actorRoles: ['Property Administration Officer', 'Accountant'],
@@ -133,7 +134,6 @@ const TRANSITIONS = {
     inferred: true,
   },
 
-  // Obsolete -> Disposed
   [`${InventoryState.OBSOLETE}->DISPOSE`]: {
     to: InventoryState.DISPOSED,
     actorRoles: ['Property Administration Officer', 'Accountant'],
@@ -147,20 +147,20 @@ const TRANSITIONS = {
 const TERMINAL_STATES = Object.freeze([InventoryState.DISPOSED]);
 
 // ---------------------------------------------------------------------------
-// 3. State machine engine
+// 3. State machine engine — Prisma-backed (implementation, not SRS content)
 // ---------------------------------------------------------------------------
 class InventoryStateMachine {
   /**
    * @param {object} deps
-   * @param {object} deps.db - pg client/pool with a `query(text, params)` method
+   * @param {import('@prisma/client').PrismaClient} deps.prisma
    */
-  constructor({ db }) {
-    this.db = db;
+  constructor({ prisma }) {
+    this.prisma = prisma;
   }
 
   /**
-   * Validate + apply a transition. Does not commit unless a transaction
-   * client is passed in as deps.db (caller controls BEGIN/COMMIT).
+   * Validate + apply a transition. Pass a `$transaction`-scoped Prisma
+   * client as `deps.prisma` if the caller wants atomic commit control.
    *
    * @param {string|null} currentState - current InventoryState, or null for REGISTER
    * @param {string} event - transition event name, e.g. 'ISSUE'
@@ -168,7 +168,7 @@ class InventoryStateMachine {
    * @param {string} context.actorRole - role of the user performing the action
    * @param {string} context.inventoryId
    * @param {string} context.userId
-   * @param {function} [context.checkGuard] - optional async fn(context) => boolean
+   * @param {function} [context.checkGuard] - optional async fn(context, rule) => boolean
    *        for guards that need DB lookups (e.g. "requisition is APPROVED")
    */
   async transition(currentState, event, context) {
@@ -204,23 +204,29 @@ class InventoryStateMachine {
     }
 
     // Persist new state + audit trail (Rule 5, Rule 12, §3.1 Audit Management)
-    await this.db.query(
-      `UPDATE inventories SET status = $1, updated_at = now() WHERE id = $2`,
-      [rule.to, context.inventoryId]
-    );
+    await this.prisma.inventory.update({
+      where: { id: context.inventoryId },
+      data: { status: rule.to, updatedAt: new Date() },
+    });
 
-    await this.db.query(
-      `INSERT INTO stock_transactions
-         (inventory_id, transaction_type, from_status, to_status, performed_by, created_at)
-       VALUES ($1, $2, $3, $4, $5, now())`,
-      [context.inventoryId, event, currentState, rule.to, context.userId]
-    );
+    await this.prisma.stockTransaction.create({
+      data: {
+        inventoryId: context.inventoryId,
+        transactionType: event,
+        fromStatus: currentState,
+        toStatus: rule.to,
+        performedBy: context.userId,
+      },
+    });
 
-    await this.db.query(
-      `INSERT INTO audit_logs (entity, entity_id, action, performed_by, created_at)
-       VALUES ('Inventory', $1, $2, $3, now())`,
-      [context.inventoryId, event, context.userId]
-    );
+    await this.prisma.auditLog.create({
+      data: {
+        entity: 'Inventory',
+        entityId: context.inventoryId,
+        action: event,
+        performedBy: context.userId,
+      },
+    });
 
     return { from: currentState, to: rule.to, event, inferred: !!rule.inferred };
   }
