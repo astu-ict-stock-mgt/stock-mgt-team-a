@@ -1,19 +1,39 @@
-import jwt from 'jsonwebtoken'
+/**
+ * Session & Bearer JWT Token Validation Middleware
+ * Task: BE-029 (Implement Session/Token Validation)
+ * SRS Traceability: FR-03 (Session Management), Section 13 (Security Requirements)
+ */
 
-export const authenticateToken = (req, res, next) => {
-  const authHeader = req.headers['authorization']
-  const token = authHeader && authHeader.split(' ')[1]
+import { verifyAuthToken } from '../modules/auth/auth.service.js'
+import { UnauthorizedError } from '../utils/errors.js'
 
-  if (!token) {
-    return res.status(401).json({ message: 'Access token missing or invalid' })
-  }
-
+/**
+ * Authenticate incoming requests by inspecting Bearer JWT token
+ * @param {Object} req - Express Request
+ * @param {Object} res - Express Response
+ * @param {Function} next - Express Next Function
+ */
+export const authenticate = (req, res, next) => {
   try {
-    const secret = process.env.JWT_SECRET || 'your_jwt_secret'
-    const decoded = jwt.verify(token, secret)
-    req.user = decoded
+    const authHeader = req.headers.authorization || req.headers.Authorization
+
+    if (!authHeader || typeof authHeader !== 'string' || !authHeader.startsWith('Bearer ')) {
+      throw new UnauthorizedError('Authentication token required')
+    }
+
+    const token = authHeader.split(' ')[1]
+    if (!token) {
+      throw new UnauthorizedError('Authentication token required')
+    }
+
+    // Verify token signature and expiration
+    const decodedPayload = verifyAuthToken(token)
+
+    // Attach validated identity context to request object
+    req.user = decodedPayload
+
     next()
-  } catch (error) {
-    return res.status(403).json({ message: 'Invalid or expired token' })
+  } catch (err) {
+    next(err)
   }
 }
