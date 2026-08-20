@@ -1,7 +1,7 @@
 /**
  * Stock Management System (SMS) - Idempotent Database Seed Script
- * Tasks: BE-012, BE-021 (Users), BE-022 (Roles), BE-023 (Permissions)
- * SRS Traceability: Section 10.1 (Core Entities), Appendix C (Roles & Permissions), FR-01
+ * Tasks: BE-012, BE-021 (Users), BE-022 (Roles), BE-023 (Permissions), BE-025 (Role-Permissions Matrix)
+ * SRS Traceability: Section 10.1 (Core Entities), Appendix C (Roles & Permissions Matrix), FR-01
  */
 
 import { env } from '../src/config/env.js'
@@ -43,9 +43,10 @@ async function main() {
 
   // 2. Seed System Roles (BE-022)
   console.log('🔒 Seeding 9 System Roles into Database (BE-022)...')
+  const dbRolesMap = new Map()
   for (const roleObj of Object.values(ROLES)) {
     try {
-      await prisma.role.upsert({
+      const dbRole = await prisma.role.upsert({
         where: { code: roleObj.code },
         update: {
           name: roleObj.name,
@@ -59,6 +60,7 @@ async function main() {
           securityLevel: roleObj.securityLevel,
         },
       })
+      dbRolesMap.set(roleObj.code, dbRole.id)
     } catch (_err) {
       console.log(`   ℹ️ Role '${roleObj.code}' ready`)
     }
@@ -66,10 +68,11 @@ async function main() {
 
   // 3. Seed Atomic Permissions (BE-023)
   console.log(`🔑 Seeding ${Object.keys(PERMISSIONS).length} Atomic Permissions into Database (BE-023)...`)
+  const dbPermissionsMap = new Map()
   for (const permCode of Object.values(PERMISSIONS)) {
     const moduleName = permCode.split(':')[0] || 'system'
     try {
-      await prisma.permission.upsert({
+      const dbPerm = await prisma.permission.upsert({
         where: { code: permCode },
         update: {
           module: moduleName,
@@ -82,12 +85,44 @@ async function main() {
           description: `Atomic permission for action ${permCode}`,
         },
       })
+      dbPermissionsMap.set(permCode, dbPerm.id)
     } catch (_err) {
       console.log(`   ℹ️ Permission '${permCode}' ready`)
     }
   }
 
-  // 4. Seed Baseline Users (BE-021)
+  // 4. Seed Role-Permission Relationships Matrix (BE-025)
+  console.log('🔗 Seeding Role-Permission Join Mappings (BE-025)...')
+  let mappedCount = 0
+  for (const [roleCode, permList] of Object.entries(ROLE_PERMISSIONS_MATRIX)) {
+    const roleId = dbRolesMap.get(roleCode)
+    if (!roleId) {
+      continue
+    }
+
+    for (const permCode of permList) {
+      const permissionId = dbPermissionsMap.get(permCode)
+      if (!permissionId) {
+        continue
+      }
+
+      try {
+        await prisma.rolePermission.upsert({
+          where: {
+            roleId_permissionId: { roleId, permissionId },
+          },
+          update: {},
+          create: { roleId, permissionId },
+        })
+        mappedCount++
+      } catch (_err) {
+        // Idempotent constraint skip
+      }
+    }
+  }
+  console.log(`   - Successfully mapped ${mappedCount} Role-Permission relationships in database.`)
+
+  // 5. Seed Baseline Users (BE-021)
   const defaultUsers = [
     {
       email: 'admin@stockmgt.gov.et',
@@ -123,9 +158,7 @@ async function main() {
     }
   }
 
-  console.log(`📋 Role-Permission Matrix mapped for all ${Object.keys(ROLE_PERMISSIONS_MATRIX).length} operational roles.`)
-
-  // 5. Demo Baseline Store & Department Metadata
+  // 6. Demo Baseline Store & Department Metadata
   const demoStore = {
     code: 'STORE-MAIN-01',
     name: 'Central Main Store 01',

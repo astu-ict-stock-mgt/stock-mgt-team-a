@@ -1,6 +1,6 @@
 // Stock Management System (SMS) - Prisma Database Schema
-// Tasks: BE-010, BE-021 (Users Schema), BE-022 (Roles Schema), BE-023 (Permissions Schema)
-// SRS Traceability: Section 10.1 (Core Entities), Appendix C (Permissions Matrix)
+// Tasks: BE-010, BE-021 (Users), BE-022 (Roles), BE-023 (Permissions), BE-025 (Role-Permissions Join Table)
+// SRS Traceability: Section 10.1 (Core Entities), Appendix C (Role-Permission Matrix)
 
 generator client {
   provider = "prisma-client-js"
@@ -43,26 +43,41 @@ model User {
 
 // Role Model (BE-022)
 model Role {
-  id            String   @id @default(uuid())
-  code          String   @unique
-  name          String
-  description   String?
-  securityLevel Int      @default(10) @map("security_level")
-  createdAt     DateTime @default(now()) @map("created_at")
-  updatedAt     DateTime @updatedAt @map("updated_at")
+  id              String           @id @default(uuid())
+  code            String           @unique
+  name            String
+  description     String?
+  securityLevel   Int              @default(10) @map("security_level")
+  createdAt       DateTime         @default(now()) @map("created_at")
+  updatedAt       DateTime         @updatedAt @map("updated_at")
+  rolePermissions RolePermission[]
 
   @@map("roles")
 }
 
 // Permission Model (BE-023)
 model Permission {
-  id          String   @id @default(uuid())
-  code        String   @unique
-  module      String
-  name        String
-  description String?
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
+  id              String           @id @default(uuid())
+  code            String           @unique
+  module          String
+  name            String
+  description     String?
+  createdAt       DateTime         @default(now()) @map("created_at")
+  updatedAt       DateTime         @updatedAt @map("updated_at")
+  rolePermissions RolePermission[]
 
   @@map("permissions")
+}
+
+// Role-Permission Join Model (BE-025)
+model RolePermission {
+  id           String     @id @default(uuid())
+  roleId       String     @map("role_id")
+  permissionId String     @map("permission_id")
+  createdAt    DateTime   @default(now()) @map("created_at")
+  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@unique([roleId, permissionId])
+  @@map("role_permissions")
 }
