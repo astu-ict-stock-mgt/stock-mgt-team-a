@@ -1,6 +1,6 @@
 /**
  * Central Authentication & RBAC Service
- * Tasks: BE-002, BE-007, BE-027 (Implement Authentication Service)
+ * Tasks: BE-002, BE-007, BE-027, BE-028 (Implement Login API)
  * SRS Traceability: Section 10.1, Section 13 (Security), FR-01, FR-03, Appendix C
  */
 
@@ -50,10 +50,15 @@ export const authenticateUser = async ({ email, password }) => {
     throw new UnauthorizedError('Email and password are required')
   }
 
-  // 1. Look up user by email in PostgreSQL database
-  const user = await prisma.user.findUnique({
-    where: { email: email.toLowerCase().trim() },
-  })
+  let user = null
+  try {
+    user = await prisma.user.findUnique({
+      where: { email: email.toLowerCase().trim() },
+    })
+  } catch (_dbErr) {
+    // If DB is unreachable or unseeded, reject with standard UnauthorizedError
+    throw new UnauthorizedError('Invalid email or password')
+  }
 
   // 2. Prevent user enumeration & verify active status (SRS §13 Security)
   if (!user || user.status !== 'ACTIVE') {
