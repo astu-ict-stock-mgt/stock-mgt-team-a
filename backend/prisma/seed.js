@@ -1,6 +1,6 @@
 /**
  * Stock Management System (SMS) - Idempotent Database Seed Script
- * Tasks: BE-012, BE-021 (Users Fixtures), BE-022 (Roles Schema Fixtures)
+ * Tasks: BE-012, BE-021 (Users), BE-022 (Roles), BE-023 (Permissions)
  * SRS Traceability: Section 10.1 (Core Entities), Appendix C (Roles & Permissions), FR-01
  */
 
@@ -59,13 +59,35 @@ async function main() {
           securityLevel: roleObj.securityLevel,
         },
       })
-      console.log(`   - Seeded Role: [${roleObj.code}] ${roleObj.name} (Security Level: ${roleObj.securityLevel})`)
     } catch (_err) {
       console.log(`   ℹ️ Role '${roleObj.code}' ready`)
     }
   }
 
-  // 3. Seed Baseline Users (BE-021)
+  // 3. Seed Atomic Permissions (BE-023)
+  console.log(`🔑 Seeding ${Object.keys(PERMISSIONS).length} Atomic Permissions into Database (BE-023)...`)
+  for (const permCode of Object.values(PERMISSIONS)) {
+    const moduleName = permCode.split(':')[0] || 'system'
+    try {
+      await prisma.permission.upsert({
+        where: { code: permCode },
+        update: {
+          module: moduleName,
+          name: `Permission ${permCode}`,
+        },
+        create: {
+          code: permCode,
+          module: moduleName,
+          name: `Permission ${permCode}`,
+          description: `Atomic permission for action ${permCode}`,
+        },
+      })
+    } catch (_err) {
+      console.log(`   ℹ️ Permission '${permCode}' ready`)
+    }
+  }
+
+  // 4. Seed Baseline Users (BE-021)
   const defaultUsers = [
     {
       email: 'admin@stockmgt.gov.et',
@@ -101,8 +123,6 @@ async function main() {
     }
   }
 
-  // 4. Log Matrix Summary
-  console.log(`🔑 Validating ${Object.keys(PERMISSIONS).length} Atomic Permissions across 13 Domain Modules`)
   console.log(`📋 Role-Permission Matrix mapped for all ${Object.keys(ROLE_PERMISSIONS_MATRIX).length} operational roles.`)
 
   // 5. Demo Baseline Store & Department Metadata
