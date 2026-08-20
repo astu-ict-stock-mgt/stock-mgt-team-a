@@ -1,12 +1,13 @@
 /**
  * Stock Management System (SMS) - Idempotent Database Seed Script
- * Tasks: BE-012, BE-021 (Users), BE-022 (Roles), BE-023 (Permissions), BE-025 (Role-Permissions Matrix)
- * SRS Traceability: Section 10.1 (Core Entities), Appendix C (Roles & Permissions Matrix), FR-01
+ * Tasks: BE-012, BE-021 (Users), BE-022 (Roles), BE-023 (Permissions), BE-025 (Role-Permissions Matrix), BE-026 (Password Hashing)
+ * SRS Traceability: Section 10.1 (Core Entities), Section 13 (Security), Appendix C (Roles & Permissions Matrix), FR-01
  */
 
 import { env } from '../src/config/env.js'
 import { PrismaClient } from '@prisma/client'
 import { ROLES, PERMISSIONS, ROLE_PERMISSIONS_MATRIX } from '../src/config/rbac.js'
+import { hashPassword } from '../src/utils/password.js'
 
 const prisma = new PrismaClient({
   datasources: {
@@ -122,34 +123,35 @@ async function main() {
   }
   console.log(`   - Successfully mapped ${mappedCount} Role-Permission relationships in database.`)
 
-  // 5. Seed Baseline Users (BE-021)
+  // 5. Seed Baseline Users with Secure Bcrypt Passwords (BE-021 & BE-026)
+  const defaultPasswordHash = await hashPassword('AdminSecret@2026!')
   const defaultUsers = [
     {
       email: 'admin@stockmgt.gov.et',
       fullName: 'System Administrator',
-      passwordHash: '$2b$10$e8Kz.0xP89m4/x4u9l2.xO3QY7L3vG5N1oH6.m9n.l3vG5N1oH6.m',
+      passwordHash: defaultPasswordHash,
       status: 'ACTIVE',
     },
     {
       email: 'pao@stockmgt.gov.et',
       fullName: 'Property Administration Officer',
-      passwordHash: '$2b$10$e8Kz.0xP89m4/x4u9l2.xO3QY7L3vG5N1oH6.m9n.l3vG5N1oH6.m',
+      passwordHash: defaultPasswordHash,
       status: 'ACTIVE',
     },
     {
       email: 'storekeeper@stockmgt.gov.et',
       fullName: 'Head Storekeeper',
-      passwordHash: '$2b$10$e8Kz.0xP89m4/x4u9l2.xO3QY7L3vG5N1oH6.m9n.l3vG5N1oH6.m',
+      passwordHash: defaultPasswordHash,
       status: 'ACTIVE',
     },
   ]
 
-  console.log('👤 Seeding Baseline Users (BE-021)...')
+  console.log('👤 Seeding Baseline Users (BE-021 & BE-026)...')
   for (const u of defaultUsers) {
     try {
       await prisma.user.upsert({
         where: { email: u.email },
-        update: { fullName: u.fullName, status: u.status },
+        update: { fullName: u.fullName, status: u.status, passwordHash: u.passwordHash },
         create: u,
       })
       console.log(`   - Seeded User: ${u.email} (${u.fullName})`)
