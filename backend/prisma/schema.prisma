@@ -1,6 +1,6 @@
 // Stock Management System (SMS) - Prisma Database Schema
-// Tasks: BE-010, BE-021 (Users Schema)
-// SRS Traceability: Section 10.1 (Core Entities), FR-01, BR-21
+// Tasks: BE-010, BE-021 (Users Schema), BE-022 (Roles Schema)
+// SRS Traceability: Section 10.1 (Core Entities), Appendix C (Role Matrix)
 
 generator client {
   provider = "prisma-client-js"
@@ -39,4 +39,17 @@ model User {
   updatedAt    DateTime   @updatedAt @map("updated_at")
 
   @@map("users")
+}
+
+// Role Model (BE-022)
+model Role {
+  id            String   @id @default(uuid())
+  code          String   @unique
+  name          String
+  description   String?
+  securityLevel Int      @default(10) @map("security_level")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  @@map("roles")
 }

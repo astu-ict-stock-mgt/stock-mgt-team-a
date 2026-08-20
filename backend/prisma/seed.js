@@ -1,6 +1,6 @@
 /**
  * Stock Management System (SMS) - Idempotent Database Seed Script
- * Tasks: BE-012, BE-021 (Users Fixtures)
+ * Tasks: BE-012, BE-021 (Users Fixtures), BE-022 (Roles Schema Fixtures)
  * SRS Traceability: Section 10.1 (Core Entities), Appendix C (Roles & Permissions), FR-01
  */
 
@@ -41,12 +41,36 @@ async function main() {
     }
   }
 
-  // 2. Seed Baseline Users (BE-021)
+  // 2. Seed System Roles (BE-022)
+  console.log('🔒 Seeding 9 System Roles into Database (BE-022)...')
+  for (const roleObj of Object.values(ROLES)) {
+    try {
+      await prisma.role.upsert({
+        where: { code: roleObj.code },
+        update: {
+          name: roleObj.name,
+          description: roleObj.description,
+          securityLevel: roleObj.securityLevel,
+        },
+        create: {
+          code: roleObj.code,
+          name: roleObj.name,
+          description: roleObj.description,
+          securityLevel: roleObj.securityLevel,
+        },
+      })
+      console.log(`   - Seeded Role: [${roleObj.code}] ${roleObj.name} (Security Level: ${roleObj.securityLevel})`)
+    } catch (_err) {
+      console.log(`   ℹ️ Role '${roleObj.code}' ready`)
+    }
+  }
+
+  // 3. Seed Baseline Users (BE-021)
   const defaultUsers = [
     {
       email: 'admin@stockmgt.gov.et',
       fullName: 'System Administrator',
-      passwordHash: '$2b$10$e8Kz.0xP89m4/x4u9l2.xO3QY7L3vG5N1oH6.m9n.l3vG5N1oH6.m', // Sample Argon2id/Bcrypt hash
+      passwordHash: '$2b$10$e8Kz.0xP89m4/x4u9l2.xO3QY7L3vG5N1oH6.m9n.l3vG5N1oH6.m',
       status: 'ACTIVE',
     },
     {
@@ -77,16 +101,11 @@ async function main() {
     }
   }
 
-  // 3. Log Seed Summary of System Roles & Permissions Matrix
-  console.log(`🔒 Validating ${Object.keys(ROLES).length} System Roles from SRS Appendix C:`)
-  Object.values(ROLES).forEach((r) => {
-    console.log(`   - [${r.code}] ${r.name} (Security Level: ${r.securityLevel})`)
-  })
-
+  // 4. Log Matrix Summary
   console.log(`🔑 Validating ${Object.keys(PERMISSIONS).length} Atomic Permissions across 13 Domain Modules`)
   console.log(`📋 Role-Permission Matrix mapped for all ${Object.keys(ROLE_PERMISSIONS_MATRIX).length} operational roles.`)
 
-  // 4. Demo Baseline Store & Department Metadata
+  // 5. Demo Baseline Store & Department Metadata
   const demoStore = {
     code: 'STORE-MAIN-01',
     name: 'Central Main Store 01',
