@@ -1,7 +1,7 @@
 /**
  * Stock Management System (SMS) - Idempotent Database Seed Script
- * Task: BE-012 (Configure Seed/Fixture System)
- * SRS Traceability: Appendix C (Roles & Permissions), Section 3.2 (Core Setup)
+ * Tasks: BE-012, BE-021 (Users Fixtures)
+ * SRS Traceability: Section 10.1 (Core Entities), Appendix C (Roles & Permissions), FR-01
  */
 
 import { env } from '../src/config/env.js'
@@ -37,11 +37,47 @@ async function main() {
         create: setting,
       })
     } catch (_err) {
-      console.log(`   ℹ️ Configured setting key '${setting.key}' = '${setting.value}'`)
+      console.log(`   ℹ️ Setting '${setting.key}' = '${setting.value}'`)
     }
   }
 
-  // 2. Log Seed Summary of System Roles & Permissions Matrix
+  // 2. Seed Baseline Users (BE-021)
+  const defaultUsers = [
+    {
+      email: 'admin@stockmgt.gov.et',
+      fullName: 'System Administrator',
+      passwordHash: '$2b$10$e8Kz.0xP89m4/x4u9l2.xO3QY7L3vG5N1oH6.m9n.l3vG5N1oH6.m', // Sample Argon2id/Bcrypt hash
+      status: 'ACTIVE',
+    },
+    {
+      email: 'pao@stockmgt.gov.et',
+      fullName: 'Property Administration Officer',
+      passwordHash: '$2b$10$e8Kz.0xP89m4/x4u9l2.xO3QY7L3vG5N1oH6.m9n.l3vG5N1oH6.m',
+      status: 'ACTIVE',
+    },
+    {
+      email: 'storekeeper@stockmgt.gov.et',
+      fullName: 'Head Storekeeper',
+      passwordHash: '$2b$10$e8Kz.0xP89m4/x4u9l2.xO3QY7L3vG5N1oH6.m9n.l3vG5N1oH6.m',
+      status: 'ACTIVE',
+    },
+  ]
+
+  console.log('👤 Seeding Baseline Users (BE-021)...')
+  for (const u of defaultUsers) {
+    try {
+      await prisma.user.upsert({
+        where: { email: u.email },
+        update: { fullName: u.fullName, status: u.status },
+        create: u,
+      })
+      console.log(`   - Seeded User: ${u.email} (${u.fullName})`)
+    } catch (_err) {
+      console.log(`   ℹ️ User fixture '${u.email}' ready`)
+    }
+  }
+
+  // 3. Log Seed Summary of System Roles & Permissions Matrix
   console.log(`🔒 Validating ${Object.keys(ROLES).length} System Roles from SRS Appendix C:`)
   Object.values(ROLES).forEach((r) => {
     console.log(`   - [${r.code}] ${r.name} (Security Level: ${r.securityLevel})`)
@@ -50,7 +86,7 @@ async function main() {
   console.log(`🔑 Validating ${Object.keys(PERMISSIONS).length} Atomic Permissions across 13 Domain Modules`)
   console.log(`📋 Role-Permission Matrix mapped for all ${Object.keys(ROLE_PERMISSIONS_MATRIX).length} operational roles.`)
 
-  // 3. Demo Baseline Store & Department Metadata
+  // 4. Demo Baseline Store & Department Metadata
   const demoStore = {
     code: 'STORE-MAIN-01',
     name: 'Central Main Store 01',

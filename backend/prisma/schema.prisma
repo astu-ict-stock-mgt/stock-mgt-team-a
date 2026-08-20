@@ -1,3 +1,7 @@
+// Stock Management System (SMS) - Prisma Database Schema
+// Tasks: BE-010, BE-021 (Users Schema)
+// SRS Traceability: Section 10.1 (Core Entities), FR-01, BR-21
+
 generator client {
   provider = "prisma-client-js"
 }
@@ -5,4 +9,34 @@ generator client {
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
+}
+
+// System Health / Setting Model
+model SystemSetting {
+  id        String   @id @default(uuid())
+  key       String   @unique
+  value     String
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("system_settings")
+}
+
+// User Status Enum
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+}
+
+// User Identity Model
+model User {
+  id           String     @id @default(uuid())
+  email        String     @unique
+  passwordHash String     @map("password_hash")
+  fullName     String     @map("full_name")
+  status       UserStatus @default(ACTIVE)
+  createdAt    DateTime   @default(now()) @map("created_at")
+  updatedAt    DateTime   @updatedAt @map("updated_at")
+
+  @@map("users")
 }
