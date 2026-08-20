@@ -1,10 +1,10 @@
 /**
  * Auth Domain Router & OpenAPI Specification
- * Tasks: BE-007, BE-028, BE-029 (Implement Session/Token Validation)
+ * Tasks: BE-007, BE-028, BE-029, BE-030 (Implement Logout/Session Revocation)
  */
 
 import { Router } from 'express'
-import { getRoles, getPermissions, getMatrix, getRoleByCode, login } from './auth.controller.js'
+import { getRoles, getPermissions, getMatrix, getRoleByCode, login, logout } from './auth.controller.js'
 import { validateRequest } from '../../middleware/validate.middleware.js'
 import { authenticate } from '../../middleware/auth.middleware.js'
 import { sendSuccess } from '../../utils/response.js'
@@ -32,11 +32,9 @@ const router = Router()
  *               email:
  *                 type: string
  *                 format: email
- *                 example: admin@stockmgt.gov.et
  *               password:
  *                 type: string
  *                 format: password
- *                 example: AdminSecret@2026!
  *     responses:
  *       200:
  *         description: Successful login
@@ -46,6 +44,23 @@ const router = Router()
  *         description: Invalid credentials
  */
 router.post('/login', validateRequest({ body: loginSchema }), login)
+
+/**
+ * @openapi
+ * /auth/logout:
+ *   post:
+ *     summary: Log out user and revoke session token
+ *     tags:
+ *       - Authentication
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Successfully logged out
+ *       401:
+ *         description: Missing or invalid token
+ */
+router.post('/logout', authenticate, logout)
 
 /**
  * @openapi
