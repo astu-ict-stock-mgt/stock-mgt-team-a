@@ -1,6 +1,6 @@
 /**
  * Central Authentication & RBAC Service
- * Tasks: BE-002, BE-007, BE-027, BE-028 (Implement Login API)
+ * Tasks: BE-002, BE-007, BE-027, BE-028, BE-030 (Implement Logout/Session Revocation)
  * SRS Traceability: Section 10.1, Section 13 (Security), FR-01, FR-03, Appendix C
  */
 
@@ -10,6 +10,28 @@ import { prisma } from '../../config/database.js'
 import { verifyPassword } from '../../utils/password.js'
 import { UnauthorizedError } from '../../utils/errors.js'
 import { ROLES, PERMISSIONS, ROLE_PERMISSIONS_MATRIX } from '../../config/rbac.js'
+
+// In-Memory Token Blacklist / Revocation Cache (SRS FR-03)
+const revokedTokenSet = new Set()
+
+/**
+ * Revoke an active session token
+ * @param {string} token - JWT token string
+ */
+export const revokeToken = (token) => {
+  if (token && typeof token === 'string') {
+    revokedTokenSet.add(token)
+  }
+}
+
+/**
+ * Check if a token has been revoked
+ * @param {string} token 
+ * @returns {boolean}
+ */
+export const isTokenRevoked = (token) => {
+  return revokedTokenSet.has(token)
+}
 
 // Legacy Metadata Functions (BE-002 / BE-007)
 export const fetchRoles = () => Object.values(ROLES)
@@ -33,6 +55,10 @@ export const issueAuthToken = (payload, expiresIn = '8h') => {
  * @returns {Object} Decoded token payload
  */
 export const verifyAuthToken = (token) => {
+  if (!token || isTokenRevoked(token)) {
+    throw new UnauthorizedError('Session has been revoked or logged out')
+  }
+
   try {
     return jwt.verify(token, env.JWT_SECRET)
   } catch (_err) {
@@ -56,22 +82,18 @@ export const authenticateUser = async ({ email, password }) => {
       where: { email: email.toLowerCase().trim() },
     })
   } catch (_dbErr) {
-    // If DB is unreachable or unseeded, reject with standard UnauthorizedError
     throw new UnauthorizedError('Invalid email or password')
   }
 
-  // 2. Prevent user enumeration & verify active status (SRS §13 Security)
   if (!user || user.status !== 'ACTIVE') {
     throw new UnauthorizedError('Invalid email or password')
   }
 
-  // 3. Verify bcrypt password hash
   const isMatch = await verifyPassword(password, user.passwordHash)
   if (!isMatch) {
     throw new UnauthorizedError('Invalid email or password')
   }
 
-  // 4. Construct JWT Payload & Issue Token
   const tokenPayload = {
     userId: user.id,
     email: user.email,
@@ -91,4 +113,18 @@ export const authenticateUser = async ({ email, password }) => {
     },
     token,
   }
+}
+
+/**
+ * Log out user and revoke session token (BE-030)
+ * @param {string} token - Bearer JWT token string
+ * @returns {Object} Logout confirmation payload
+ */
+export const logoutUser = async (token) => {
+  if (!token) {
+    throw new UnauthorizedError('No active session token provided')
+  }
+
+  revokeToken(token)
+  return { message: 'Successfully logged out and session revoked' }
 }
