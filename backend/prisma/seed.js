@@ -1,9 +1,8 @@
 /**
  * Stock Management System (SMS) - Idempotent Database Seed Script
- * Tasks: BE-012, BE-021 (Users Fixtures), BE-022 (Roles Schema Fixtures)
- * SRS Traceability: Section 10.1 (Core Entities), Appendix C (Roles & Permissions), FR-01
+ * Tasks: BE-012, BE-021 (Users Fixtures), BE-022 (Roles Fixtures), BE-024 (User-Role Assignments)
+ * SRS Traceability: Section 10.1 (Core Entities), Appendix C (Roles & Permissions), FR-01, FR-02, BR-20
  */
-
 import { env } from '../src/config/env.js'
 import { PrismaClient } from '@prisma/client'
 import { ROLES, PERMISSIONS, ROLE_PERMISSIONS_MATRIX } from '../src/config/rbac.js'
@@ -41,11 +40,15 @@ async function main() {
     }
   }
 
-  // 2. Seed System Roles (BE-022)
-  console.log('🔒 Seeding 9 System Roles into Database (BE-022)...')
+  // 2. Seed System Roles into the database (BE-022)
+  // NOTE: previously this section only logged ROLES for reference — it did not
+  // persist them. Restored the actual upsert so `roles` rows exist before
+  // BE-024 tries to link users to them below.
+  console.log(`🔒 Seeding ${Object.keys(ROLES).length} System Roles into Database (BE-022)...`)
+  const roleRecords = {} // code -> persisted Role row (with id)
   for (const roleObj of Object.values(ROLES)) {
     try {
-      await prisma.role.upsert({
+      const role = await prisma.role.upsert({
         where: { code: roleObj.code },
         update: {
           name: roleObj.name,
@@ -59,6 +62,7 @@ async function main() {
           securityLevel: roleObj.securityLevel,
         },
       })
+      roleRecords[role.code] = role
       console.log(`   - Seeded Role: [${roleObj.code}] ${roleObj.name} (Security Level: ${roleObj.securityLevel})`)
     } catch (_err) {
       console.log(`   ℹ️ Role '${roleObj.code}' ready`)
@@ -70,42 +74,91 @@ async function main() {
     {
       email: 'admin@stockmgt.gov.et',
       fullName: 'System Administrator',
-      passwordHash: '$2b$10$e8Kz.0xP89m4/x4u9l2.xO3QY7L3vG5N1oH6.m9n.l3vG5N1oH6.m',
+      passwordHash: '$2b$10$e8Kz.0xP89m4/x4u9l2.xO3QY7L3vG5N1oH6.m9n.l3vG5N1oH6.m', // Sample Argon2id/Bcrypt hash
       status: 'ACTIVE',
+      roleCode: ROLES.ADMIN.code,
     },
     {
       email: 'pao@stockmgt.gov.et',
       fullName: 'Property Administration Officer',
       passwordHash: '$2b$10$e8Kz.0xP89m4/x4u9l2.xO3QY7L3vG5N1oH6.m9n.l3vG5N1oH6.m',
       status: 'ACTIVE',
+      roleCode: ROLES.PAO.code,
     },
     {
       email: 'storekeeper@stockmgt.gov.et',
       fullName: 'Head Storekeeper',
       passwordHash: '$2b$10$e8Kz.0xP89m4/x4u9l2.xO3QY7L3vG5N1oH6.m9n.l3vG5N1oH6.m',
       status: 'ACTIVE',
+      roleCode: ROLES.STOREKEEPER.code,
     },
   ]
 
   console.log('👤 Seeding Baseline Users (BE-021)...')
+  const userRecords = {} // email -> persisted User row (with id)
   for (const u of defaultUsers) {
     try {
-      await prisma.user.upsert({
-        where: { email: u.email },
-        update: { fullName: u.fullName, status: u.status },
-        create: u,
+      const { roleCode, ...userData } = u
+      const user = await prisma.user.upsert({
+        where: { email: userData.email },
+        update: { fullName: userData.fullName, status: userData.status },
+        create: userData,
       })
+      userRecords[user.email] = user
       console.log(`   - Seeded User: ${u.email} (${u.fullName})`)
     } catch (_err) {
       console.log(`   ℹ️ User fixture '${u.email}' ready`)
     }
   }
 
-  // 4. Log Matrix Summary
-  console.log(`🔑 Validating ${Object.keys(PERMISSIONS).length} Atomic Permissions across 13 Domain Modules`)
+  // 4. Seed User-Role Assignments (BE-024)
+  // Links each baseline user to their operational role from Appendix C.
+  // Uses the composite unique constraint on (userId, roleId) so re-running
+  // the seed never creates duplicate grants.
+  console.log('🔗 Seeding User-Role Assignments (BE-024)...')
+  const ADMIN_EMAIL = 'admin@stockmgt.gov.et'
+  const adminUser = userRecords[ADMIN_EMAIL]
+
+  for (const u of defaultUsers) {
+    const user = userRecords[u.email]
+    const role = roleRecords[u.roleCode]
+
+    if (!user || !role) {
+      console.log(`   ⚠️ Skipped role link for '${u.email}': user or role not found in this run`)
+      continue
+    }
+
+    // Admin's own grant is self-seeded (no assignedBy). Every other
+    // baseline grant is recorded as having been assigned by the admin
+    // fixture, matching how the app will attribute real grants later.
+    const assignedBy = u.email === ADMIN_EMAIL ? null : adminUser?.id ?? null
+
+    try {
+      await prisma.userRole.upsert({
+        where: {
+          uq_user_roles_user_role: {
+            userId: user.id,
+            roleId: role.id,
+          },
+        },
+        update: {},
+        create: {
+          userId: user.id,
+          roleId: role.id,
+          assignedBy,
+        },
+      })
+      console.log(`   - Linked: ${u.email} -> [${u.roleCode}]`)
+    } catch (_err) {
+      console.log(`   ℹ️ User-Role link '${u.email}' -> '${u.roleCode}' ready`)
+    }
+  }
+
+  // 5. Log Seed Summary of System Roles & Permissions Matrix
+  console.log(`🔑 Validating ${Object.keys(PERMISSIONS).length} Atomic Permissions across Domain Modules`)
   console.log(`📋 Role-Permission Matrix mapped for all ${Object.keys(ROLE_PERMISSIONS_MATRIX).length} operational roles.`)
 
-  // 5. Demo Baseline Store & Department Metadata
+  // 6. Demo Baseline Store & Department Metadata
   const demoStore = {
     code: 'STORE-MAIN-01',
     name: 'Central Main Store 01',

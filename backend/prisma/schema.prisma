@@ -1,6 +1,10 @@
 // Stock Management System (SMS) - Prisma Database Schema
-// Tasks: BE-010, BE-021 (Users Schema), BE-022 (Roles Schema)
-// SRS Traceability: Section 10.1 (Core Entities), Appendix C (Role Matrix)
+// Tasks: BE-010, BE-021 (Users Schema), BE-022 (Roles Schema), BE-024 (User-Role Relationships)
+// SRS Traceability: Section 10.1 (Core Entities: users, roles, user_roles),
+//                   FR-01 (authenticate registered users), FR-02 (RBAC / least privilege),
+//                   BR-21 (no hard-delete of records that are part of an auditable relationship),
+//                   Appendix C (Initial Permission Matrix)
+// Depends on: BE-021, BE-022
 
 generator client {
   provider = "prisma-client-js"
@@ -11,7 +15,9 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// System Health / Setting Model
+// ────────────────────────────────────────────────────────────────
+// System Health / Setting Model (BE-010)
+// ────────────────────────────────────────────────────────────────
 model SystemSetting {
   id        String   @id @default(uuid())
   key       String   @unique
@@ -22,13 +28,14 @@ model SystemSetting {
   @@map("system_settings")
 }
 
-// User Status Enum
+// ────────────────────────────────────────────────────────────────
+// User Identity Model (BE-021)
+// ────────────────────────────────────────────────────────────────
 enum UserStatus {
   ACTIVE
   INACTIVE
 }
 
-// User Identity Model
 model User {
   id           String     @id @default(uuid())
   email        String     @unique
@@ -38,10 +45,18 @@ model User {
   createdAt    DateTime   @default(now()) @map("created_at")
   updatedAt    DateTime   @updatedAt @map("updated_at")
 
+  // BE-024: roles held by this user
+  roles UserRole[] @relation("UserRoles")
+
+  // BE-024: role-assignment events this user performed on others (audit trail, FR-04 / BR-21)
+  roleAssignmentsMade UserRole[] @relation("RoleAssignedBy")
+
   @@map("users")
 }
 
+// ────────────────────────────────────────────────────────────────
 // Role Model (BE-022)
+// ────────────────────────────────────────────────────────────────
 model Role {
   id            String   @id @default(uuid())
   code          String   @unique
@@ -51,5 +66,48 @@ model Role {
   createdAt     DateTime @default(now()) @map("created_at")
   updatedAt     DateTime @updatedAt @map("updated_at")
 
+  // BE-024: users holding this role
+  users UserRole[]
+
   @@map("roles")
+}
+
+// ────────────────────────────────────────────────────────────────
+// User-Role Join Model (BE-024)
+//
+// Design notes:
+// - Surrogate UUID PK (`id`) rather than a composite PK, so the row itself
+//   can be referenced (e.g. from audit_logs / notifications) and so a role
+//   assignment is a first-class, individually revocable/auditable record —
+//   consistent with BR-04 (evaluator/date/decision on records) and
+//   BR-21 (no hard delete of records that become part of an audit trail).
+// - `@@unique([userId, roleId])` enforces "a user cannot hold the same role
+//   twice" at the database level, not just in application code.
+// - `assignedBy` is nullable + SetNull on delete: if the assigning admin
+//   account is later removed, the grant itself must survive (BR-21) — we
+//   just lose the "who granted it" pointer, not the grant.
+// - `role` FK uses Restrict: a role that is currently assigned to any user
+//   cannot be deleted out from under them (must be unassigned first).
+// - `user` FK uses Cascade: deleting a user record removes their role
+//   grants (their own grants are junk data with no meaning once orphaned;
+//   this does not touch users.status which is how BR-21 handles
+//   deactivation instead of hard delete in the first place).
+// ────────────────────────────────────────────────────────────────
+model UserRole {
+  id         String   @id @default(uuid())
+  userId     String   @map("user_id")
+  roleId     String   @map("role_id")
+  assignedBy String?  @map("assigned_by")
+  assignedAt DateTime @default(now()) @map("assigned_at")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  user           User  @relation("UserRoles", fields: [userId], references: [id], onDelete: Cascade)
+  role           Role  @relation(fields: [roleId], references: [id], onDelete: Restrict)
+  assignedByUser User? @relation("RoleAssignedBy", fields: [assignedBy], references: [id], onDelete: SetNull)
+
+  @@unique([userId, roleId], name: "uq_user_roles_user_role")
+  @@index([userId])
+  @@index([roleId])
+  @@map("user_roles")
 }
