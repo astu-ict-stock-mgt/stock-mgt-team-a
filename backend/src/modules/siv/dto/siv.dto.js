@@ -1,6 +1,6 @@
 /**
  * Store Issue Voucher (SIV/ISIV) DTO Schemas (Zod)
- * Tasks: BE-106, BE-107 (Implement SIV/ISIV Amendment API)
+ * Tasks: BE-106, BE-107, BE-111 (Gate/Dispatch Verification API)
  * SRS Traceability: Section 6 (Store Issue Module), NFR-06 (Usability)
  */
 
@@ -63,4 +63,11 @@ export const amendSivSchema = z.object({
   issuedToUserId: z.string().optional(),
   notes: z.string().optional(),
   lineAmendments: z.array(lineAmendmentSchema).optional(),
+})
+
+export const verifyDispatchSchema = z.object({
+  vehicleNumber: z.string().optional(),
+  driverName: z.string().optional(),
+  gateNumber: z.string().optional(),
+  remarks: z.string().optional(),
 })
