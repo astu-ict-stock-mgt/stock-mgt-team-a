@@ -1,5 +1,5 @@
 import unitService from './unit.service.js';
-import { sendSuccess, sendError } from '../../../utils/response.js';
+import { sendSuccess, sendError } from '../../utils/response.js';
 
 class UnitController {
   async create(req, res, next) {
