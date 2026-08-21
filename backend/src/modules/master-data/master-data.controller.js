@@ -1,5 +1,5 @@
 import masterDataService from './master-data.service.js';
-import { sendSuccess, sendError } from '../../../utils/response.js';
+import { sendSuccess, sendError } from '../../utils/response.js';
 
 class MasterDataController {
   async search(req, res, next) {

@@ -1,5 +1,5 @@
 import validationService from './validation.service.js';
-import { sendSuccess, sendError } from '../../../utils/response.js';
+import { sendSuccess, sendError } from '../../utils/response.js';
 
 class ValidationController {
   async validateCode(req, res, next) {

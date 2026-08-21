@@ -74,6 +74,14 @@ model User {
   // BE-084: bin transactions created by this user
   binTransactionsCreated BinTransaction[] @relation("BinTransactionCreatedBy")
 
+  // BE-096: requisitions requested or approved by this user
+  requisitionsRequested      Requisition[] @relation("RequisitionRequester")
+  requisitionsDeptApproved   Requisition[] @relation("RequisitionDeptApprover")
+  requisitionsPaoApproved    Requisition[] @relation("RequisitionPAOApprover")
+  preparedSIVs               SIV[]         @relation("SIVPreparedBy")
+  approvedSIVs               SIV[]         @relation("SIVApprovedBy")
+  issuedToSIVs               SIV[]         @relation("SIVIssuedTo")
+
   @@map("users")
 }
 
@@ -237,6 +245,8 @@ model Item {
   goodsReceiptLines GoodsReceiptLine[]
   stockCards StockCard[]
   binCards   BinCard[]
+  requisitionLines RequisitionLine[]
+  sivLines         SIVLine[]
 
   @@index([code])
   @@index([categoryId])
@@ -345,6 +355,8 @@ model Store {
   locations           Location[]
   goodsReceipts       GoodsReceipt[]
   stockCards          StockCard[]
+  requisitions        Requisition[]
+  sivs                SIV[]
 
   @@index([code])
   @@index([status])
@@ -378,6 +390,7 @@ model Department {
   headUser      User?            @relation("DepartmentHead", fields: [headUserId], references: [id], onDelete: SetNull)
   stores        StoreDepartment[]
   goodsReceipts GoodsReceipt[]
+  requisitions  Requisition[]
 
   @@index([code])
   @@index([status])
@@ -750,5 +763,135 @@ model BinTransaction {
 }
 
 // ────────────────────────────────────────────────────────────────
-// User Model Additional Relations (BE-063+)
+// User Model Additional Relations & Requisition Schema (BE-096)
 // ────────────────────────────────────────────────────────────────
+
+enum RequisitionStatus {
+  DRAFT
+  SUBMITTED
+  DEPARTMENT_APPROVED
+  DEPARTMENT_REJECTED
+  PAO_APPROVED
+  PAO_REJECTED
+  CANCELLED
+  COMPLETED
+  PARTIALLY_ISSUED
+}
+
+model Requisition {
+  id                   String            @id @default(uuid())
+  requisitionNumber    String            @unique @map("requisition_number")
+  requesterId          String            @map("requester_id")
+  departmentId         String            @map("department_id")
+  storeId              String            @map("store_id")
+  status               RequisitionStatus @default(DRAFT)
+  purpose              String
+  rejectionReason      String?           @map("rejection_reason")
+  departmentApprovedAt DateTime?         @map("department_approved_at")
+  departmentApprovedBy String?           @map("department_approved_by")
+  paoApprovedAt        DateTime?         @map("pao_approved_at")
+  paoApprovedBy        String?           @map("pao_approved_by")
+  createdAt            DateTime          @default(now()) @map("created_at")
+  updatedAt            DateTime          @updatedAt @map("updated_at")
+
+  requester                User              @relation("RequisitionRequester", fields: [requesterId], references: [id], onDelete: Restrict)
+  department               Department        @relation(fields: [departmentId], references: [id], onDelete: Restrict)
+  store                    Store             @relation(fields: [storeId], references: [id], onDelete: Restrict)
+  departmentApprovedByUser User?             @relation("RequisitionDeptApprover", fields: [departmentApprovedBy], references: [id], onDelete: SetNull)
+  paoApprovedByUser        User?             @relation("RequisitionPAOApprover", fields: [paoApprovedBy], references: [id], onDelete: SetNull)
+  lines                    RequisitionLine[]
+  sivs                     SIV[]
+
+  @@index([requisitionNumber])
+  @@index([requesterId])
+  @@index([departmentId])
+  @@index([storeId])
+  @@index([status])
+  @@map("requisitions")
+}
+
+model RequisitionLine {
+  id                String      @id @default(uuid())
+  requisitionId     String      @map("requisition_id")
+  itemId            String      @map("item_id")
+  requestedQuantity Int         @map("requested_quantity")
+  approvedQuantity  Int?        @map("approved_quantity")
+  issuedQuantity    Int         @default(0) @map("issued_quantity")
+  remarks           String?
+  createdAt         DateTime    @default(now()) @map("created_at")
+  updatedAt         DateTime    @updatedAt @map("updated_at")
+
+  requisition       Requisition @relation(fields: [requisitionId], references: [id], onDelete: Cascade)
+  item              Item        @relation(fields: [itemId], references: [id], onDelete: Restrict)
+
+  @@unique([requisitionId, itemId], name: "uq_requisition_line_item")
+  @@index([requisitionId])
+  @@index([itemId])
+  @@map("requisition_lines")
+}
+
+// ────────────────────────────────────────────────────────────────
+// Store Issue Voucher (SIV/ISIV) Model (BE-103)
+//
+// Design notes:
+// - Document lifecycle: DRAFT -> PREPARED -> APPROVED -> FINALIZED -> CANCELLED
+// - Linked to requisition, store, recipient user, preparedBy, and approvedBy.
+// - SIVLine links items and quantities issued.
+// ────────────────────────────────────────────────────────────────
+enum SIVStatus {
+  DRAFT
+  PREPARED
+  APPROVED
+  FINALIZED
+  CANCELLED
+}
+
+model SIV {
+  id            String    @id @default(uuid())
+  sivNumber     String    @unique @map("siv_number")
+  requisitionId String    @map("requisition_id")
+  storeId       String    @map("store_id")
+  issuedToUserId String   @map("issued_to_user_id")
+  status        SIVStatus @default(DRAFT)
+  issueDate     DateTime  @default(now()) @map("issue_date")
+  preparedBy    String    @map("prepared_by")
+  approvedBy    String?   @map("approved_by")
+  notes         String?
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  requisition   Requisition @relation(fields: [requisitionId], references: [id], onDelete: Restrict)
+  store         Store       @relation(fields: [storeId], references: [id], onDelete: Restrict)
+  issuedToUser  User        @relation("SIVIssuedTo", fields: [issuedToUserId], references: [id], onDelete: Restrict)
+  preparedByUser User       @relation("SIVPreparedBy", fields: [preparedBy], references: [id], onDelete: Restrict)
+  approvedByUser User?      @relation("SIVApprovedBy", fields: [approvedBy], references: [id], onDelete: SetNull)
+  lines         SIVLine[]
+
+  @@index([sivNumber])
+  @@index([requisitionId])
+  @@index([storeId])
+  @@index([status])
+  @@map("sivs")
+}
+
+model SIVLine {
+  id             String   @id @default(uuid())
+  sivId          String   @map("siv_id")
+  itemId         String   @map("item_id")
+  quantityIssued Int      @map("quantity_issued")
+  unitCost       Decimal? @map("unit_cost")
+  totalCost      Decimal? @map("total_cost")
+  remarks        String?
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  siv  SIV  @relation(fields: [sivId], references: [id], onDelete: Cascade)
+  item Item @relation(fields: [itemId], references: [id], onDelete: Restrict)
+
+  @@unique([sivId, itemId], name: "uq_siv_line_item")
+  @@index([sivId])
+  @@index([itemId])
+  @@map("siv_lines")
+}
+
+
