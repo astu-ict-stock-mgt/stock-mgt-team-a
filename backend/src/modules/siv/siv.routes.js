@@ -1,6 +1,6 @@
 /**
  * Store Issue Voucher (SIV/ISIV) Router & OpenAPI Specs
- * Tasks: BE-105, BE-106, BE-107, BE-111 (Gate/Dispatch Verification API)
+ * Tasks: BE-105, BE-106, BE-107, BE-111, BE-112 (Issue Transaction Audit)
  */
 
 import { Router } from 'express'
@@ -12,6 +12,7 @@ import {
   finalize,
   amend,
   verifyDispatch,
+  getAudit,
 } from './siv.controller.js'
 import { validateRequest } from '../../middleware/validate.middleware.js'
 import { authenticate } from '../../middleware/auth.middleware.js'
@@ -160,27 +161,9 @@ router.patch('/:id/finalize', authenticate, authorize(PERMISSIONS.ISSUES_APPROVE
  *         required: true
  *         schema:
  *           type: string
- *     requestBody:
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               vehicleNumber:
- *                 type: string
- *               driverName:
- *                 type: string
- *               gateNumber:
- *                 type: string
- *               remarks:
- *                 type: string
  *     responses:
  *       200:
  *         description: Dispatch gate exit verified successfully
- *       403:
- *         description: Forbidden - Insufficient permissions
- *       409:
- *         description: Conflict - Cannot verify un-finalized SIV
  */
 router.post(
   '/:id/verify-dispatch',
@@ -188,6 +171,34 @@ router.post(
   authorize(PERMISSIONS.DISPATCH_VERIFY),
   validateRequest({ body: verifyDispatchSchema }),
   verifyDispatch
+)
+
+/**
+ * @openapi
+ * /sivs/{id}/audit:
+ *   get:
+ *     summary: Get SIV Issue Transaction Audit Trail & Stock Ledger Entries
+ *     tags:
+ *       - Store Issue Vouchers
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: SIV audit trail and transaction history
+ *       404:
+ *         description: SIV not found
+ */
+router.get(
+  '/:id/audit',
+  authenticate,
+  authorize(PERMISSIONS.ISSUES_READ),
+  getAudit
 )
 
 router.get('/', authenticate, authorize(PERMISSIONS.ISSUES_READ), list)
