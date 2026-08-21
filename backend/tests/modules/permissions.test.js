@@ -7,8 +7,8 @@
 import { describe, it, expect, beforeAll } from 'vitest'
 import request from 'supertest'
 import express from 'express'
-import permissionRoutes from '../src/modules/permissions/permission.routes.js'
-import { errorHandler } from '../src/middleware/error.middleware.js'
+import permissionRoutes from '../../src/modules/permissions/permission.routes.js'
+import { errorHandler } from '../../src/middleware/error.middleware.js'
 
 const app = express()
 app.use(express.json())

@@ -7,8 +7,8 @@
 import { describe, it, expect, beforeAll } from 'vitest'
 import request from 'supertest'
 import express from 'express'
-import auditRoutes from '../src/modules/audit/audit.routes.js'
-import { errorHandler } from '../src/middleware/error.middleware.js'
+import auditRoutes from '../../src/modules/audit/audit.routes.js'
+import { errorHandler } from '../../src/middleware/error.middleware.js'
 
 const app = express()
 app.use(express.json())
