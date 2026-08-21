@@ -1,6 +1,6 @@
 import transactionPostingService from './transaction-posting.service.js';
 import inventoryLedgerService from './inventory-ledger.service.js';
-import { sendSuccess, sendError } from '../../../utils/response.js';
+import { sendSuccess, sendError } from '../../utils/response.js';
 
 class InventoryController {
   async postTransaction(req, res, next) {

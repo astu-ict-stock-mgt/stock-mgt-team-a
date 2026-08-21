@@ -1,5 +1,5 @@
 import goodsReceiptService from './goods-receipt.service.js';
-import { sendSuccess, sendError } from '../../../utils/response.js';
+import { sendSuccess, sendError } from '../../utils/response.js';
 
 class GoodsReceiptController {
   async create(req, res, next) {
