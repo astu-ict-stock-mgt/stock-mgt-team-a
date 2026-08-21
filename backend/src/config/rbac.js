@@ -102,6 +102,9 @@ export const PERMISSIONS = Object.freeze({
   SIV_AMEND: { key: 'siv:amend', module: 'Issue', description: 'Amend preliminary SIV/ISIV lines' },
   SIV_APPROVE: { key: 'siv:approve', module: 'Issue', description: 'Approve SIV/ISIV issue documents' },
   SIV_FINALIZE: { key: 'siv:finalize', module: 'Issue', description: 'Finalize issue voucher and trigger stock ledger deduction' },
+  ISSUES_CREATE: { key: 'siv:prepare', module: 'Issue', description: 'Prepare draft Store Issue Voucher (SIV/ISIV)' },
+  ISSUES_READ: { key: 'requisitions:read', module: 'Issue', description: 'View SIV issue vouchers' },
+  ISSUES_APPROVE: { key: 'siv:approve', module: 'Issue', description: 'Approve SIV issue vouchers' },
 
   // --- FIXED ASSETS REGISTRATION ---
   ASSETS_REGISTER: { key: 'assets:register', module: 'Assets', description: 'Register accepted materials as fixed assets' },
