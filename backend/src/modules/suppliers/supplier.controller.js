@@ -1,5 +1,5 @@
 import supplierService from './supplier.service.js';
-import { sendSuccess, sendError } from '../../../utils/response.js';
+import { sendSuccess, sendError } from '../../utils/response.js';
 
 class SupplierController {
   async create(req, res, next) {
