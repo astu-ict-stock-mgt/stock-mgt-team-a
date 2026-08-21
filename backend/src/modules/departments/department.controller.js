@@ -1,5 +1,5 @@
 import departmentService from './department.service.js';
-import { sendSuccess, sendError } from '../../../utils/response.js';
+import { sendSuccess, sendError } from '../../utils/response.js';
 
 class DepartmentController {
   async create(req, res, next) {
