@@ -1,15 +1,15 @@
 /**
  * Store Issue Voucher (SIV/ISIV) Router & OpenAPI Specs
- * Tasks: BE-105, BE-106 (Implement Preliminary SIV/ISIV API)
+ * Tasks: BE-105, BE-106, BE-107 (Implement SIV/ISIV Amendment API)
  */
 
 import { Router } from 'express'
-import { create, getById, list, approve, finalize } from './siv.controller.js'
+import { create, getById, list, approve, finalize, amend } from './siv.controller.js'
 import { validateRequest } from '../../middleware/validate.middleware.js'
 import { authenticate } from '../../middleware/auth.middleware.js'
 import { authorize } from '../../middleware/rbac.middleware.js'
 import { PERMISSIONS } from '../../config/rbac.js'
-import { createSivSchema } from './dto/siv.dto.js'
+import { createSivSchema, amendSivSchema } from './dto/siv.dto.js'
 
 const router = Router()
 
@@ -59,12 +59,6 @@ const router = Router()
  *     responses:
  *       201:
  *         description: SIV successfully generated in PREPARED state
- *       400:
- *         description: Validation error
- *       401:
- *         description: Unauthorized
- *       403:
- *         description: Forbidden - Insufficient permissions
  */
 router.post(
   '/',
@@ -72,6 +66,60 @@ router.post(
   authorize(PERMISSIONS.ISSUES_CREATE),
   validateRequest({ body: createSivSchema }),
   create
+)
+
+/**
+ * @openapi
+ * /sivs/{id}/amend:
+ *   patch:
+ *     summary: Amend preliminary SIV voucher details and line quantities
+ *     tags:
+ *       - Store Issue Vouchers
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               issuedToUserId:
+ *                 type: string
+ *               notes:
+ *                 type: string
+ *               lineAmendments:
+ *                 type: array
+ *                 items:
+ *                   type: object
+ *                   required:
+ *                     - lineId
+ *                     - quantityIssued
+ *                   properties:
+ *                     lineId:
+ *                       type: string
+ *                     quantityIssued:
+ *                       type: integer
+ *     responses:
+ *       200:
+ *         description: SIV amended successfully
+ *       403:
+ *         description: Forbidden - Insufficient permissions
+ *       409:
+ *         description: Conflict - Cannot amend finalized SIV
+ */
+router.patch(
+  '/:id/amend',
+  authenticate,
+  authorize(PERMISSIONS.SIV_AMEND),
+  validateRequest({ body: amendSivSchema }),
+  amend
 )
 
 /**

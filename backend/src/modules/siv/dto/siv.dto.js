@@ -1,6 +1,6 @@
 /**
  * Store Issue Voucher (SIV/ISIV) DTO Schemas (Zod)
- * Task: BE-106 (Implement Preliminary SIV/ISIV API)
+ * Tasks: BE-106, BE-107 (Implement SIV/ISIV Amendment API)
  * SRS Traceability: Section 6 (Store Issue Module), NFR-06 (Usability)
  */
 
@@ -42,4 +42,25 @@ export const createSivSchema = z.object({
       required_error: 'lines array is required',
     })
     .min(1, 'SIV must contain at least one item line'),
+})
+
+export const lineAmendmentSchema = z.object({
+  lineId: z.string({
+    required_error: 'lineId is required',
+  }),
+
+  quantityIssued: z
+    .number({
+      required_error: 'quantityIssued is required',
+    })
+    .int('quantityIssued must be an integer')
+    .positive('quantityIssued must be greater than zero'),
+
+  remarks: z.string().optional(),
+})
+
+export const amendSivSchema = z.object({
+  issuedToUserId: z.string().optional(),
+  notes: z.string().optional(),
+  lineAmendments: z.array(lineAmendmentSchema).optional(),
 })
