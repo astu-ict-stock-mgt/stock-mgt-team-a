@@ -15,6 +15,7 @@ import { itemRoutes } from '../modules/items/index.js'
 import { supplierRoutes } from '../modules/suppliers/index.js'
 import { locationRoutes } from '../modules/locations/index.js'
 import { masterDataRoutes, validationRoutes } from '../modules/master-data/index.js'
+import { goodsReceiptRoutes } from '../modules/goods-receipt/index.js'
 
 const router = Router()
 
@@ -30,5 +31,6 @@ router.use('/suppliers', supplierRoutes)
 router.use('/locations', locationRoutes)
 router.use('/master-data', masterDataRoutes)
 router.use('/validation', validationRoutes)
+router.use('/goods-receipts', goodsReceiptRoutes)
 
 export default router
