@@ -1,5 +1,5 @@
 import itemService from './item.service.js';
-import { sendSuccess, sendError } from '../../../utils/response.js';
+import { sendSuccess, sendError } from '../../utils/response.js';
 
 class ItemController {
   async create(req, res, next) {
