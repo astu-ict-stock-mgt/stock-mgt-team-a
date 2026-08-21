@@ -7,10 +7,10 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import request from 'supertest'
 import express from 'express'
-import accountActivationRoutes from '../src/modules/users/account-activation.routes.js'
-import { errorHandler } from '../src/middleware/error.middleware.js'
-import { prisma } from '../src/config/database.js'
-import { hashPassword } from '../src/utils/password.js'
+import accountActivationRoutes from '../../src/modules/users/account-activation.routes.js'
+import { errorHandler } from '../../src/middleware/error.middleware.js'
+import { prisma } from '../../src/config/database.js'
+import { hashPassword } from '../../src/utils/password.js'
 
 const app = express()
 app.use(express.json())
