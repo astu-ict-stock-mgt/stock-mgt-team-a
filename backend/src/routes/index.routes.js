@@ -11,6 +11,7 @@ import { storeRoutes } from '../modules/stores/index.js'
 import { departmentRoutes } from '../modules/departments/index.js'
 import { categoryRoutes } from '../modules/categories/index.js'
 import { unitRoutes } from '../modules/units/index.js'
+import { itemRoutes } from '../modules/items/index.js'
 
 const router = Router()
 
@@ -21,5 +22,6 @@ router.use('/stores', storeRoutes)
 router.use('/departments', departmentRoutes)
 router.use('/categories', categoryRoutes)
 router.use('/units', unitRoutes)
+router.use('/items', itemRoutes)
 
 export default router
