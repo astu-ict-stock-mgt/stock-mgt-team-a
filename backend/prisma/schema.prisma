@@ -59,6 +59,21 @@ model User {
   // BE-042: departments where this user is department head
   headedDepartments Department[] @relation("DepartmentHead")
 
+  // BE-063: goods receipts received by this user
+  goodsReceiptsReceived GoodsReceipt[] @relation("GoodsReceiptReceivedBy")
+
+  // BE-070: technical evaluations performed by this user
+  evaluationsPerformed TechnicalEvaluation[] @relation("EvaluationEvaluator")
+
+  // BE-077: GRNs finalized by this user
+  grnsFinalized GRN[] @relation("GRNFinalizedBy")
+
+  // BE-082: stock card transactions created by this user
+  stockTransactionsCreated StockCardTransaction[] @relation("StockTransactionCreatedBy")
+
+  // BE-084: bin transactions created by this user
+  binTransactionsCreated BinTransaction[] @relation("BinTransactionCreatedBy")
+
   @@map("users")
 }
 
@@ -124,6 +139,7 @@ model Unit {
 
   // Relationships
   items Item[]
+  goodsReceiptLines GoodsReceiptLine[]
 
   @@index([code])
   @@index([status])
@@ -165,6 +181,7 @@ model Supplier {
 
   // Relationships
   items Item[]
+  goodsReceipts GoodsReceipt[]
 
   @@index([code])
   @@index([status])
@@ -217,6 +234,9 @@ model Item {
   category   Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
   unit       Unit      @relation(fields: [unitId], references: [id], onDelete: Restrict)
   supplier   Supplier? @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+  goodsReceiptLines GoodsReceiptLine[]
+  stockCards StockCard[]
+  binCards   BinCard[]
 
   @@index([code])
   @@index([categoryId])
@@ -323,6 +343,8 @@ model Store {
   responsibleOfficer  User?       @relation("StoreResponsibleOfficer", fields: [responsibleOfficerId], references: [id], onDelete: SetNull)
   departments         StoreDepartment[]
   locations           Location[]
+  goodsReceipts       GoodsReceipt[]
+  stockCards          StockCard[]
 
   @@index([code])
   @@index([status])
@@ -355,6 +377,7 @@ model Department {
   // Relationships
   headUser      User?            @relation("DepartmentHead", fields: [headUserId], references: [id], onDelete: SetNull)
   stores        StoreDepartment[]
+  goodsReceipts GoodsReceipt[]
 
   @@index([code])
   @@index([status])
@@ -426,6 +449,8 @@ model Location {
   store       Store          @relation(fields: [storeId], references: [id], onDelete: Cascade)
   parent      Location?      @relation("LocationHierarchy", fields: [parentId], references: [id], onDelete: SetNull)
   children    Location[]     @relation("LocationHierarchy")
+  goodsReceiptLines GoodsReceiptLine[]
+  binCards    BinCard[]
 
   @@index([code])
   @@index([storeId])
@@ -433,3 +458,297 @@ model Location {
   @@index([type])
   @@map("locations")
 }
+
+// ────────────────────────────────────────────────────────────────
+// Goods Receipt Model (BE-063)
+//
+// Design notes:
+// - Records receipt of goods from suppliers/donors.
+// - Linked to supplier, store, and purchase order (if applicable).
+// - Status workflow: DRAFT -> PENDING_EVALUATION -> EVALUATED -> APPROVED -> REJECTED
+// - BR-21: No hard-delete; status field used for lifecycle.
+// - SRS FR-10: Record goods receipt information.
+// ────────────────────────────────────────────────────────────────
+enum GoodsReceiptStatus {
+  DRAFT
+  PENDING_EVALUATION
+  EVALUATED
+  APPROVED
+  REJECTED
+}
+
+model GoodsReceipt {
+  id                String              @id @default(uuid())
+  receiptNumber     String              @unique @map("receipt_number")
+  supplierId        String              @map("supplier_id")
+  storeId           String              @map("store_id")
+  departmentId      String?             @map("department_id")
+  purchaseOrderNumber String?           @map("purchase_order_number")
+  status            GoodsReceiptStatus  @default(DRAFT)
+  receivedDate      DateTime            @default(now()) @map("received_date")
+  receivedBy        String              @map("received_by")
+  notes             String?
+  totalAmount       Decimal?            @map("total_amount")
+  currency          String?             @default("ETB")
+  createdAt         DateTime            @default(now()) @map("created_at")
+  updatedAt         DateTime            @updatedAt @map("updated_at")
+
+  // Relationships
+  supplier          Supplier            @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+  store             Store               @relation(fields: [storeId], references: [id], onDelete: Restrict)
+  department        Department?         @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  receivedByUser    User                @relation("GoodsReceiptReceivedBy", fields: [receivedBy], references: [id], onDelete: Restrict)
+  lines             GoodsReceiptLine[]
+  evaluations       TechnicalEvaluation[]
+  grn               GRN?
+
+  @@index([receiptNumber])
+  @@index([supplierId])
+  @@index([storeId])
+  @@index([status])
+  @@index([receivedDate])
+  @@map("goods_receipts")
+}
+
+// ────────────────────────────────────────────────────────────────
+// Goods Receipt Line Model (BE-064)
+//
+// Design notes:
+// - Individual line items on a goods receipt.
+// - References item, unit, and location for storage.
+// - Quantity and cost tracking for valuation.
+// ────────────────────────────────────────────────────────────────
+model GoodsReceiptLine {
+  id              String      @id @default(uuid())
+  goodsReceiptId  String      @map("goods_receipt_id")
+  itemId          String      @map("item_id")
+  unitId          String      @map("unit_id")
+  locationId      String?     @map("location_id")
+  quantity        Int
+  unitCost        Decimal     @map("unit_cost")
+  totalCost       Decimal     @map("total_cost")
+  condition       String?
+  batchNumber     String?     @map("batch_number")
+  expiryDate      DateTime?   @map("expiry_date")
+  notes           String?
+  createdAt       DateTime    @default(now()) @map("created_at")
+  updatedAt       DateTime    @updatedAt @map("updated_at")
+
+  // Relationships
+  goodsReceipt    GoodsReceipt @relation(fields: [goodsReceiptId], references: [id], onDelete: Cascade)
+  item            Item         @relation(fields: [itemId], references: [id], onDelete: Restrict)
+  unit            Unit         @relation(fields: [unitId], references: [id], onDelete: Restrict)
+  location        Location?    @relation(fields: [locationId], references: [id], onDelete: SetNull)
+
+  @@index([goodsReceiptId])
+  @@index([itemId])
+  @@index([unitId])
+  @@map("goods_receipt_lines")
+}
+
+// ────────────────────────────────────────────────────────────────
+// Technical Evaluation Model (BE-070)
+//
+// Design notes:
+// - Technical evaluation of received goods.
+// - Linked to goods receipt and evaluator user.
+// - Status workflow: PENDING -> IN_PROGRESS -> COMPLETED
+// ────────────────────────────────────────────────────────────────
+enum EvaluationStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+}
+
+model TechnicalEvaluation {
+  id              String          @id @default(uuid())
+  goodsReceiptId  String          @map("goods_receipt_id")
+  evaluatorId     String          @map("evaluator_id")
+  status          EvaluationStatus @default(PENDING)
+  decision        EvaluationDecision?
+  decisionDate    DateTime?       @map("decision_date")
+  notes           String?
+  createdAt       DateTime        @default(now()) @map("created_at")
+  updatedAt       DateTime        @updatedAt @map("updated_at")
+
+  // Relationships
+  goodsReceipt    GoodsReceipt    @relation(fields: [goodsReceiptId], references: [id], onDelete: Cascade)
+  evaluator       User            @relation("EvaluationEvaluator", fields: [evaluatorId], references: [id], onDelete: Restrict)
+
+  @@index([goodsReceiptId])
+  @@index([evaluatorId])
+  @@index([status])
+  @@map("technical_evaluations")
+}
+
+enum EvaluationDecision {
+  APPROVED
+  REJECTED
+  CONDITIONAL
+}
+
+// ────────────────────────────────────────────────────────────────
+// GRN Model (BE-077)
+//
+// Design notes:
+// - Goods Receipt Note - final document after evaluation approval.
+// - Unique GRN number for tracking.
+// - Links to goods receipt and evaluation.
+// ────────────────────────────────────────────────────────────────
+enum GRNStatus {
+  DRAFT
+  FINALIZED
+  CANCELLED
+}
+
+model GRN {
+  id              String      @id @default(uuid())
+  grnNumber       String      @unique @map("grn_number")
+  goodsReceiptId  String      @map("goods_receipt_id")
+  status          GRNStatus  @default(DRAFT)
+  finalizedDate   DateTime?   @map("finalized_date")
+  finalizedBy     String?     @map("finalized_by")
+  notes           String?
+  createdAt       DateTime    @default(now()) @map("created_at")
+  updatedAt       DateTime    @updatedAt @map("updated_at")
+
+  // Relationships
+  goodsReceipt    GoodsReceipt @relation(fields: [goodsReceiptId], references: [id], onDelete: Restrict)
+  finalizedByUser User?        @relation("GRNFinalizedBy", fields: [finalizedBy], references: [id], onDelete: SetNull)
+
+  @@unique([goodsReceiptId])
+  @@index([grnNumber])
+  @@index([status])
+  @@map("grns")
+}
+
+// ────────────────────────────────────────────────────────────────
+// Stock Card Model (BE-081)
+//
+// Design notes:
+// - Tracks current stock balance per item per store.
+// - Single record per item-store combination.
+// - Updated by transaction posting engine.
+// ────────────────────────────────────────────────────────────────
+model StockCard {
+  id              String      @id @default(uuid())
+  itemId          String      @map("item_id")
+  storeId         String      @map("store_id")
+  quantity        Int         @default(0)
+  reservedQty     Int         @default(0) @map("reserved_qty")
+  availableQty    Int         @default(0) @map("available_qty")
+  averageCost     Decimal?    @map("average_cost")
+  lastMovementAt  DateTime?   @map("last_movement_at")
+  createdAt       DateTime    @default(now()) @map("created_at")
+  updatedAt       DateTime    @updatedAt @map("updated_at")
+
+  // Relationships
+  item            Item        @relation(fields: [itemId], references: [id], onDelete: Restrict)
+  store           Store       @relation(fields: [storeId], references: [id], onDelete: Restrict)
+  transactions    StockCardTransaction[]
+
+  @@unique([itemId, storeId], name: "uq_stock_card_item_store")
+  @@index([itemId])
+  @@index([storeId])
+  @@map("stock_cards")
+}
+
+// ────────────────────────────────────────────────────────────────
+// Stock Card Transaction Model (BE-082)
+//
+// Design notes:
+// - Immutable record of each stock movement.
+// - Referenced by stock card for balance calculation.
+// ────────────────────────────────────────────────────────────────
+enum TransactionType {
+  RECEIPT
+  ISSUE
+  TRANSFER_IN
+  TRANSFER_OUT
+  ADJUSTMENT
+  RETURN
+  DISPOSAL
+}
+
+model StockCardTransaction {
+  id              String          @id @default(uuid())
+  stockCardId     String          @map("stock_card_id")
+  transactionType TransactionType
+  quantity        Int
+  referenceType   String?         @map("reference_type")
+  referenceId     String?         @map("reference_id")
+  referenceNumber String?         @map("reference_number")
+  notes           String?
+  createdBy       String          @map("created_by")
+  createdAt       DateTime        @default(now()) @map("created_at")
+
+  // Relationships
+  stockCard       StockCard       @relation(fields: [stockCardId], references: [id], onDelete: Restrict)
+  createdByUser   User            @relation("StockTransactionCreatedBy", fields: [createdBy], references: [id], onDelete: Restrict)
+
+  @@index([stockCardId])
+  @@index([transactionType])
+  @@index([referenceType, referenceId])
+  @@index([createdAt])
+  @@map("stock_card_transactions")
+}
+
+// ────────────────────────────────────────────────────────────────
+// Bin Card Model (BE-083)
+//
+// Design notes:
+// - Tracks stock balance per item per location (bin).
+// - More granular than stock card (location-level).
+// ────────────────────────────────────────────────────────────────
+model BinCard {
+  id              String      @id @default(uuid())
+  itemId          String      @map("item_id")
+  locationId      String      @map("location_id")
+  quantity        Int         @default(0)
+  lastMovementAt  DateTime?   @map("last_movement_at")
+  createdAt       DateTime    @default(now()) @map("created_at")
+  updatedAt       DateTime    @updatedAt @map("updated_at")
+
+  // Relationships
+  item            Item        @relation(fields: [itemId], references: [id], onDelete: Restrict)
+  location        Location    @relation(fields: [locationId], references: [id], onDelete: Restrict)
+  transactions    BinTransaction[]
+
+  @@unique([itemId, locationId], name: "uq_bin_card_item_location")
+  @@index([itemId])
+  @@index([locationId])
+  @@map("bin_cards")
+}
+
+// ────────────────────────────────────────────────────────────────
+// Bin Transaction Model (BE-084)
+//
+// Design notes:
+// - Immutable record of each bin-level stock movement.
+// ────────────────────────────────────────────────────────────────
+model BinTransaction {
+  id              String          @id @default(uuid())
+  binCardId       String          @map("bin_card_id")
+  transactionType TransactionType
+  quantity        Int
+  referenceType   String?         @map("reference_type")
+  referenceId     String?         @map("reference_id")
+  referenceNumber String?         @map("reference_number")
+  notes           String?
+  createdBy       String          @map("created_by")
+  createdAt       DateTime        @default(now()) @map("created_at")
+
+  // Relationships
+  binCard         BinCard         @relation(fields: [binCardId], references: [id], onDelete: Restrict)
+  createdByUser   User            @relation("BinTransactionCreatedBy", fields: [createdBy], references: [id], onDelete: Restrict)
+
+  @@index([binCardId])
+  @@index([transactionType])
+  @@index([referenceType, referenceId])
+  @@index([createdAt])
+  @@map("bin_transactions")
+}
+
+// ────────────────────────────────────────────────────────────────
+// User Model Additional Relations (BE-063+)
+// ────────────────────────────────────────────────────────────────
