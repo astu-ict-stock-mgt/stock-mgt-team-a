@@ -1,10 +1,12 @@
 // Stock Management System (SMS) - Prisma Database Schema
-// Tasks: BE-010, BE-021 (Users Schema), BE-022 (Roles Schema), BE-024 (User-Role Relationships)
-// SRS Traceability: Section 10.1 (Core Entities: users, roles, user_roles),
+// Tasks: BE-010, BE-021 (Users Schema), BE-022 (Roles Schema), BE-024 (User-Role Relationships),
+//        BE-041 (Stores Schema)
+// SRS Traceability: Section 10.1 (Core Entities: users, roles, user_roles, stores),
 //                   FR-01 (authenticate registered users), FR-02 (RBAC / least privilege),
+//                   FR-05 (manage store information),
 //                   BR-21 (no hard-delete of records that are part of an auditable relationship),
 //                   Appendix C (Initial Permission Matrix)
-// Depends on: BE-021, BE-022
+// Depends on: BE-021, BE-022, BE-041
 
 generator client {
   provider = "prisma-client-js"
@@ -50,6 +52,12 @@ model User {
 
   // BE-024: role-assignment events this user performed on others (audit trail, FR-04 / BR-21)
   roleAssignmentsMade UserRole[] @relation("RoleAssignedBy")
+
+  // BE-041: stores where this user is responsible officer
+  managedStores Store[] @relation("StoreResponsibleOfficer")
+
+  // BE-042: departments where this user is department head
+  headedDepartments Department[] @relation("DepartmentHead")
 
   @@map("users")
 }
@@ -110,4 +118,154 @@ model UserRole {
   @@index([userId])
   @@index([roleId])
   @@map("user_roles")
+}
+
+// ────────────────────────────────────────────────────────────────
+// Store Model (BE-041)
+//
+// Design notes:
+// - Stores represent physical storage locations (main stores, department stores, warehouses).
+// - Each store has a unique code and can be linked to a responsible officer.
+// - Store type classification supports different organizational storage patterns.
+// - BR-21: No hard-delete; status field used for deactivation.
+// - SRS FR-05: Create, update, activate/deactivate store information.
+// ────────────────────────────────────────────────────────────────
+enum StoreType {
+  MAIN_STORE
+  DEPARTMENT_STORE
+  WAREHOUSE
+  TRANSIT_STORE
+  QUARANTINE_STORE
+}
+
+enum StoreStatus {
+  ACTIVE
+  INACTIVE
+}
+
+model Store {
+  id                  String      @id @default(uuid())
+  code                String      @unique
+  name                String
+  type                StoreType   @default(MAIN_STORE)
+  status              StoreStatus @default(ACTIVE)
+  description         String?
+  address             String?
+  responsibleOfficerId String?    @map("responsible_officer_id")
+  createdAt           DateTime    @default(now()) @map("created_at")
+  updatedAt           DateTime    @updatedAt @map("updated_at")
+
+  // Relationships
+  responsibleOfficer  User?       @relation("StoreResponsibleOfficer", fields: [responsibleOfficerId], references: [id], onDelete: SetNull)
+  departments         StoreDepartment[]
+  locations           Location[]
+
+  @@index([code])
+  @@index([status])
+  @@map("stores")
+}
+
+// ────────────────────────────────────────────────────────────────
+// Department Model (BE-042)
+//
+// Design notes:
+// - Departments represent organizational units that interact with stores.
+// - Many-to-many relationship with stores via StoreDepartment.
+// - BR-21: No hard-delete; status field used for deactivation.
+// ────────────────────────────────────────────────────────────────
+enum DepartmentStatus {
+  ACTIVE
+  INACTIVE
+}
+
+model Department {
+  id            String           @id @default(uuid())
+  code          String           @unique
+  name          String
+  status        DepartmentStatus @default(ACTIVE)
+  description   String?
+  headUserId    String?          @map("head_user_id")
+  createdAt     DateTime         @default(now()) @map("created_at")
+  updatedAt     DateTime         @updatedAt @map("updated_at")
+
+  // Relationships
+  headUser      User?            @relation("DepartmentHead", fields: [headUserId], references: [id], onDelete: SetNull)
+  stores        StoreDepartment[]
+
+  @@index([code])
+  @@index([status])
+  @@map("departments")
+}
+
+// ────────────────────────────────────────────────────────────────
+// Store-Department Join Model (BE-042)
+//
+// Design notes:
+// - Many-to-many relationship between stores and departments.
+// - Allows departments to be associated with multiple stores.
+// ────────────────────────────────────────────────────────────────
+model StoreDepartment {
+  id           String     @id @default(uuid())
+  storeId      String     @map("store_id")
+  departmentId String     @map("department_id")
+  isPrimary    Boolean    @default(false) @map("is_primary")
+  createdAt    DateTime   @default(now()) @map("created_at")
+  updatedAt    DateTime   @updatedAt @map("updated_at")
+
+  // Relationships
+  store        Store      @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  department   Department @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+
+  @@unique([storeId, departmentId], name: "uq_store_department")
+  @@index([storeId])
+  @@index([departmentId])
+  @@map("store_departments")
+}
+
+// ────────────────────────────────────────────────────────────────
+// Location Model (BE-047)
+//
+// Design notes:
+// - Hierarchical physical locations within stores (area -> shelf -> rack -> bin).
+// - Self-referential parent-child relationship for hierarchy.
+// - Each location belongs to a specific store.
+// - BR-21: No hard-delete; status field used for deactivation.
+// - SRS FR-09: Maintain hierarchical physical locations for materials.
+// ────────────────────────────────────────────────────────────────
+enum LocationType {
+  STORE
+  AREA
+  SHELF
+  RACK
+  BIN
+}
+
+enum LocationStatus {
+  ACTIVE
+  INACTIVE
+}
+
+model Location {
+  id          String         @id @default(uuid())
+  code        String         @unique
+  name        String
+  type        LocationType   @default(BIN)
+  storeId     String         @map("store_id")
+  parentId    String?        @map("parent_id")
+  status      LocationStatus @default(ACTIVE)
+  capacity    Int?
+  description String?
+  createdAt   DateTime       @default(now()) @map("created_at")
+  updatedAt   DateTime       @updatedAt @map("updated_at")
+
+  // Relationships
+  store       Store          @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  parent      Location?      @relation("LocationHierarchy", fields: [parentId], references: [id], onDelete: SetNull)
+  children    Location[]     @relation("LocationHierarchy")
+
+  @@index([code])
+  @@index([storeId])
+  @@index([parentId])
+  @@index([type])
+  @@map("locations")
 }
