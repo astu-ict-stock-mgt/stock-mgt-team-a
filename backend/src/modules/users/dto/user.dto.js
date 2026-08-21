@@ -1,6 +1,6 @@
 /**
  * User Management DTOs (Data Transfer Objects)
- * Task: BE-034 (User Management Service)
+ * Tasks: BE-034, BE-038 (User Management, Account Activation)
  * SRS Traceability: FR-01 (User Management)
  */
 
@@ -54,5 +54,17 @@ export const assignRolesSchema = Joi.object({
     'array.min': 'At least one role ID must be provided',
     'string.uuid': 'Invalid role ID format',
     'any.required': 'Role IDs are required',
+  }),
+})
+
+/**
+ * Bulk Action Schema (for activation/deactivation)
+ */
+export const bulkActionSchema = Joi.object({
+  userIds: Joi.array().items(Joi.string().uuid()).min(1).required().messages({
+    'array.base': 'User IDs must be an array',
+    'array.min': 'At least one user ID must be provided',
+    'string.uuid': 'Invalid user ID format',
+    'any.required': 'User IDs are required',
   }),
 })
