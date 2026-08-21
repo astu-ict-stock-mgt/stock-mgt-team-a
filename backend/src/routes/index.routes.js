@@ -9,6 +9,7 @@ import rbacRoutes from './rbac.routes.js'
 import authRoutes from '../modules/auth/auth.routes.js'
 import { storeRoutes } from '../modules/stores/index.js'
 import { departmentRoutes } from '../modules/departments/index.js'
+import { categoryRoutes } from '../modules/categories/index.js'
 
 const router = Router()
 
@@ -17,5 +18,6 @@ router.use('/', rbacRoutes)
 router.use('/auth', authRoutes)
 router.use('/stores', storeRoutes)
 router.use('/departments', departmentRoutes)
+router.use('/categories', categoryRoutes)
 
 export default router
