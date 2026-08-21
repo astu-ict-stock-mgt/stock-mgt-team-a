@@ -1,5 +1,5 @@
 import grnService from './grn.service.js';
-import { sendSuccess, sendError } from '../../../utils/response.js';
+import { sendSuccess, sendError } from '../../utils/response.js';
 
 class GRNController {
   async create(req, res, next) {
