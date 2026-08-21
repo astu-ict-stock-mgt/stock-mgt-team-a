@@ -63,7 +63,171 @@ model User {
 }
 
 // ────────────────────────────────────────────────────────────────
-// Role Model (BE-022)
+// Category Model (BE-043)
+//
+// Design notes:
+// - Hierarchical categories for organizing items (e.g., Electronics -> Phones).
+// - Self-referential parent-child relationship for category hierarchy.
+// - BR-21: No hard-delete; status field used for deactivation.
+// - SRS FR-06: Maintain categories for item classification.
+// ────────────────────────────────────────────────────────────────
+enum CategoryStatus {
+  ACTIVE
+  INACTIVE
+}
+
+model Category {
+  id          String         @id @default(uuid())
+  code        String         @unique
+  name        String
+  parentId    String?        @map("parent_id")
+  status      CategoryStatus @default(ACTIVE)
+  description String?
+  createdAt   DateTime       @default(now()) @map("created_at")
+  updatedAt   DateTime       @updatedAt @map("updated_at")
+
+  // Relationships
+  parent   Category?  @relation("CategoryHierarchy", fields: [parentId], references: [id], onDelete: SetNull)
+  children Category[] @relation("CategoryHierarchy")
+  items    Item[]
+
+  @@index([code])
+  @@index([parentId])
+  @@index([status])
+  @@map("categories")
+}
+
+// ────────────────────────────────────────────────────────────────
+// Unit of Measure Model (BE-044)
+//
+// Design notes:
+// - Standard units for measuring items (e.g., KG, LTR, PCS, BOX).
+// - Conversion factor to base unit for cross-unit calculations.
+// - BR-21: No hard-delete; status field used for deactivation.
+// - SRS FR-06: Maintain standardized units of measure.
+// ────────────────────────────────────────────────────────────────
+enum UnitStatus {
+  ACTIVE
+  INACTIVE
+}
+
+model Unit {
+  id              String     @id @default(uuid())
+  code            String     @unique
+  name            String
+  symbol          String
+  conversionFactor Float?    @map("conversion_factor")
+  status          UnitStatus @default(ACTIVE)
+  description     String?
+  createdAt       DateTime   @default(now()) @map("created_at")
+  updatedAt       DateTime   @updatedAt @map("updated_at")
+
+  // Relationships
+  items Item[]
+
+  @@index([code])
+  @@index([status])
+  @@map("units")
+}
+
+// ────────────────────────────────────────────────────────────────
+// Supplier Model (BE-046)
+//
+// Design notes:
+// - External suppliers or donors who provide items to the organization.
+// - Contact information and performance tracking fields.
+// - BR-21: No hard-delete; status field used for deactivation.
+// - SRS FR-08: Maintain supplier information.
+// ────────────────────────────────────────────────────────────────
+enum SupplierStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+}
+
+model Supplier {
+  id              String         @id @default(uuid())
+  code            String         @unique
+  name            String
+  type            SupplierType   @default(COMPANY)
+  status          SupplierStatus @default(ACTIVE)
+  contactPerson   String?        @map("contact_person")
+  email           String?
+  phone           String?
+  address         String?
+  taxId           String?        @map("tax_id")
+  paymentTerms    String?        @map("payment_terms")
+  leadTimeDays    Int?           @map("lead_time_days")
+  rating          Float?
+  notes           String?
+  createdAt       DateTime       @default(now()) @map("created_at")
+  updatedAt       DateTime       @updatedAt @map("updated_at")
+
+  // Relationships
+  items Item[]
+
+  @@index([code])
+  @@index([status])
+  @@index([type])
+  @@map("suppliers")
+}
+
+enum SupplierType {
+  COMPANY
+  DONOR
+  GOVERNMENT
+  NGO
+}
+
+// ────────────────────────────────────────────────────────────────
+// Item Model (BE-045)
+//
+// Design notes:
+// - Master record for each distinct material/product in the system.
+// - References category, unit, and optionally supplier.
+// - BR-21: No hard-delete; status field used for deactivation.
+// - SRS FR-07: Maintain item master data.
+// ────────────────────────────────────────────────────────────────
+enum ItemStatus {
+  ACTIVE
+  INACTIVE
+  DISCONTINUED
+}
+
+model Item {
+  id              String     @id @default(uuid())
+  code            String     @unique
+  name            String
+  description     String?
+  categoryId      String?    @map("category_id")
+  unitId          String     @map("unit_id")
+  supplierId      String?    @map("supplier_id")
+  status          ItemStatus @default(ACTIVE)
+  minimumStock    Int?       @map("minimum_stock")
+  maximumStock    Int?       @map("maximum_stock")
+  reorderPoint    Int?       @map("reorder_point")
+  unitCost        Decimal?   @map("unit_cost")
+  weight          String?    @map("weight")
+  dimensions      String?
+  barcode         String?
+  createdAt       DateTime   @default(now()) @map("created_at")
+  updatedAt       DateTime   @updatedAt @map("updated_at")
+
+  // Relationships
+  category   Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  unit       Unit      @relation(fields: [unitId], references: [id], onDelete: Restrict)
+  supplier   Supplier? @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+
+  @@index([code])
+  @@index([categoryId])
+  @@index([unitId])
+  @@index([supplierId])
+  @@index([status])
+  @@map("items")
+}
+
+// ────────────────────────────────────────────────────────────────
+// Location Model (BE-047)
 // ────────────────────────────────────────────────────────────────
 model Role {
   id            String   @id @default(uuid())
