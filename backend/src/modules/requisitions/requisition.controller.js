@@ -1,7 +1,7 @@
 /**
  * Requisition Controller
- * Tasks: BE-098, BE-099 (Implement Requisition Create API)
- * SRS Traceability: Section 6 (Requisition Module)
+ * Tasks: BE-098, BE-099, BE-100 (Implement Requisition Approval Routing)
+ * SRS Traceability: Section 6 (Requisition Module), Clarification C-01
  */
 
 import {
@@ -53,6 +53,58 @@ export const list = async (req, res, next) => {
       page: result.page,
       totalPages: result.totalPages,
     })
+  } catch (err) {
+    next(err)
+  }
+}
+
+/**
+ * Handle PATCH /api/requisitions/:id/approve-department endpoint (BE-100)
+ */
+export const approveDepartment = async (req, res, next) => {
+  try {
+    const approverId = req.user?.userId || req.user?.id || 'usr-dept-head'
+    const result = await approveDepartmentRequisition({
+      id: req.params.id,
+      approverId,
+      lineApprovals: req.body.lineApprovals,
+    })
+    sendSuccess(res, result)
+  } catch (err) {
+    next(err)
+  }
+}
+
+/**
+ * Handle PATCH /api/requisitions/:id/approve-pao endpoint (BE-100)
+ */
+export const approvePAO = async (req, res, next) => {
+  try {
+    const paoUserId = req.user?.userId || req.user?.id || 'usr-pao-officer'
+    const result = await approvePAORequisition({
+      id: req.params.id,
+      paoUserId,
+      lineApprovals: req.body.lineApprovals,
+    })
+    sendSuccess(res, result)
+  } catch (err) {
+    next(err)
+  }
+}
+
+/**
+ * Handle PATCH /api/requisitions/:id/reject endpoint (BE-100)
+ */
+export const reject = async (req, res, next) => {
+  try {
+    const rejectedByUserId = req.user?.userId || req.user?.id || 'usr-approver'
+    const result = await rejectRequisition({
+      id: req.params.id,
+      rejectedByUserId,
+      reason: req.body.reason,
+      level: req.body.level,
+    })
+    sendSuccess(res, result)
   } catch (err) {
     next(err)
   }
