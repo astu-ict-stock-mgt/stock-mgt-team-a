@@ -14,6 +14,7 @@ import { unitRoutes } from '../modules/units/index.js'
 import { itemRoutes } from '../modules/items/index.js'
 import { supplierRoutes } from '../modules/suppliers/index.js'
 import { locationRoutes } from '../modules/locations/index.js'
+import { masterDataRoutes } from '../modules/master-data/index.js'
 
 const router = Router()
 
@@ -27,5 +28,6 @@ router.use('/units', unitRoutes)
 router.use('/items', itemRoutes)
 router.use('/suppliers', supplierRoutes)
 router.use('/locations', locationRoutes)
+router.use('/master-data', masterDataRoutes)
 
 export default router
