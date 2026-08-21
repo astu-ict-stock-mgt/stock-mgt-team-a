@@ -1,5 +1,5 @@
 import storeService from './store.service.js';
-import { sendSuccess, sendError } from '../../../utils/response.js';
+import { sendSuccess, sendError } from '../../utils/response.js';
 
 class StoreController {
   async create(req, res, next) {
