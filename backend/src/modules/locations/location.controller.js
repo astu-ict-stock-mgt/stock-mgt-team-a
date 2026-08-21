@@ -1,5 +1,5 @@
 import locationService from './location.service.js';
-import { sendSuccess, sendError } from '../../../utils/response.js';
+import { sendSuccess, sendError } from '../../utils/response.js';
 
 class LocationController {
   async create(req, res, next) {

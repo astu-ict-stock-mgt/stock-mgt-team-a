@@ -74,6 +74,11 @@ model User {
   // BE-084: bin transactions created by this user
   binTransactionsCreated BinTransaction[] @relation("BinTransactionCreatedBy")
 
+  // BE-096: requisitions requested or approved by this user
+  requisitionsRequested      Requisition[] @relation("RequisitionRequester")
+  requisitionsDeptApproved   Requisition[] @relation("RequisitionDeptApprover")
+  requisitionsPaoApproved    Requisition[] @relation("RequisitionPAOApprover")
+
   @@map("users")
 }
 
@@ -237,6 +242,7 @@ model Item {
   goodsReceiptLines GoodsReceiptLine[]
   stockCards StockCard[]
   binCards   BinCard[]
+  requisitionLines RequisitionLine[]
 
   @@index([code])
   @@index([categoryId])
@@ -345,6 +351,7 @@ model Store {
   locations           Location[]
   goodsReceipts       GoodsReceipt[]
   stockCards          StockCard[]
+  requisitions        Requisition[]
 
   @@index([code])
   @@index([status])
@@ -378,6 +385,7 @@ model Department {
   headUser      User?            @relation("DepartmentHead", fields: [headUserId], references: [id], onDelete: SetNull)
   stores        StoreDepartment[]
   goodsReceipts GoodsReceipt[]
+  requisitions  Requisition[]
 
   @@index([code])
   @@index([status])
@@ -750,5 +758,69 @@ model BinTransaction {
 }
 
 // ────────────────────────────────────────────────────────────────
-// User Model Additional Relations (BE-063+)
+// User Model Additional Relations & Requisition Schema (BE-096)
 // ────────────────────────────────────────────────────────────────
+
+enum RequisitionStatus {
+  DRAFT
+  SUBMITTED
+  DEPARTMENT_APPROVED
+  DEPARTMENT_REJECTED
+  PAO_APPROVED
+  PAO_REJECTED
+  CANCELLED
+  COMPLETED
+  PARTIALLY_ISSUED
+}
+
+model Requisition {
+  id                   String            @id @default(uuid())
+  requisitionNumber    String            @unique @map("requisition_number")
+  requesterId          String            @map("requester_id")
+  departmentId         String            @map("department_id")
+  storeId              String            @map("store_id")
+  status               RequisitionStatus @default(DRAFT)
+  purpose              String
+  rejectionReason      String?           @map("rejection_reason")
+  departmentApprovedAt DateTime?         @map("department_approved_at")
+  departmentApprovedBy String?           @map("department_approved_by")
+  paoApprovedAt        DateTime?         @map("pao_approved_at")
+  paoApprovedBy        String?           @map("pao_approved_by")
+  createdAt            DateTime          @default(now()) @map("created_at")
+  updatedAt            DateTime          @updatedAt @map("updated_at")
+
+  requester                User              @relation("RequisitionRequester", fields: [requesterId], references: [id], onDelete: Restrict)
+  department               Department        @relation(fields: [departmentId], references: [id], onDelete: Restrict)
+  store                    Store             @relation(fields: [storeId], references: [id], onDelete: Restrict)
+  departmentApprovedByUser User?             @relation("RequisitionDeptApprover", fields: [departmentApprovedBy], references: [id], onDelete: SetNull)
+  paoApprovedByUser        User?             @relation("RequisitionPAOApprover", fields: [paoApprovedBy], references: [id], onDelete: SetNull)
+  lines                    RequisitionLine[]
+
+  @@index([requisitionNumber])
+  @@index([requesterId])
+  @@index([departmentId])
+  @@index([storeId])
+  @@index([status])
+  @@map("requisitions")
+}
+
+model RequisitionLine {
+  id                String      @id @default(uuid())
+  requisitionId     String      @map("requisition_id")
+  itemId            String      @map("item_id")
+  requestedQuantity Int         @map("requested_quantity")
+  approvedQuantity  Int?        @map("approved_quantity")
+  issuedQuantity    Int         @default(0) @map("issued_quantity")
+  remarks           String?
+  createdAt         DateTime    @default(now()) @map("created_at")
+  updatedAt         DateTime    @updatedAt @map("updated_at")
+
+  requisition       Requisition @relation(fields: [requisitionId], references: [id], onDelete: Cascade)
+  item              Item        @relation(fields: [itemId], references: [id], onDelete: Restrict)
+
+  @@unique([requisitionId, itemId], name: "uq_requisition_line_item")
+  @@index([requisitionId])
+  @@index([itemId])
+  @@map("requisition_lines")
+}
+
