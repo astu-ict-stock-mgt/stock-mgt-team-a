@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { ToastContainer, useToast, Icons, SearchBar } from './components/ui'
 import { useApp } from './context/AppContext'
+import Dashboard from './screens/Dashboard'
+import Reports from './screens/Reports'
 
 type Screen =
   | 'dashboard'
@@ -324,7 +326,7 @@ export default function App() {
         {/* MAIN SCROLL AREA */}
         <main className="flex-1 overflow-auto bg-[#F8FAFC] print:bg-white print:overflow-visible">
           <div className="p-6 max-w-[1400px] mx-auto min-h-full print:p-0 print:max-w-none">
-            {screen === 'dashboard' && <PlaceholderScreen title="Dashboard" />}
+            {screen === 'dashboard' && <Dashboard />}
             {screen === 'inventory' && <PlaceholderScreen title="Inventory" />}
             {screen === 'suppliers' && <PlaceholderScreen title="Suppliers" />}
             {screen === 'stock-receiving' && <PlaceholderScreen title="Stock Receiving" />}
@@ -334,7 +336,7 @@ export default function App() {
             {screen === 'stock-taking' && <PlaceholderScreen title="Stock Taking" />}
             {screen === 'users' && <PlaceholderScreen title="User Management" />}
             {screen === 'roles' && <PlaceholderScreen title="Roles & Permissions" />}
-            {screen === 'reports' && <PlaceholderScreen title="Reports" />}
+            {screen === 'reports' && <Reports />}
             {screen === 'audit' && <PlaceholderScreen title="Audit Log" />}
             {screen === 'notifications' && <PlaceholderScreen title="Notifications" />}
             {screen === 'settings' && <PlaceholderScreen title="Settings" />}
