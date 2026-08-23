@@ -87,6 +87,10 @@ model User {
   transfersRequested         TransferRequest[] @relation("TransferRequestedBy")
   transfersApproved          TransferRequest[] @relation("TransferApprovedBy")
   fixedAssetsCustody         FixedAsset[]      @relation("FixedAssetCustodian")
+  disposalsRequested         DisposalRequest[] @relation("DisposalRequestedBy")
+  disposalsEvaluated         DisposalRequest[] @relation("DisposalEvaluatedBy")
+  disposalsApproved          DisposalRequest[] @relation("DisposalApprovedBy")
+  disposalsExecuted          DisposalRequest[] @relation("DisposalExecutedBy")
 
   @@map("users")
 }
@@ -371,6 +375,7 @@ model Store {
   transfersAsSource   TransferRequest[] @relation("TransferSourceStore")
   transfersAsDestination TransferRequest[] @relation("TransferDestinationStore")
   shelfLifeRecords       ShelfLifeRecord[]
+  disposalRequests       DisposalRequest[]
 
   @@index([code])
   @@index([status])
@@ -1157,6 +1162,66 @@ model ShelfLifeRecord {
   @@index([storeId])
   @@map("shelflife_records")
 }
+
+// ────────────────────────────────────────────────────────────────
+// Disposal Request Models (BE-136)
+//
+// Design notes:
+// - Disposal Request Number format (SRS C-13): DSP-YYYY-XXXXX
+// - Methods: AUCTION, DONATION, DESTRUCTION, RECYCLING, TRANSFER_OUT
+// - Lifecycle statuses: DRAFT, SUBMITTED, EVALUATED, APPROVED, REJECTED, EXECUTED, CANCELLED
+// ────────────────────────────────────────────────────────────────
+enum DisposalMethod {
+  AUCTION
+  DONATION
+  DESTRUCTION
+  RECYCLING
+  TRANSFER_OUT
+}
+
+enum DisposalStatus {
+  DRAFT
+  SUBMITTED
+  EVALUATED
+  APPROVED
+  REJECTED
+  EXECUTED
+  CANCELLED
+}
+
+model DisposalRequest {
+  id             String         @id @default(uuid())
+  disposalNumber String         @unique @map("disposal_number")
+  disposalMethod DisposalMethod @map("disposal_method")
+  status         DisposalStatus @default(DRAFT)
+  storeId        String?        @map("store_id")
+
+  requestedBy String    @map("requested_by")
+  evaluatedBy String?   @map("evaluated_by")
+  evaluatedAt DateTime? @map("evaluated_at")
+  approvedBy  String?   @map("approved_by")
+  approvedAt  DateTime? @map("approved_at")
+  executedBy  String?   @map("executed_by")
+  executedAt  DateTime? @map("executed_at")
+
+  reason    String?
+  notes     String?
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  store           Store? @relation(fields: [storeId], references: [id], onDelete: SetNull)
+  requestedByUser User   @relation("DisposalRequestedBy", fields: [requestedBy], references: [id], onDelete: Restrict)
+  evaluatedByUser User?  @relation("DisposalEvaluatedBy", fields: [evaluatedBy], references: [id], onDelete: SetNull)
+  approvedByUser  User?  @relation("DisposalApprovedBy", fields: [approvedBy], references: [id], onDelete: SetNull)
+  executedByUser  User?  @relation("DisposalExecutedBy", fields: [executedBy], references: [id], onDelete: SetNull)
+
+  @@index([disposalNumber])
+  @@index([status])
+  @@index([storeId])
+  @@index([requestedBy])
+  @@map("disposal_requests")
+}
+
 
 
 
