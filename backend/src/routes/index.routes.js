@@ -1,6 +1,6 @@
 /**
  * Master Router Aggregator
- * Tasks: BE-006, BE-028, BE-099, BE-106, BE-117, BE-124 (Transfer Request APIs)
+ * Tasks: BE-006, BE-028, BE-099, BE-106, BE-117, BE-124, BE-130 (Asset Registration APIs)
  */
 
 import { Router } from 'express'
@@ -21,6 +21,7 @@ import requisitionRoutes from '../modules/requisitions/requisition.routes.js'
 import sivRoutes from '../modules/siv/siv.routes.js'
 import returnRoutes from '../modules/returns/return.routes.js'
 import transferRoutes from '../modules/transfers/transfer.routes.js'
+import assetRoutes from '../modules/assets/asset.routes.js'
 
 const router = Router()
 
@@ -44,5 +45,6 @@ router.use('/requisitions', requisitionRoutes)
 router.use('/sivs', sivRoutes)
 router.use('/returns', returnRoutes)
 router.use('/transfers', transferRoutes)
+router.use('/assets', assetRoutes)
 
 export default router
