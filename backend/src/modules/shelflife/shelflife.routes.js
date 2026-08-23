@@ -1,10 +1,10 @@
 /**
  * Shelf-Life Router & OpenAPI Specs
- * Task: BE-134 (Implement Expiry/Status Rules)
+ * Tasks: BE-134, BE-135 (Implement Disposal Candidate Detection)
  */
 
 import { Router } from 'express'
-import { createBatch, getById, list, getExpiring, evaluate } from './shelflife.controller.js'
+import { createBatch, getById, list, getExpiring, evaluate, getDisposalCandidates } from './shelflife.controller.js'
 import { validateRequest } from '../../middleware/validate.middleware.js'
 import { authenticate } from '../../middleware/auth.middleware.js'
 import { authorize } from '../../middleware/rbac.middleware.js'
@@ -71,6 +71,22 @@ router.post(
  *         description: Evaluation summary returned with updated record counts
  */
 router.post('/evaluate', authenticate, authorize(PERMISSIONS.INVENTORY_READ), evaluate)
+
+/**
+ * @openapi
+ * /shelflife/disposal-candidates:
+ *   get:
+ *     summary: Detect items and assets eligible for disposal recommendation (expired batches, return disposals, fixed assets)
+ *     tags:
+ *       - Shelf-Life & Expiry
+ *       - Disposal
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Aggregated disposal candidates list (BR-17 compliant, non-mutating scan)
+ */
+router.get('/disposal-candidates', authenticate, authorize(PERMISSIONS.INVENTORY_READ), getDisposalCandidates)
 
 router.get('/batches/expiring', authenticate, authorize(PERMISSIONS.INVENTORY_READ), getExpiring)
 router.get('/batches', authenticate, authorize(PERMISSIONS.INVENTORY_READ), list)

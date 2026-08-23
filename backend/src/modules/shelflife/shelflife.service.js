@@ -1,7 +1,7 @@
 /**
  * Central Shelf-Life & Expiry Status Calculation Engine & Service
- * Tasks: BE-132, BE-134 (Implement Expiry/Status Rules)
- * SRS Traceability: Section 10 (Shelf-Life & Expiry Module), Clarification Register C-12
+ * Tasks: BE-132, BE-134, BE-135 (Implement Disposal Candidate Detection)
+ * SRS Traceability: Section 10 (Shelf-Life & Expiry), Section 11 (Disposal), SRS BR-17
  */
 
 import { prisma } from '../../config/database.js'
@@ -215,5 +215,66 @@ export async function evaluateBatchStatuses() {
     nearExpiryCount,
     expiredCount,
     evaluatedAt: referenceDate.toISOString(),
+  }
+}
+
+/**
+ * Detect Disposal Candidates automatically without hard delete or silent stock mutation (BE-135, SRS BR-17)
+ * Combines 3 signals:
+ * 1. Expired shelf-life batches (status = 'EXPIRED')
+ * 2. Return lines evaluated for disposal (disposition = 'DISPOSAL')
+ * 3. Fixed assets marked for disposal (status IN ('DISPOSED', 'WRITTEN_OFF'))
+ * 
+ * @param {Object} [filters={}] - { storeId }
+ * @returns {Promise<Object>} Aggregated disposal candidates summary
+ */
+export async function detectDisposalCandidates(filters = {}) {
+  const { storeId } = filters
+
+  const [expiredBatches, returnDisposals, fixedAssets] = await Promise.all([
+    prisma.shelfLifeRecord.findMany({
+      where: {
+        status: 'EXPIRED',
+        ...(storeId && { storeId }),
+      },
+      include: {
+        item: { select: { id: true, name: true, code: true } },
+        store: { select: { id: true, name: true } },
+      },
+    }),
+
+    prisma.returnLine.findMany({
+      where: {
+        disposition: 'DISPOSAL',
+        ...(storeId && { return: { storeId } }),
+      },
+      include: {
+        item: { select: { id: true, name: true, code: true } },
+        return: { select: { id: true, returnNumber: true, status: true, storeId: true } },
+      },
+    }),
+
+    prisma.fixedAsset.findMany({
+      where: {
+        status: { in: ['DISPOSED', 'WRITTEN_OFF'] },
+      },
+      include: {
+        item: { select: { id: true, name: true, code: true } },
+        custodian: { select: { id: true, fullName: true } },
+        department: { select: { id: true, name: true } },
+      },
+    }),
+  ])
+
+  const totalCandidates = expiredBatches.length + returnDisposals.length + fixedAssets.length
+
+  return {
+    totalCandidates,
+    candidates: {
+      expiredBatches,
+      returnDisposals,
+      fixedAssets,
+    },
+    detectedAt: new Date().toISOString(),
   }
 }

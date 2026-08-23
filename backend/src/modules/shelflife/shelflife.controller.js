@@ -1,7 +1,7 @@
 /**
  * Shelf-Life & Expiry Controller
- * Task: BE-134 (Implement Expiry/Status Rules)
- * SRS Traceability: Section 10 (Shelf-Life & Expiry Module)
+ * Tasks: BE-134, BE-135 (Implement Disposal Candidate Detection)
+ * SRS Traceability: Section 10 (Shelf-Life & Expiry Module), Section 11 (Disposal)
  */
 
 import {
@@ -10,6 +10,7 @@ import {
   listBatches,
   getExpiringBatches,
   evaluateBatchStatuses,
+  detectDisposalCandidates,
 } from './shelflife.service.js'
 import { sendCreated, sendSuccess } from '../../utils/response.js'
 
@@ -72,6 +73,18 @@ export const evaluate = async (req, res, next) => {
   try {
     const summary = await evaluateBatchStatuses()
     sendSuccess(res, summary)
+  } catch (err) {
+    next(err)
+  }
+}
+
+/**
+ * Handle GET /api/shelflife/disposal-candidates endpoint (BE-135)
+ */
+export const getDisposalCandidates = async (req, res, next) => {
+  try {
+    const result = await detectDisposalCandidates(req.query)
+    sendSuccess(res, result)
   } catch (err) {
     next(err)
   }
