@@ -1,12 +1,5 @@
 -- PostgreSQL Migration: 7_create_return_schema
--- Tasks: BE-114 (Create Return Schema), BE-115 (Create Return Lines Schema)
--- SRS Traceability: Section 10.1 (Core Entities: returns, return_lines),
---                   FR-32 (material return requests / SRN),
---                   FR-33 (technical evaluation of returned materials),
---                   FR-34 (approval/rejection and stock update),
---                   BR-13 (return stock increases after approval & disposition),
---                   BR-21 (auditability and no hard-delete),
---                   Clarification C-09 (disposition options)
+-- Tasks: BE-115 (Create Return Lines Schema)
 
 -- 1. Create Enum Types
 CREATE TYPE "ReturnStatus" AS ENUM (
