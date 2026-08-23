@@ -818,6 +818,7 @@ model RequisitionLine {
   requisition       Requisition @relation(fields: [requisitionId], references: [id], onDelete: Cascade)
   item              Item        @relation(fields: [itemId], references: [id], onDelete: Restrict)
 
+  @@unique([requisitionId, itemId], name: "uq_requisition_line_item")
   @@index([requisitionId])
   @@index([itemId])
   @@map("requisition_lines")

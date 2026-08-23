@@ -1,5 +1,5 @@
 import { PrismaClient } from '@prisma/client';
-import { NotFoundError, ValidationError } from '../../../utils/errors.js';
+import { NotFoundError, ValidationError } from '../../utils/errors.js';
 
 const prisma = new PrismaClient();
 

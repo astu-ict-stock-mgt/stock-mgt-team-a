@@ -1,5 +1,5 @@
 import evaluationService from './evaluation.service.js';
-import { sendSuccess, sendError } from '../../../utils/response.js';
+import { sendSuccess, sendError } from '../../utils/response.js';
 
 class EvaluationController {
   async create(req, res, next) {

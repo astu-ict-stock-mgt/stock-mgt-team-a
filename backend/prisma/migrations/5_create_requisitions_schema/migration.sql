@@ -1,5 +1,5 @@
 -- PostgreSQL Migration: 5_create_requisitions_schema
--- Task: BE-096 (Create Requisition Schema)
+-- Tasks: BE-096 (Create Requisition Schema), BE-097 (Create Requisition Lines Schema)
 -- SRS Traceability: Section 10.1 (Core Entities), Section 6 (Requisition & Issue Module), Clarification C-01
 
 -- 1. Create Enum Type RequisitionStatus
@@ -54,6 +54,7 @@ CREATE TABLE "requisition_lines" (
 
 -- 4. Create Unique Constraints & Indexes
 CREATE UNIQUE INDEX "requisitions_requisition_number_key" ON "requisitions"("requisition_number");
+CREATE UNIQUE INDEX "uq_requisition_line_item" ON "requisition_lines"("requisition_id", "item_id");
 CREATE INDEX "requisitions_requisition_number_idx" ON "requisitions"("requisition_number");
 CREATE INDEX "requisitions_requester_id_idx" ON "requisitions"("requester_id");
 CREATE INDEX "requisitions_department_id_idx" ON "requisitions"("department_id");
