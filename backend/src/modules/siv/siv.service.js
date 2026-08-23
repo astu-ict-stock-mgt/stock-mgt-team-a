@@ -1,6 +1,6 @@
 /**
  * Central Store Issue Voucher (SIV/ISIV) Service & Workflow Engine
- * Tasks: BE-103, BE-104, BE-105 (Implement SIV/ISIV Service)
+ * Tasks: BE-103, BE-104, BE-105, BE-107 (Implement SIV/ISIV Amendment API)
  * SRS Traceability: Section 6 (Store Issue Module), Clarification Register C-01
  */
 
@@ -32,7 +32,6 @@ export async function createSIV({ requisitionId, storeId, issuedToUserId, prepar
     throw new ValidationError('SIV must contain at least one item line')
   }
 
-  // Validate requisition existence and approval status
   const requisition = await prisma.requisition.findUnique({
     where: { id: requisitionId },
   })
@@ -45,7 +44,6 @@ export async function createSIV({ requisitionId, storeId, issuedToUserId, prepar
     throw new ConflictError(`SIV cannot be issued for requisition in status '${requisition.status}'`)
   }
 
-  // Validate line items
   for (const line of lines) {
     if (!line.itemId || !line.quantityIssued || line.quantityIssued <= 0) {
       throw new ValidationError('Each SIV line requires a valid itemId and positive quantityIssued')
@@ -188,7 +186,6 @@ export async function finalizeSIV({ id }) {
   }
 
   return prisma.$transaction(async (tx) => {
-    // Update requisition line issued quantities
     for (const line of siv.lines) {
       await tx.requisitionLine.updateMany({
         where: {
@@ -205,6 +202,49 @@ export async function finalizeSIV({ id }) {
       where: { id },
       data: {
         status: 'FINALIZED',
+      },
+      include: { lines: true },
+    })
+  })
+}
+
+/**
+ * Amend Preliminary SIV Voucher (BE-107)
+ * @param {Object} params - { id, notes, issuedToUserId, lineAmendments }
+ * @returns {Promise<Object>} Amended SIV record
+ */
+export async function amendSIV({ id, notes, issuedToUserId, lineAmendments }) {
+  const siv = await getSivById(id)
+
+  if (!['DRAFT', 'PREPARED'].includes(siv.status)) {
+    throw new ConflictError(`SIV cannot be amended from current status '${siv.status}'`)
+  }
+
+  return prisma.$transaction(async (tx) => {
+    if (Array.isArray(lineAmendments) && lineAmendments.length > 0) {
+      for (const amendment of lineAmendments) {
+        if (amendment.lineId && amendment.quantityIssued && amendment.quantityIssued > 0) {
+          const existingLine = siv.lines.find((l) => l.id === amendment.lineId)
+          const unitCost = existingLine?.unitCost ? Number(existingLine.unitCost) : null
+          const totalCost = unitCost ? unitCost * amendment.quantityIssued : null
+
+          await tx.sIVLine.update({
+            where: { id: amendment.lineId },
+            data: {
+              quantityIssued: amendment.quantityIssued,
+              totalCost,
+              ...(amendment.remarks && { remarks: amendment.remarks }),
+            },
+          })
+        }
+      }
+    }
+
+    return tx.sIV.update({
+      where: { id },
+      data: {
+        ...(notes && { notes }),
+        ...(issuedToUserId && { issuedToUserId }),
       },
       include: { lines: true },
     })
