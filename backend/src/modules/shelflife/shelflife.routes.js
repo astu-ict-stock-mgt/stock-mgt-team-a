@@ -52,7 +52,7 @@ const router = Router()
 router.post(
   '/batches',
   authenticate,
-  authorize(PERMISSIONS.INVENTORY_READ),
+  authorize(PERMISSIONS.SHELFLIFE_READ),
   validateRequest({ body: createBatchSchema }),
   createBatch
 )
@@ -70,7 +70,7 @@ router.post(
  *       200:
  *         description: Evaluation summary returned with updated record counts
  */
-router.post('/evaluate', authenticate, authorize(PERMISSIONS.INVENTORY_READ), evaluate)
+router.post('/evaluate', authenticate, authorize(PERMISSIONS.SHELFLIFE_READ), evaluate)
 
 /**
  * @openapi
@@ -86,10 +86,10 @@ router.post('/evaluate', authenticate, authorize(PERMISSIONS.INVENTORY_READ), ev
  *       200:
  *         description: Aggregated disposal candidates list (BR-17 compliant, non-mutating scan)
  */
-router.get('/disposal-candidates', authenticate, authorize(PERMISSIONS.INVENTORY_READ), getDisposalCandidates)
+router.get('/disposal-candidates', authenticate, authorize(PERMISSIONS.SHELFLIFE_READ), getDisposalCandidates)
 
-router.get('/batches/expiring', authenticate, authorize(PERMISSIONS.INVENTORY_READ), getExpiring)
-router.get('/batches', authenticate, authorize(PERMISSIONS.INVENTORY_READ), list)
-router.get('/batches/:id', authenticate, authorize(PERMISSIONS.INVENTORY_READ), getById)
+router.get('/batches/expiring', authenticate, authorize(PERMISSIONS.SHELFLIFE_READ), getExpiring)
+router.get('/batches', authenticate, authorize(PERMISSIONS.SHELFLIFE_READ), list)
+router.get('/batches/:id', authenticate, authorize(PERMISSIONS.SHELFLIFE_READ), getById)
 
 export default router
