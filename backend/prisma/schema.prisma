@@ -253,6 +253,7 @@ model Item {
   requisitionLines RequisitionLine[]
   sivLines         SIVLine[]
   returnLines      ReturnLine[]
+  transferLines    TransferLine[]
 
   @@index([code])
   @@index([categoryId])
@@ -1031,8 +1032,9 @@ model TransferRequest {
   destinationStore    Store     @relation("TransferDestinationStore", fields: [destinationStoreId], references: [id], onDelete: Restrict)
   sourceLocation      Location? @relation("TransferSourceLocation", fields: [sourceLocationId], references: [id], onDelete: SetNull)
   destinationLocation Location? @relation("TransferDestinationLocation", fields: [destinationLocationId], references: [id], onDelete: SetNull)
-  requestedByUser     User      @relation("TransferRequestedBy", fields: [requestedBy], references: [id], onDelete: Restrict)
-  approvedByUser      User?     @relation("TransferApprovedBy", fields: [approvedBy], references: [id], onDelete: SetNull)
+  requestedByUser     User           @relation("TransferRequestedBy", fields: [requestedBy], references: [id], onDelete: Restrict)
+  approvedByUser      User?          @relation("TransferApprovedBy", fields: [approvedBy], references: [id], onDelete: SetNull)
+  lines               TransferLine[]
 
   @@index([transferNumber])
   @@index([sourceStoreId])
@@ -1040,6 +1042,26 @@ model TransferRequest {
   @@index([status])
   @@map("transfer_requests")
 }
+
+model TransferLine {
+  id                  String   @id @default(uuid())
+  transferId          String   @map("transfer_id")
+  itemId              String   @map("item_id")
+  quantityRequested   Int      @map("quantity_requested")
+  quantityTransferred Int?     @default(0) @map("quantity_transferred")
+  remarks             String?
+  createdAt           DateTime @default(now()) @map("created_at")
+  updatedAt           DateTime @updatedAt @map("updated_at")
+
+  transfer TransferRequest @relation(fields: [transferId], references: [id], onDelete: Cascade)
+  item     Item            @relation(fields: [itemId], references: [id], onDelete: Restrict)
+
+  @@unique([transferId, itemId], name: "uq_transfer_line_item")
+  @@index([transferId])
+  @@index([itemId])
+  @@map("transfer_lines")
+}
+
 
 
 
