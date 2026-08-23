@@ -82,6 +82,12 @@ model User {
   approvedSIVs               SIV[]         @relation("SIVApprovedBy")
   issuedToSIVs               SIV[]         @relation("SIVIssuedTo")
 
+  // BE-136 / BE-139: Disposal relations
+  disposalRequestsRequested  DisposalRequest[] @relation("DisposalRequester")
+  disposalRequestsReviewed   DisposalRequest[] @relation("DisposalReviewer")
+  disposalRequestsApproved   DisposalRequest[] @relation("DisposalApprover")
+  disposalRequestsExecuted   DisposalRequest[] @relation("DisposalExecutor")
+
   @@map("users")
 }
 
@@ -247,6 +253,7 @@ model Item {
   binCards   BinCard[]
   requisitionLines RequisitionLine[]
   sivLines         SIVLine[]
+  disposalLines    DisposalRequestLine[]
 
   @@index([code])
   @@index([categoryId])
@@ -357,6 +364,7 @@ model Store {
   stockCards          StockCard[]
   requisitions        Requisition[]
   sivs                SIV[]
+  disposalRequests    DisposalRequest[]
 
   @@index([code])
   @@index([status])
@@ -464,6 +472,7 @@ model Location {
   children    Location[]     @relation("LocationHierarchy")
   goodsReceiptLines GoodsReceiptLine[]
   binCards    BinCard[]
+  disposalLines DisposalRequestLine[]
 
   @@index([code])
   @@index([storeId])
@@ -893,5 +902,103 @@ model SIVLine {
   @@index([itemId])
   @@map("siv_lines")
 }
+
+// ────────────────────────────────────────────────────────────────
+// Disposal Request Models (BE-136, BE-138, BE-139, BE-140)
+//
+// Design notes:
+// - Manages disposal candidate requests, multi-level review/approval, and execution.
+// - DisposalStatus workflow: DRAFT -> PENDING_APPROVAL -> APPROVED / REJECTED -> EXECUTED -> CANCELLED
+// - Disposal execution triggers transactional stock deduction (BE-086).
+// - BR-18: Disposal requires an auditable request, approval, and completion record.
+// - FR-38, FR-39: Flag items, manage disposal workflow and completion evidence.
+// ────────────────────────────────────────────────────────────────
+enum DisposalStatus {
+  DRAFT
+  PENDING_APPROVAL
+  APPROVED
+  REJECTED
+  EXECUTED
+  CANCELLED
+}
+
+enum DisposalMethod {
+  AUCTION
+  DONATION
+  DESTRUCTION
+  RECYCLE
+  TRANSFER
+  WRITE_OFF
+}
+
+model DisposalRequest {
+  id                  String         @id @default(uuid())
+  requestNumber       String         @unique @map("request_number")
+  storeId             String         @map("store_id")
+  requesterId         String         @map("requester_id")
+  status              DisposalStatus @default(DRAFT)
+  disposalMethod      DisposalMethod @default(WRITE_OFF) @map("disposal_method")
+  reason              String
+  remarks             String?
+  totalEstimatedValue Decimal?       @map("total_estimated_value")
+  reviewedBy          String?        @map("reviewed_by")
+  reviewedAt          DateTime?      @map("reviewed_at")
+  reviewNotes         String?        @map("review_notes")
+  approvedBy          String?        @map("approved_by")
+  approvedAt          DateTime?      @map("approved_at")
+  approvalNotes       String?        @map("approval_notes")
+  rejectionReason     String?        @map("rejection_reason")
+  executedBy          String?        @map("executed_by")
+  executedAt          DateTime?      @map("executed_at")
+  executionNotes      String?        @map("execution_notes")
+  witnessName         String?        @map("witness_name")
+  certificateNumber   String?        @map("certificate_number")
+  disposalLocation    String?        @map("disposal_location")
+  createdAt           DateTime       @default(now()) @map("created_at")
+  updatedAt           DateTime       @updatedAt @map("updated_at")
+
+  // Relationships
+  store          Store                 @relation(fields: [storeId], references: [id], onDelete: Restrict)
+  requester      User                  @relation("DisposalRequester", fields: [requesterId], references: [id], onDelete: Restrict)
+  reviewedByUser User?                 @relation("DisposalReviewer", fields: [reviewedBy], references: [id], onDelete: SetNull)
+  approvedByUser User?                 @relation("DisposalApprover", fields: [approvedBy], references: [id], onDelete: SetNull)
+  executedByUser User?                 @relation("DisposalExecutor", fields: [executedBy], references: [id], onDelete: SetNull)
+  lines          DisposalRequestLine[]
+
+  @@index([requestNumber])
+  @@index([storeId])
+  @@index([requesterId])
+  @@index([status])
+  @@map("disposal_requests")
+}
+
+model DisposalRequestLine {
+  id                String    @id @default(uuid())
+  disposalRequestId String    @map("disposal_request_id")
+  itemId            String    @map("item_id")
+  locationId        String?   @map("location_id")
+  quantity          Int
+  unitCost          Decimal?  @map("unit_cost")
+  totalCost         Decimal?  @map("total_cost")
+  condition         String?
+  batchNumber       String?   @map("batch_number")
+  expiryDate        DateTime? @map("expiry_date")
+  remarks           String?
+  status            String    @default("PENDING")
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
+
+  // Relationships
+  disposalRequest DisposalRequest @relation(fields: [disposalRequestId], references: [id], onDelete: Cascade)
+  item            Item            @relation(fields: [itemId], references: [id], onDelete: Restrict)
+  location        Location?       @relation(fields: [locationId], references: [id], onDelete: SetNull)
+
+  @@unique([disposalRequestId, itemId], name: "uq_disposal_line_item")
+  @@index([disposalRequestId])
+  @@index([itemId])
+  @@index([locationId])
+  @@map("disposal_request_lines")
+}
+
 
 

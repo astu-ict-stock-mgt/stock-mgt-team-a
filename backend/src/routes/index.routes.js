@@ -19,6 +19,7 @@ import { goodsReceiptRoutes, evaluationRoutes, grnRoutes } from '../modules/good
 import { inventoryRoutes } from '../modules/inventory/index.js'
 import requisitionRoutes from '../modules/requisitions/requisition.routes.js'
 import sivRoutes from '../modules/siv/siv.routes.js'
+import disposalRoutes from '../modules/disposal/disposal.routes.js'
 
 const router = Router()
 
@@ -40,5 +41,7 @@ router.use('/grns', grnRoutes)
 router.use('/inventory', inventoryRoutes)
 router.use('/requisitions', requisitionRoutes)
 router.use('/sivs', sivRoutes)
+router.use('/disposal-requests', disposalRoutes)
+router.use('/disposal', disposalRoutes)
 
 export default router
