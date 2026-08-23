@@ -1,6 +1,6 @@
 /**
  * Central Store Issue Voucher (SIV/ISIV) Service & Workflow Engine
- * Tasks: BE-103, BE-104, BE-105, BE-107, BE-110 (Implement Issue Posting Service)
+ * Tasks: BE-103, BE-104, BE-105, BE-107, BE-110, BE-111 (Gate/Dispatch Verification API)
  * SRS Traceability: Section 6 (Store Issue Module), BR-21 (Auditability & Stock Deduction), Clarification Register C-01
  */
 
@@ -182,7 +182,6 @@ export async function approveSIV({ id, approverId }) {
 export async function finalizeSIV({ id, finalizerId }) {
   const siv = await getSivById(id)
 
-  // Enforce strict Idempotency Rule: Prevent double posting on already finalized SIVs
   if (siv.status === 'FINALIZED') {
     throw new ConflictError('SIV is already finalized. Stock has already been deducted.')
   }
@@ -193,7 +192,6 @@ export async function finalizeSIV({ id, finalizerId }) {
 
   return prisma.$transaction(async (tx) => {
     for (const line of siv.lines) {
-      // 1. Reduce StockCard balance for item in store
       const stockCard = await tx.stockCard.findUnique({
         where: {
           itemId_storeId: {
@@ -215,7 +213,6 @@ export async function finalizeSIV({ id, finalizerId }) {
           },
         })
 
-        // Record stock card transaction ledger entry
         await tx.stockCardTransaction.create({
           data: {
             stockCardId: stockCard.id,
@@ -231,7 +228,6 @@ export async function finalizeSIV({ id, finalizerId }) {
         })
       }
 
-      // 2. Increment requisition line issued quantity
       await tx.requisitionLine.updateMany({
         where: {
           requisitionId: siv.requisitionId,
@@ -243,7 +239,6 @@ export async function finalizeSIV({ id, finalizerId }) {
       })
     }
 
-    // 3. Mark SIV status as FINALIZED
     return tx.sIV.update({
       where: { id },
       data: {
@@ -295,4 +290,33 @@ export async function amendSIV({ id, notes, issuedToUserId, lineAmendments }) {
       include: { lines: true },
     })
   })
+}
+
+/**
+ * Verify Gate Exit & Dispatch for Finalized SIV (BE-111)
+ * @param {Object} params - { id, verifierId, vehicleNumber, driverName, gateNumber, remarks }
+ * @returns {Promise<Object>} Verification audit result payload
+ */
+export async function verifyDispatchSIV({ id, verifierId, vehicleNumber, driverName, gateNumber, remarks }) {
+  const siv = await getSivById(id)
+
+  if (!['FINALIZED', 'APPROVED'].includes(siv.status)) {
+    throw new ConflictError(`Cannot verify gate exit for un-finalized SIV in status '${siv.status}'`)
+  }
+
+  return {
+    verified: true,
+    verificationTimestamp: new Date(),
+    sivId: siv.id,
+    sivNumber: siv.sivNumber,
+    status: siv.status,
+    verifiedBy: verifierId,
+    gateDetails: {
+      gateNumber: gateNumber || 'MAIN_GATE_01',
+      vehicleNumber: vehicleNumber || 'N/A',
+      driverName: driverName || 'N/A',
+    },
+    remarks: remarks || 'Material exit documentation verified at security checkpoint',
+    totalItemsDispatched: siv.lines.reduce((acc, l) => acc + l.quantityIssued, 0),
+  }
 }

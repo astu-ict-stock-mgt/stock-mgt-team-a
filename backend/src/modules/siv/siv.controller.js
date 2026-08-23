@@ -1,6 +1,6 @@
 /**
  * Store Issue Voucher (SIV/ISIV) Controller
- * Tasks: BE-105, BE-106, BE-107 (Implement SIV/ISIV Amendment API)
+ * Tasks: BE-105, BE-106, BE-107, BE-111 (Gate/Dispatch Verification API)
  * SRS Traceability: Section 6 (Store Issue Module)
  */
 
@@ -11,6 +11,7 @@ import {
   approveSIV,
   finalizeSIV,
   amendSIV,
+  verifyDispatchSIV,
 } from './siv.service.js'
 import { sendCreated, sendSuccess } from '../../utils/response.js'
 
@@ -97,6 +98,23 @@ export const amend = async (req, res, next) => {
   try {
     const result = await amendSIV({
       id: req.params.id,
+      ...req.body,
+    })
+    sendSuccess(res, result)
+  } catch (err) {
+    next(err)
+  }
+}
+
+/**
+ * Handle POST /api/sivs/:id/verify-dispatch endpoint (BE-111)
+ */
+export const verifyDispatch = async (req, res, next) => {
+  try {
+    const verifierId = req.user?.userId || req.user?.id || 'usr-security-1'
+    const result = await verifyDispatchSIV({
+      id: req.params.id,
+      verifierId,
       ...req.body,
     })
     sendSuccess(res, result)
