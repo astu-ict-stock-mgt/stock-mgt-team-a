@@ -79,8 +79,18 @@ model User {
   requisitionsDeptApproved   Requisition[] @relation("RequisitionDeptApprover")
   requisitionsPaoApproved    Requisition[] @relation("RequisitionPAOApprover")
   preparedSIVs               SIV[]         @relation("SIVPreparedBy")
+<<<<<<< HEAD
   approvedSIVs               SIV[]         @relation("SIVApprovedBy")
   issuedToSIVs               SIV[]         @relation("SIVIssuedTo")
+=======
+  approvedSIVs                SIV[]         @relation("SIVApprovedBy")
+  issuedToSIVs                SIV[]         @relation("SIVIssuedTo")
+
+  // BE-114: returns requested / evaluated / approved by this user
+  returnsRequested Return[] @relation("ReturnRequestedBy")
+  returnsEvaluated Return[] @relation("ReturnEvaluatedBy")
+  returnsApproved  Return[] @relation("ReturnApprovedBy")
+>>>>>>> 7a40cac (feat(schema): design Return/ReturnLine models for the schema (BE-114))
 
   @@map("users")
 }
@@ -247,6 +257,12 @@ model Item {
   binCards   BinCard[]
   requisitionLines RequisitionLine[]
   sivLines         SIVLine[]
+<<<<<<< HEAD
+=======
+
+  // BE-114: return lines referencing this item
+  returnLines ReturnLine[]
+>>>>>>> 7a40cac (feat(schema): design Return/ReturnLine models for the schema (BE-114))
 
   @@index([code])
   @@index([categoryId])
@@ -257,7 +273,7 @@ model Item {
 }
 
 // ────────────────────────────────────────────────────────────────
-// Location Model (BE-047)
+// Role Model (BE-022)
 // ────────────────────────────────────────────────────────────────
 model Role {
   id            String   @id @default(uuid())
@@ -357,6 +373,12 @@ model Store {
   stockCards          StockCard[]
   requisitions        Requisition[]
   sivs                SIV[]
+<<<<<<< HEAD
+=======
+
+  // BE-114: returns received into this store
+  returns Return[]
+>>>>>>> 7a40cac (feat(schema): design Return/ReturnLine models for the schema (BE-114))
 
   @@index([code])
   @@index([status])
@@ -867,6 +889,12 @@ model SIV {
   approvedByUser User?      @relation("SIVApprovedBy", fields: [approvedBy], references: [id], onDelete: SetNull)
   lines         SIVLine[]
 
+<<<<<<< HEAD
+=======
+  // BE-114: returns raised against this SIV (original issue reference)
+  returns Return[]
+
+>>>>>>> 7a40cac (feat(schema): design Return/ReturnLine models for the schema (BE-114))
   @@index([sivNumber])
   @@index([requisitionId])
   @@index([storeId])
@@ -894,4 +922,106 @@ model SIVLine {
   @@map("siv_lines")
 }
 
+<<<<<<< HEAD
 
+=======
+// ────────────────────────────────────────────────────────────────
+// Store Return Note (SRN) / Return Model (BE-114)
+//
+// Design notes:
+// - No existing Return/ReturnLine model was present before this addition —
+//   this is a new design, not a transcription of something already built.
+// - ReturnStatus values are taken verbatim from SRS §7.1's Material Return
+//   state model: "Draft → Submitted → Under Evaluation → Approved /
+//   Rejected → Received → Dispositioned → Closed". No states were added
+//   beyond that list.
+// - evaluationResult reuses the existing `EvaluationDecision` enum
+//   (APPROVED / REJECTED / CONDITIONAL) already defined for
+//   TechnicalEvaluation, rather than inventing a parallel enum.
+// - `disposition` values (RESTOCK / QUARANTINE / REPAIR / DISPOSAL /
+//   REPLACEMENT) are taken verbatim from SRS clarification C-09, which is
+//   explicitly still OPEN. The column exists so the schema can express a
+//   disposition once decided — the enum's exact membership is NOT
+//   confirmed policy. Flag against C-09 before this is frozen for
+//   production.
+// - `sivId` (original issue reference) is REQUIRED (NOT NULL / Restrict).
+//   ASSUMPTION: if a return can ever exist without a traceable original
+//   issue, this FK needs to become nullable — flag alongside C-09.
+// - BR-13: "Returns shall not increase stock until the return is approved
+//   and the disposition is known" — enforced at the application/posting
+//   layer (BE-086), not by this schema; the schema only records status
+//   and disposition, it does not itself move stock.
+// ────────────────────────────────────────────────────────────────
+enum ReturnStatus {
+  DRAFT
+  SUBMITTED
+  UNDER_EVALUATION
+  APPROVED
+  REJECTED
+  RECEIVED
+  DISPOSITIONED
+  CLOSED
+}
+
+enum ReturnDisposition {
+  RESTOCK
+  QUARANTINE
+  REPAIR
+  DISPOSAL
+  REPLACEMENT
+}
+
+model Return {
+  id               String              @id @default(uuid())
+  returnNumber     String              @unique @map("return_number")
+  sivId            String              @map("siv_id")
+  requestedById    String              @map("requested_by")
+  storeId          String              @map("store_id")
+  status           ReturnStatus        @default(DRAFT)
+  reason           String
+  evaluationResult EvaluationDecision? @map("evaluation_result")
+  evaluatedBy      String?             @map("evaluated_by")
+  evaluatedAt      DateTime?           @map("evaluated_at")
+  approvedBy       String?             @map("approved_by")
+  approvedAt       DateTime?           @map("approved_at")
+  rejectionReason  String?             @map("rejection_reason")
+  disposition      ReturnDisposition?  @map("disposition")
+  receivedAt       DateTime?           @map("received_at")
+  notes            String?
+  createdAt        DateTime            @default(now()) @map("created_at")
+  updatedAt        DateTime            @updatedAt @map("updated_at")
+
+  siv              SIV          @relation(fields: [sivId], references: [id], onDelete: Restrict)
+  requestedByUser  User         @relation("ReturnRequestedBy", fields: [requestedById], references: [id], onDelete: Restrict)
+  store            Store        @relation(fields: [storeId], references: [id], onDelete: Restrict)
+  evaluatedByUser  User?        @relation("ReturnEvaluatedBy", fields: [evaluatedBy], references: [id], onDelete: SetNull)
+  approvedByUser   User?        @relation("ReturnApprovedBy", fields: [approvedBy], references: [id], onDelete: SetNull)
+  lines            ReturnLine[]
+
+  @@index([returnNumber])
+  @@index([sivId])
+  @@index([requestedById])
+  @@index([storeId])
+  @@index([status])
+  @@map("returns")
+}
+
+model ReturnLine {
+  id               String   @id @default(uuid())
+  returnId         String   @map("return_id")
+  itemId           String   @map("item_id")
+  returnedQuantity Int      @map("returned_quantity")
+  acceptedQuantity Int?     @map("accepted_quantity")
+  remarks          String?
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  return Return @relation(fields: [returnId], references: [id], onDelete: Cascade)
+  item   Item   @relation(fields: [itemId], references: [id], onDelete: Restrict)
+
+  @@unique([returnId, itemId], name: "uq_return_line_item")
+  @@index([returnId])
+  @@index([itemId])
+  @@map("return_lines")
+}
+>>>>>>> 7a40cac (feat(schema): design Return/ReturnLine models for the schema (BE-114))
