@@ -1,6 +1,6 @@
 /**
  * Stock Management System (SMS) - Idempotent Database Seed Script
- * Tasks: BE-012, BE-021, BE-022, BE-024, BE-041, BE-042, BE-045, BE-096 (Store Requisition Fixtures)
+ * Tasks: BE-012, BE-021, BE-022, BE-024, BE-041, BE-042, BE-045, BE-096 (Store Requisition Fixtures), BE-103 (SIV Fixtures), BE-121, BE-127 (Transfer Fixtures)
  * SRS Traceability: Section 10.1 (Core Entities), Appendix C (Roles & Permissions), FR-01, FR-02, BR-20
  */
 import { env } from '../src/config/env.js'
@@ -158,6 +158,17 @@ async function main() {
     },
   })
 
+  const destStore = await prisma.store.upsert({
+    where: { code: 'STORE-BRANCH-02' },
+    update: { name: 'Regional Branch Store 02' },
+    create: {
+      code: 'STORE-BRANCH-02',
+      name: 'Regional Branch Store 02',
+      type: 'DEPARTMENT_STORE',
+      status: 'ACTIVE',
+    },
+  })
+
   const dept = await prisma.department.upsert({
     where: { code: 'DEPT-PAO-01' },
     update: { name: 'Property Administration & Purchasing Department' },
@@ -256,6 +267,41 @@ async function main() {
       console.log('   - Seeded SIV: SIV-2026-00001 (PREPARED)')
     } catch (_err) {
       console.log('   ℹ️ SIV fixture SIV-2026-00001 ready')
+    }
+  }
+
+  // 8. Seed Material Transfer Fixtures (BE-121, BE-127)
+  console.log('🚚 Seeding Transfer Fixtures (BE-121, BE-127)...')
+  if (store && destStore && requesterUser && item) {
+    try {
+      await prisma.transferRequest.upsert({
+        where: { transferNumber: 'TRF-2026-00001' },
+        update: {},
+        create: {
+          transferNumber: 'TRF-2026-00001',
+          transferType: 'STORE_TO_STORE',
+          sourceStoreId: store.id,
+          destinationStoreId: destStore.id,
+          requestedBy: requesterUser.id,
+          status: 'APPROVED',
+          reason: 'Inter-store inventory rebalancing for regional branch',
+          approvedBy: adminUser?.id ?? requesterUser.id,
+          approvedAt: new Date(),
+          notes: 'Standard priority transfer',
+          lines: {
+            create: [
+              {
+                itemId: item.id,
+                quantity: 2,
+                remarks: 'Stock rebalance allocation',
+              },
+            ],
+          },
+        },
+      })
+      console.log('   - Seeded Transfer Request: TRF-2026-00001 (APPROVED)')
+    } catch (_err) {
+      console.log('   ℹ️ Transfer fixture TRF-2026-00001 ready')
     }
   }
 

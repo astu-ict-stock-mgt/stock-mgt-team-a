@@ -50,3 +50,34 @@ export class ValidationError extends AppError {
     super(message, 400, 'VALIDATION_ERROR', details)
   }
 }
+
+export class InsufficientStockError extends AppError {
+  constructor(message = 'Insufficient stock for requested operation', details = null) {
+    super(message, 409, 'INSUFFICIENT_STOCK', details)
+  }
+}
+
+export class InvalidStatusError extends AppError {
+  constructor(message = 'Document is not in an authorising state for this operation', details = null) {
+    super(message, 422, 'INVALID_STATUS', details)
+  }
+}
+
+export class InvalidDestinationError extends AppError {
+  constructor(message = 'Destination store or location is invalid', details = null) {
+    super(message, 422, 'INVALID_DESTINATION', details)
+  }
+}
+
+export class InvalidSourceError extends AppError {
+  constructor(message = 'Source store or location is invalid', details = null) {
+    super(message, 422, 'INVALID_SOURCE', details)
+  }
+}
+
+export class DuplicatePostingError extends AppError {
+  constructor(message = 'Document has already been finalized/posted', details = null) {
+    super(message, 409, 'DUPLICATE_POSTING', details)
+  }
+}
+

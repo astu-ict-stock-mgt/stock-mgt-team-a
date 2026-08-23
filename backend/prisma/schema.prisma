@@ -82,6 +82,11 @@ model User {
   approvedSIVs               SIV[]         @relation("SIVApprovedBy")
   issuedToSIVs               SIV[]         @relation("SIVIssuedTo")
 
+  // BE-121..BE-127: transfers requested, approved, or executed by this user
+  transfersRequested         TransferRequest[] @relation("TransferRequestedBy")
+  transfersApproved          TransferRequest[] @relation("TransferApprovedBy")
+  transfersExecuted          TransferRequest[] @relation("TransferExecutedBy")
+
   @@map("users")
 }
 
@@ -247,6 +252,7 @@ model Item {
   binCards   BinCard[]
   requisitionLines RequisitionLine[]
   sivLines         SIVLine[]
+  transferLines    TransferLine[]
 
   @@index([code])
   @@index([categoryId])
@@ -357,6 +363,8 @@ model Store {
   stockCards          StockCard[]
   requisitions        Requisition[]
   sivs                SIV[]
+  sourceTransfers     TransferRequest[] @relation("TransferSourceStore")
+  destinationTransfers TransferRequest[] @relation("TransferDestinationStore")
 
   @@index([code])
   @@index([status])
@@ -391,6 +399,8 @@ model Department {
   stores        StoreDepartment[]
   goodsReceipts GoodsReceipt[]
   requisitions  Requisition[]
+  sourceTransfers TransferRequest[] @relation("TransferSourceDepartment")
+  destinationTransfers TransferRequest[] @relation("TransferDestinationDepartment")
 
   @@index([code])
   @@index([status])
@@ -464,6 +474,10 @@ model Location {
   children    Location[]     @relation("LocationHierarchy")
   goodsReceiptLines GoodsReceiptLine[]
   binCards    BinCard[]
+  sourceTransfers TransferRequest[] @relation("TransferSourceLocation")
+  destinationTransfers TransferRequest[] @relation("TransferDestinationLocation")
+  sourceTransferLines TransferLine[] @relation("TransferLineSourceLocation")
+  destinationTransferLines TransferLine[] @relation("TransferLineDestinationLocation")
 
   @@index([code])
   @@index([storeId])
@@ -893,5 +907,112 @@ model SIVLine {
   @@index([itemId])
   @@map("siv_lines")
 }
+
+// ────────────────────────────────────────────────────────────────
+// Transfer Request Model (BE-121)
+//
+// Design notes:
+// - Material Transfer Request header.
+// - Supports store-to-store, bin-to-bin, and department transfers (FR-35, C-10).
+// - Status workflow: DRAFT -> SUBMITTED -> APPROVED -> IN_TRANSIT -> COMPLETED (or REJECTED / CANCELLED).
+// - Atomic execution postings: decrease at source, increase at destination (BR-15).
+// - Non-negative stock balance controls (BR-06).
+// - SRS FR-35, FR-36, Section 10.1
+// ────────────────────────────────────────────────────────────────
+enum TransferType {
+  STORE_TO_STORE
+  BIN_TO_BIN
+  STORE_TO_DEPT
+  DEPT_TO_STORE
+}
+
+enum TransferStatus {
+  DRAFT
+  SUBMITTED
+  APPROVED
+  REJECTED
+  IN_TRANSIT
+  COMPLETED
+  CANCELLED
+}
+
+model TransferRequest {
+  id                      String         @id @default(uuid())
+  transferNumber          String         @unique @map("transfer_number")
+  transferType            TransferType   @default(STORE_TO_STORE) @map("transfer_type")
+  sourceStoreId           String?        @map("source_store_id")
+  destinationStoreId      String?        @map("destination_store_id")
+  sourceLocationId        String?        @map("source_location_id")
+  destinationLocationId   String?        @map("destination_location_id")
+  sourceDepartmentId      String?        @map("source_department_id")
+  destinationDepartmentId String?        @map("destination_department_id")
+  requestedBy             String         @map("requested_by")
+  status                  TransferStatus @default(DRAFT)
+  reason                  String
+  approvedBy              String?        @map("approved_by")
+  approvedAt              DateTime?      @map("approved_at")
+  rejectionReason         String?        @map("rejection_reason")
+  executedBy              String?        @map("executed_by")
+  executedAt              DateTime?      @map("executed_at")
+  notes                   String?
+  createdAt               DateTime       @default(now()) @map("created_at")
+  updatedAt               DateTime       @updatedAt @map("updated_at")
+
+  // Relationships
+  sourceStore             Store?         @relation("TransferSourceStore", fields: [sourceStoreId], references: [id], onDelete: Restrict)
+  destinationStore        Store?         @relation("TransferDestinationStore", fields: [destinationStoreId], references: [id], onDelete: Restrict)
+  sourceLocation          Location?      @relation("TransferSourceLocation", fields: [sourceLocationId], references: [id], onDelete: SetNull)
+  destinationLocation     Location?      @relation("TransferDestinationLocation", fields: [destinationLocationId], references: [id], onDelete: SetNull)
+  sourceDepartment        Department?    @relation("TransferSourceDepartment", fields: [sourceDepartmentId], references: [id], onDelete: SetNull)
+  destinationDepartment   Department?    @relation("TransferDestinationDepartment", fields: [destinationDepartmentId], references: [id], onDelete: SetNull)
+  requestedByUser         User           @relation("TransferRequestedBy", fields: [requestedBy], references: [id], onDelete: Restrict)
+  approvedByUser          User?          @relation("TransferApprovedBy", fields: [approvedBy], references: [id], onDelete: SetNull)
+  executedByUser          User?          @relation("TransferExecutedBy", fields: [executedBy], references: [id], onDelete: SetNull)
+  lines                   TransferLine[]
+
+  @@index([transferNumber])
+  @@index([sourceStoreId])
+  @@index([destinationStoreId])
+  @@index([sourceLocationId])
+  @@index([destinationLocationId])
+  @@index([requestedBy])
+  @@index([status])
+  @@map("transfer_requests")
+}
+
+// ────────────────────────────────────────────────────────────────
+// Transfer Line Model (BE-122)
+//
+// Design notes:
+// - Line items for material transfer requests.
+// - References item and transferred quantity.
+// - Optional source and destination locations for granular bin-to-bin movements.
+// - Cascade delete on transferRequestId; Restrict on itemId.
+// - Check constraints: quantity > 0.
+// - Unique constraint: uq_transfer_line_item on (transfer_request_id, item_id).
+// ────────────────────────────────────────────────────────────────
+model TransferLine {
+  id                    String          @id @default(uuid())
+  transferRequestId     String          @map("transfer_request_id")
+  itemId                String          @map("item_id")
+  quantity              Int
+  sourceLocationId      String?         @map("source_location_id")
+  destinationLocationId String?         @map("destination_location_id")
+  remarks               String?
+  createdAt             DateTime        @default(now()) @map("created_at")
+  updatedAt             DateTime        @updatedAt @map("updated_at")
+
+  // Relationships
+  transferRequest       TransferRequest @relation(fields: [transferRequestId], references: [id], onDelete: Cascade)
+  item                  Item            @relation(fields: [itemId], references: [id], onDelete: Restrict)
+  sourceLocation        Location?       @relation("TransferLineSourceLocation", fields: [sourceLocationId], references: [id], onDelete: SetNull)
+  destinationLocation   Location?       @relation("TransferLineDestinationLocation", fields: [destinationLocationId], references: [id], onDelete: SetNull)
+
+  @@unique([transferRequestId, itemId], name: "uq_transfer_line_item")
+  @@index([transferRequestId])
+  @@index([itemId])
+  @@map("transfer_lines")
+}
+
 
 
