@@ -1,7 +1,7 @@
 /**
  * Central Requisition Service & Workflow Engine
- * Tasks: BE-096, BE-097, BE-098 (Implement Requisition Service)
- * SRS Traceability: Section 6 (Requisition & Issue Module), Clarification Register C-01
+ * Tasks: BE-096, BE-097, BE-098, BE-102 (Implement Requisition History)
+ * SRS Traceability: Section 6 (Requisition & Issue Module), Section 13 (Auditability), Clarification Register C-01
  */
 
 import { prisma } from '../../config/database.js'
@@ -32,7 +32,6 @@ export async function createRequisition({ requesterId, departmentId, storeId, pu
     throw new ValidationError('Requisition must contain at least one item line')
   }
 
-  // Validate line items
   for (const line of lines) {
     if (!line.itemId || !line.requestedQuantity || line.requestedQuantity <= 0) {
       throw new ValidationError('Each requisition line requires a valid itemId and positive requestedQuantity')
@@ -180,7 +179,6 @@ export async function approveDepartmentRequisition({ id, approverId, lineApprova
 export async function approvePAORequisition({ id, paoUserId, lineApprovals }) {
   const requisition = await getRequisitionById(id)
 
-  // Clarification C-01: Allows PAO approval from SUBMITTED or DEPARTMENT_APPROVED
   if (!['SUBMITTED', 'DEPARTMENT_APPROVED'].includes(requisition.status)) {
     throw new ConflictError(`Requisition cannot be PAO-approved from current state '${requisition.status}'`)
   }
@@ -229,4 +227,88 @@ export async function rejectRequisition({ id, rejectedByUserId, reason, level = 
       rejectionReason: reason || 'Requisition request rejected',
     },
   })
+}
+
+/**
+ * Get Requisition History & Audit Event Timeline (BE-102)
+ * @param {string} id - Requisition ID
+ * @returns {Promise<Object>} History payload with events timeline and line quantities summary
+ */
+export async function getRequisitionHistory(id) {
+  const requisition = await getRequisitionById(id)
+
+  const events = [
+    {
+      eventType: 'REQUISITION_CREATED',
+      status: 'SUBMITTED',
+      timestamp: requisition.createdAt,
+      actor: requisition.requester
+        ? { id: requisition.requester.id, fullName: requisition.requester.fullName }
+        : null,
+      details: `Requisition ${requisition.requisitionNumber} created and submitted for purpose: '${requisition.purpose}'`,
+    },
+  ]
+
+  if (requisition.departmentApprovedAt || requisition.status === 'DEPARTMENT_APPROVED') {
+    events.push({
+      eventType: 'DEPARTMENT_APPROVAL_DECISION',
+      status: 'DEPARTMENT_APPROVED',
+      timestamp: requisition.departmentApprovedAt || requisition.updatedAt,
+      actor: requisition.departmentApprovedByUser
+        ? { id: requisition.departmentApprovedByUser.id, fullName: requisition.departmentApprovedByUser.fullName }
+        : null,
+      details: 'Department Head approved the requisition request',
+    })
+  }
+
+  if (requisition.status === 'DEPARTMENT_REJECTED') {
+    events.push({
+      eventType: 'DEPARTMENT_REJECTION_DECISION',
+      status: 'DEPARTMENT_REJECTED',
+      timestamp: requisition.updatedAt,
+      actor: requisition.departmentApprovedByUser
+        ? { id: requisition.departmentApprovedByUser.id, fullName: requisition.departmentApprovedByUser.fullName }
+        : null,
+      details: `Department Head rejected requisition. Reason: ${requisition.rejectionReason || 'N/A'}`,
+    })
+  }
+
+  if (requisition.paoApprovedAt || requisition.status === 'PAO_APPROVED') {
+    events.push({
+      eventType: 'PAO_APPROVAL_DECISION',
+      status: 'PAO_APPROVED',
+      timestamp: requisition.paoApprovedAt || requisition.updatedAt,
+      actor: requisition.paoApprovedByUser
+        ? { id: requisition.paoApprovedByUser.id, fullName: requisition.paoApprovedByUser.fullName }
+        : null,
+      details: 'Property Administration Officer (PAO) approved the requisition',
+    })
+  }
+
+  if (requisition.status === 'PAO_REJECTED') {
+    events.push({
+      eventType: 'PAO_REJECTION_DECISION',
+      status: 'PAO_REJECTED',
+      timestamp: requisition.updatedAt,
+      actor: requisition.paoApprovedByUser
+        ? { id: requisition.paoApprovedByUser.id, fullName: requisition.paoApprovedByUser.fullName }
+        : null,
+      details: `PAO rejected requisition. Reason: ${requisition.rejectionReason || 'N/A'}`,
+    })
+  }
+
+  const summary = {
+    requisitionId: requisition.id,
+    requisitionNumber: requisition.requisitionNumber,
+    currentStatus: requisition.status,
+    totalRequestedItems: requisition.lines.reduce((acc, l) => acc + l.requestedQuantity, 0),
+    totalApprovedItems: requisition.lines.reduce((acc, l) => acc + (l.approvedQuantity || 0), 0),
+    totalIssuedItems: requisition.lines.reduce((acc, l) => acc + l.issuedQuantity, 0),
+  }
+
+  return {
+    summary,
+    events,
+    lines: requisition.lines,
+  }
 }

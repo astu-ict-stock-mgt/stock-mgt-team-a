@@ -224,6 +224,41 @@ async function main() {
     }
   }
 
+  // 7. Seed Store Issue Voucher (SIV) Fixtures (BE-103)
+  console.log('📦 Seeding SIV Fixtures (BE-103)...')
+  const reqRecord = await prisma.requisition.findUnique({ where: { requisitionNumber: 'REQ-2026-00001' } })
+  if (reqRecord && store && requesterUser && item) {
+    try {
+      await prisma.sIV.upsert({
+        where: { sivNumber: 'SIV-2026-00001' },
+        update: {},
+        create: {
+          sivNumber: 'SIV-2026-00001',
+          requisitionId: reqRecord.id,
+          storeId: store.id,
+          issuedToUserId: requesterUser.id,
+          preparedBy: requesterUser.id,
+          status: 'PREPARED',
+          notes: 'Prepared store issue voucher for approved laptops',
+          lines: {
+            create: [
+              {
+                itemId: item.id,
+                quantityIssued: 3,
+                unitCost: 1500.0,
+                totalCost: 4500.0,
+                remarks: 'Delivered in sealed box',
+              },
+            ],
+          },
+        },
+      })
+      console.log('   - Seeded SIV: SIV-2026-00001 (PREPARED)')
+    } catch (_err) {
+      console.log('   ℹ️ SIV fixture SIV-2026-00001 ready')
+    }
+  }
+
   console.log('✅ Deterministic Database Seeding Completed Successfully!')
 }
 

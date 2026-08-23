@@ -1,7 +1,7 @@
 /**
  * Requisition Controller
- * Tasks: BE-098, BE-099, BE-100 (Implement Requisition Approval Routing)
- * SRS Traceability: Section 6 (Requisition Module), Clarification C-01
+ * Tasks: BE-098, BE-099, BE-100, BE-102 (Implement Requisition History)
+ * SRS Traceability: Section 6 (Requisition Module), Section 13 (Auditability), Clarification C-01
  */
 
 import {
@@ -11,6 +11,7 @@ import {
   approveDepartmentRequisition,
   approvePAORequisition,
   rejectRequisition,
+  getRequisitionHistory,
 } from './requisition.service.js'
 import { sendCreated, sendSuccess } from '../../utils/response.js'
 
@@ -105,6 +106,18 @@ export const reject = async (req, res, next) => {
       level: req.body.level,
     })
     sendSuccess(res, result)
+  } catch (err) {
+    next(err)
+  }
+}
+
+/**
+ * Handle GET /api/requisitions/:id/history endpoint (BE-102)
+ */
+export const getHistory = async (req, res, next) => {
+  try {
+    const history = await getRequisitionHistory(req.params.id)
+    sendSuccess(res, history)
   } catch (err) {
     next(err)
   }
