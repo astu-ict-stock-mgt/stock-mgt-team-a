@@ -1,7 +1,7 @@
 /**
  * Central Stock Transfer Request Service & Workflow Engine
- * Tasks: BE-121, BE-122, BE-123 (Implement Transfer Service)
- * SRS Traceability: Section 8 (Stock Transfer Module), Clarification Register C-10
+ * Tasks: BE-121, BE-122, BE-123, BE-126 (Implement Transfer Execution Posting)
+ * SRS Traceability: Section 8 (Stock Transfer Module), SRS BR-15, Clarification Register C-10
  */
 
 import { prisma } from '../../config/database.js'
@@ -217,5 +217,126 @@ export async function completeTransfer({ id }) {
     where: { id },
     data: { status: 'COMPLETED' },
     include: { lines: true },
+  })
+}
+
+/**
+ * Execute Two-Legged Atomic Stock Transfer Posting (SRS BR-15 & BE-126)
+ * Source Store: Decrement stock card (TRANSFER, -qty)
+ * Destination Store: Increment stock card (TRANSFER, +qty)
+ * Both legs execute inside ONE single atomic database transaction.
+ * @param {Object} params - { id, executionUserId }
+ * @returns {Promise<Object>} Updated Transfer record
+ */
+export async function executeTransferPosting({ id, executionUserId }) {
+  const transfer = await getTransferById(id)
+
+  if (transfer.status === 'COMPLETED') {
+    throw new ConflictError('Transfer execution posting has already been completed.')
+  }
+
+  if (!['APPROVED', 'IN_TRANSIT'].includes(transfer.status)) {
+    throw new ConflictError(`Transfer execution posting cannot be executed for status '${transfer.status}'`)
+  }
+
+  return prisma.$transaction(async (tx) => {
+    for (const line of transfer.lines) {
+      const qtyTransferred = line.quantityTransferred || line.quantityRequested
+
+      // --- LEG 1: SOURCE STORE DEDUCTION ---
+      const sourceCard = await tx.stockCard.findUnique({
+        where: {
+          itemId_storeId: {
+            itemId: line.itemId,
+            storeId: transfer.sourceStoreId,
+          },
+        },
+      })
+
+      if (!sourceCard || sourceCard.availableQty < qtyTransferred) {
+        throw new ConflictError(`Insufficient stock in source store for item '${line.itemId}' to complete transfer`)
+      }
+
+      const sourceNewQty = sourceCard.quantity - qtyTransferred
+      const sourceNewAvailable = sourceCard.availableQty - qtyTransferred
+
+      await tx.stockCard.update({
+        where: { id: sourceCard.id },
+        data: {
+          quantity: sourceNewQty,
+          availableQty: sourceNewAvailable,
+        },
+      })
+
+      await tx.stockCardTransaction.create({
+        data: {
+          stockCardId: sourceCard.id,
+          transactionType: 'TRANSFER',
+          quantity: -qtyTransferred,
+          balanceAfter: sourceNewQty,
+          referenceType: 'STR',
+          referenceId: transfer.id,
+          referenceNumber: transfer.transferNumber,
+          notes: line.remarks || `Transfer OUT for ${transfer.transferNumber}`,
+          createdBy: executionUserId || transfer.requestedBy,
+        },
+      })
+
+      // --- LEG 2: DESTINATION STORE ADDITION ---
+      let destCard = await tx.stockCard.findUnique({
+        where: {
+          itemId_storeId: {
+            itemId: line.itemId,
+            storeId: transfer.destinationStoreId,
+          },
+        },
+      })
+
+      if (!destCard) {
+        destCard = await tx.stockCard.create({
+          data: {
+            itemId: line.itemId,
+            storeId: transfer.destinationStoreId,
+            quantity: 0,
+            availableQty: 0,
+            reservedQty: 0,
+          },
+        })
+      }
+
+      const destNewQty = destCard.quantity + qtyTransferred
+      const destNewAvailable = destCard.availableQty + qtyTransferred
+
+      await tx.stockCard.update({
+        where: { id: destCard.id },
+        data: {
+          quantity: destNewQty,
+          availableQty: destNewAvailable,
+        },
+      })
+
+      await tx.stockCardTransaction.create({
+        data: {
+          stockCardId: destCard.id,
+          transactionType: 'TRANSFER',
+          quantity: qtyTransferred,
+          balanceAfter: destNewQty,
+          referenceType: 'STR',
+          referenceId: transfer.id,
+          referenceNumber: transfer.transferNumber,
+          notes: line.remarks || `Transfer IN for ${transfer.transferNumber}`,
+          createdBy: executionUserId || transfer.requestedBy,
+        },
+      })
+    }
+
+    // Update transfer status to COMPLETED
+    const updatedTransfer = await tx.transferRequest.update({
+      where: { id },
+      data: { status: 'COMPLETED' },
+      include: { lines: true },
+    })
+
+    return updatedTransfer
   })
 }
