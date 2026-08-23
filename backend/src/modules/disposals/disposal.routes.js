@@ -1,15 +1,20 @@
 /**
  * Disposal Request Router & OpenAPI Specs
- * Task: BE-137 (Implement Disposal Request API)
+ * Tasks: BE-137, BE-138, BE-140 (Implement Disposal Evidence/Completion API)
  */
 
 import { Router } from 'express'
-import { create, getById, list, evaluate, approve } from './disposal.controller.js'
+import { create, getById, list, evaluate, approve, complete } from './disposal.controller.js'
 import { validateRequest } from '../../middleware/validate.middleware.js'
 import { authenticate } from '../../middleware/auth.middleware.js'
 import { authorize } from '../../middleware/rbac.middleware.js'
 import { PERMISSIONS } from '../../config/rbac.js'
-import { createDisposalSchema, evaluateDisposalSchema, approveDisposalSchema } from './dto/disposal.dto.js'
+import {
+  createDisposalSchema,
+  evaluateDisposalSchema,
+  approveDisposalSchema,
+  completeDisposalSchema,
+} from './dto/disposal.dto.js'
 
 const router = Router()
 
@@ -88,6 +93,40 @@ router.patch(
   authorize(PERMISSIONS.DISPOSALS_APPROVE),
   validateRequest({ body: approveDisposalSchema }),
   approve
+)
+
+/**
+ * @openapi
+ * /disposals/{id}/complete:
+ *   patch:
+ *     summary: Record disposal completion and evidence (SRS BR-18)
+ *     tags:
+ *       - Disposal Module
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - evidenceDetails
+ *             properties:
+ *               evidenceDetails:
+ *                 type: string
+ *               notes:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Disposal completion and evidence recorded in EXECUTED state
+ */
+router.patch(
+  '/:id/complete',
+  authenticate,
+  authorize(PERMISSIONS.DISPOSALS_EXECUTE),
+  validateRequest({ body: completeDisposalSchema }),
+  complete
 )
 
 router.get('/', authenticate, authorize(PERMISSIONS.DISPOSALS_READ), list)

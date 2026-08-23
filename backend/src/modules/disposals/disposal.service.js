@@ -1,7 +1,7 @@
 /**
  * Central Disposal Request Service & Lifecycle Engine
- * Tasks: BE-136, BE-137 (Implement Disposal Request API)
- * SRS Traceability: Section 11 (Disposal Module), Clarification Register C-13
+ * Tasks: BE-136, BE-137, BE-138, BE-140 (Implement Disposal Evidence/Completion API)
+ * SRS Traceability: Section 11 (Disposal Module), SRS BR-18, Clarification Register C-13
  */
 
 import { prisma } from '../../config/database.js'
@@ -181,6 +181,42 @@ export async function approveDisposalRequest({ id, approvedBy, approved = true, 
     include: {
       requestedByUser: { select: { id: true, fullName: true } },
       approvedByUser: { select: { id: true, fullName: true } },
+    },
+  })
+}
+
+/**
+ * Record Disposal Completion & Evidence (BE-140, SRS BR-18)
+ * @param {Object} params - { id, executedBy, evidenceDetails, notes }
+ * @returns {Promise<Object>}
+ */
+export async function completeDisposalRequest({ id, executedBy, evidenceDetails, notes }) {
+  if (!evidenceDetails || evidenceDetails.trim().length === 0) {
+    throw new ValidationError('Disposal completion evidence details are required (SRS BR-18)')
+  }
+
+  const record = await getDisposalById(id)
+
+  if (record.status !== 'APPROVED') {
+    throw new ConflictError(`Cannot complete disposal execution for request in state '${record.status}'. Must be APPROVED.`)
+  }
+
+  const combinedNotes = record.notes
+    ? `${record.notes} | Evidence: ${evidenceDetails}${notes ? ` | Notes: ${notes}` : ''}`
+    : `Evidence: ${evidenceDetails}${notes ? ` | Notes: ${notes}` : ''}`
+
+  return prisma.disposalRequest.update({
+    where: { id },
+    data: {
+      status: 'EXECUTED',
+      executedBy,
+      executedAt: new Date(),
+      notes: combinedNotes,
+    },
+    include: {
+      requestedByUser: { select: { id: true, fullName: true } },
+      approvedByUser: { select: { id: true, fullName: true } },
+      executedByUser: { select: { id: true, fullName: true } },
     },
   })
 }

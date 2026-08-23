@@ -1,6 +1,6 @@
 /**
  * Disposal Request DTO Schemas (Zod)
- * Tasks: BE-137, BE-138 (Implement Disposal Approval/Decision API)
+ * Tasks: BE-137, BE-138, BE-140 (Implement Disposal Evidence/Completion API)
  * SRS Traceability: Section 11 (Disposal Module), Clarification Register C-13
  */
 
@@ -24,5 +24,12 @@ export const approveDisposalSchema = z.object({
     required_error: 'approved status boolean is required',
     invalid_type_error: 'approved must be a boolean',
   }),
+  notes: z.string().optional(),
+})
+
+export const completeDisposalSchema = z.object({
+  evidenceDetails: z.string({
+    required_error: 'evidenceDetails is required',
+  }).min(1, 'evidenceDetails cannot be empty'),
   notes: z.string().optional(),
 })
