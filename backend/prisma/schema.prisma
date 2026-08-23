@@ -256,6 +256,7 @@ model Item {
   returnLines      ReturnLine[]
   transferLines    TransferLine[]
   fixedAssets      FixedAsset[]
+  shelfLifeRecords ShelfLifeRecord[]
 
   @@index([code])
   @@index([categoryId])
@@ -369,6 +370,7 @@ model Store {
   returns             Return[]
   transfersAsSource   TransferRequest[] @relation("TransferSourceStore")
   transfersAsDestination TransferRequest[] @relation("TransferDestinationStore")
+  shelfLifeRecords       ShelfLifeRecord[]
 
   @@index([code])
   @@index([status])
@@ -480,6 +482,7 @@ model Location {
   transfersAsSourceLocation TransferRequest[] @relation("TransferSourceLocation")
   transfersAsDestinationLocation TransferRequest[] @relation("TransferDestinationLocation")
   fixedAssets FixedAsset[]
+  shelfLifeRecords ShelfLifeRecord[]
 
   @@index([code])
   @@index([storeId])
@@ -1114,6 +1117,47 @@ model FixedAsset {
   @@index([departmentId])
   @@map("fixed_assets")
 }
+
+// ────────────────────────────────────────────────────────────────
+// Shelf-Life & Expiry Management Models (BE-132)
+//
+// Design notes:
+// - Per-batch expiry tracking and automated health evaluation (SRS C-12)
+// - Expiry status: HEALTHY, NEAR_EXPIRY, EXPIRED
+// ────────────────────────────────────────────────────────────────
+enum ShelfLifeStatus {
+  HEALTHY
+  NEAR_EXPIRY
+  EXPIRED
+}
+
+model ShelfLifeRecord {
+  id                    String          @id @default(uuid())
+  itemId                String          @map("item_id")
+  batchNumber           String          @map("batch_number")
+  quantity              Int
+  expiryDate            DateTime        @map("expiry_date")
+  alertDaysBeforeExpiry Int             @default(30) @map("alert_days_before_expiry")
+  status                ShelfLifeStatus @default(HEALTHY)
+  storeId               String?         @map("store_id")
+  locationId            String?         @map("location_id")
+  notes                 String?
+  createdAt             DateTime        @default(now()) @map("created_at")
+  updatedAt             DateTime        @updatedAt @map("updated_at")
+
+  item     Item      @relation(fields: [itemId], references: [id], onDelete: Restrict)
+  store    Store?    @relation(fields: [storeId], references: [id], onDelete: SetNull)
+  location Location? @relation(fields: [locationId], references: [id], onDelete: SetNull)
+
+  @@unique([itemId, batchNumber], name: "uq_shelflife_item_batch")
+  @@index([itemId])
+  @@index([batchNumber])
+  @@index([expiryDate])
+  @@index([status])
+  @@index([storeId])
+  @@map("shelflife_records")
+}
+
 
 
 
