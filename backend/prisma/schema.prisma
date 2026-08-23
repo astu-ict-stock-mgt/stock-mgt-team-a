@@ -81,6 +81,9 @@ model User {
   preparedSIVs               SIV[]         @relation("SIVPreparedBy")
   approvedSIVs               SIV[]         @relation("SIVApprovedBy")
   issuedToSIVs               SIV[]         @relation("SIVIssuedTo")
+  returnsReturnedBy          Return[]      @relation("ReturnReturnedBy")
+  returnsEvaluatedBy         Return[]      @relation("ReturnEvaluatedBy")
+  returnsApprovedBy          Return[]      @relation("ReturnApprovedBy")
 
   @@map("users")
 }
@@ -247,6 +250,7 @@ model Item {
   binCards   BinCard[]
   requisitionLines RequisitionLine[]
   sivLines         SIVLine[]
+  returnLines      ReturnLine[]
 
   @@index([code])
   @@index([categoryId])
@@ -357,6 +361,7 @@ model Store {
   stockCards          StockCard[]
   requisitions        Requisition[]
   sivs                SIV[]
+  returns             Return[]
 
   @@index([code])
   @@index([status])
@@ -801,6 +806,7 @@ model Requisition {
   paoApprovedByUser        User?             @relation("RequisitionPAOApprover", fields: [paoApprovedBy], references: [id], onDelete: SetNull)
   lines                    RequisitionLine[]
   sivs                     SIV[]
+  returns                  Return[]
 
   @@index([requisitionNumber])
   @@index([requesterId])
@@ -893,5 +899,87 @@ model SIVLine {
   @@index([itemId])
   @@map("siv_lines")
 }
+
+// ────────────────────────────────────────────────────────────────
+// Stock Return Note (SRN / Material Return) Models (BE-114, BE-115)
+//
+// Design notes:
+// - Life cycle: DRAFT -> SUBMITTED -> EVALUATED -> APPROVED / REJECTED -> CANCELLED
+// - Dispositions per SRS Clarification C-09: RESTOCK, QUARANTINE, REPAIR, DISPOSAL, REPLACE
+// ────────────────────────────────────────────────────────────────
+enum ReturnStatus {
+  DRAFT
+  SUBMITTED
+  EVALUATED
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+enum ReturnReason {
+  UNUSED
+  DEFECTIVE
+  EXPIRED
+  EXCESS
+  WRONG_SPECIFICATION
+}
+
+enum ReturnDisposition {
+  RESTOCK
+  QUARANTINE
+  REPAIR
+  DISPOSAL
+  REPLACE
+}
+
+model Return {
+  id            String             @id @default(uuid())
+  returnNumber  String             @unique @map("return_number")
+  requisitionId String?            @map("requisition_id")
+  storeId       String             @map("store_id")
+  returnedBy    String             @map("returned_by")
+  status        ReturnStatus       @default(DRAFT)
+  reason        ReturnReason       @default(UNUSED)
+  disposition   ReturnDisposition?
+  evaluatedBy   String?            @map("evaluated_by")
+  evaluatedAt   DateTime?          @map("evaluated_at")
+  approvedBy    String?            @map("approved_by")
+  approvedAt    DateTime?          @map("approved_at")
+  notes         String?
+  createdAt     DateTime           @default(now()) @map("created_at")
+  updatedAt     DateTime           @updatedAt @map("updated_at")
+
+  requisition     Requisition? @relation(fields: [requisitionId], references: [id], onDelete: SetNull)
+  store           Store        @relation(fields: [storeId], references: [id], onDelete: Restrict)
+  returnedByUser  User         @relation("ReturnReturnedBy", fields: [returnedBy], references: [id], onDelete: Restrict)
+  evaluatedByUser User?        @relation("ReturnEvaluatedBy", fields: [evaluatedBy], references: [id], onDelete: SetNull)
+  approvedByUser  User?        @relation("ReturnApprovedBy", fields: [approvedBy], references: [id], onDelete: SetNull)
+  lines           ReturnLine[]
+
+  @@index([returnNumber])
+  @@index([storeId])
+  @@index([status])
+  @@map("returns")
+}
+
+model ReturnLine {
+  id               String   @id @default(uuid())
+  returnId         String   @map("return_id")
+  itemId           String   @map("item_id")
+  quantityReturned Int      @map("quantity_returned")
+  condition        String?
+  remarks          String?
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  returnRecord Return @relation(fields: [returnId], references: [id], onDelete: Cascade)
+  item         Item   @relation(fields: [itemId], references: [id], onDelete: Restrict)
+
+  @@unique([returnId, itemId], name: "uq_return_line_item")
+  @@index([returnId])
+  @@index([itemId])
+  @@map("return_lines")
+}
+
 
 
