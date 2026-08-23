@@ -86,6 +86,7 @@ model User {
   returnsApprovedBy          Return[]          @relation("ReturnApprovedBy")
   transfersRequested         TransferRequest[] @relation("TransferRequestedBy")
   transfersApproved          TransferRequest[] @relation("TransferApprovedBy")
+  fixedAssetsCustody         FixedAsset[]      @relation("FixedAssetCustodian")
 
   @@map("users")
 }
@@ -254,6 +255,7 @@ model Item {
   sivLines         SIVLine[]
   returnLines      ReturnLine[]
   transferLines    TransferLine[]
+  fixedAssets      FixedAsset[]
 
   @@index([code])
   @@index([categoryId])
@@ -401,6 +403,7 @@ model Department {
   stores        StoreDepartment[]
   goodsReceipts GoodsReceipt[]
   requisitions  Requisition[]
+  fixedAssets   FixedAsset[]
 
   @@index([code])
   @@index([status])
@@ -476,6 +479,7 @@ model Location {
   binCards    BinCard[]
   transfersAsSourceLocation TransferRequest[] @relation("TransferSourceLocation")
   transfersAsDestinationLocation TransferRequest[] @relation("TransferDestinationLocation")
+  fixedAssets FixedAsset[]
 
   @@index([code])
   @@index([storeId])
@@ -640,6 +644,7 @@ model GRN {
   // Relationships
   goodsReceipt    GoodsReceipt @relation(fields: [goodsReceiptId], references: [id], onDelete: Restrict)
   finalizedByUser User?        @relation("GRNFinalizedBy", fields: [finalizedBy], references: [id], onDelete: SetNull)
+  fixedAssets     FixedAsset[]
 
   @@unique([goodsReceiptId])
   @@index([grnNumber])
@@ -1061,6 +1066,55 @@ model TransferLine {
   @@index([itemId])
   @@map("transfer_lines")
 }
+
+// ────────────────────────────────────────────────────────────────
+// Fixed Asset Models (BE-129)
+//
+// Design notes:
+// - Asset Tagging Format (SRS C-11): AST-YYYY-XXXXX
+// - Lifecycle statuses: REGISTERED, IN_SERVICE, UNDER_MAINTENANCE, DISPOSED, WRITTEN_OFF
+// ────────────────────────────────────────────────────────────────
+enum AssetStatus {
+  REGISTERED
+  IN_SERVICE
+  UNDER_MAINTENANCE
+  DISPOSED
+  WRITTEN_OFF
+}
+
+model FixedAsset {
+  id           String      @id @default(uuid())
+  assetTag     String      @unique @map("asset_tag")
+  name         String
+  itemId       String?     @map("item_id")
+  grnId        String?     @map("grn_id")
+  serialNumber String?     @map("serial_number")
+  category     String?
+  status       AssetStatus @default(REGISTERED)
+  custodianId  String?     @map("custodian_id")
+  departmentId String?     @map("department_id")
+  locationId   String?     @map("location_id")
+  purchaseDate DateTime?   @map("purchase_date")
+  purchaseCost Decimal?    @map("purchase_cost")
+  currentValue Decimal?    @map("current_value")
+  notes        String?
+  createdAt    DateTime    @default(now()) @map("created_at")
+  updatedAt    DateTime    @updatedAt @map("updated_at")
+
+  item       Item?       @relation(fields: [itemId], references: [id], onDelete: SetNull)
+  grn        GRN?        @relation(fields: [grnId], references: [id], onDelete: SetNull)
+  custodian  User?       @relation("FixedAssetCustodian", fields: [custodianId], references: [id], onDelete: SetNull)
+  department Department? @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  location   Location?   @relation(fields: [locationId], references: [id], onDelete: SetNull)
+
+  @@index([assetTag])
+  @@index([status])
+  @@index([itemId])
+  @@index([custodianId])
+  @@index([departmentId])
+  @@map("fixed_assets")
+}
+
 
 
 

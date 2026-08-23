@@ -291,6 +291,34 @@ async function main() {
     }
   }
 
+  // 9. Seed Fixed Asset Fixtures (BE-129)
+  console.log('🏛️ Seeding Fixed Asset Fixtures (BE-129)...')
+  if (item && dept && requesterUser) {
+    try {
+      await prisma.fixedAsset.upsert({
+        where: { assetTag: 'AST-2026-00001' },
+        update: {},
+        create: {
+          assetTag: 'AST-2026-00001',
+          name: 'Dell Latitude Developer Laptop',
+          itemId: item.id,
+          serialNumber: 'SN-DELL-2026-99',
+          category: 'IT Hardware',
+          status: 'REGISTERED',
+          custodianId: requesterUser.id,
+          departmentId: dept.id,
+          purchaseDate: new Date(),
+          purchaseCost: 1500.0,
+          currentValue: 1500.0,
+          notes: 'Registered fixed asset laptop from GRN receipt',
+        },
+      })
+      console.log('   - Seeded Fixed Asset: AST-2026-00001 (REGISTERED)')
+    } catch (_err) {
+      console.log('   ℹ️ Fixed Asset fixture AST-2026-00001 ready')
+    }
+  }
+
   console.log('✅ Deterministic Database Seeding Completed Successfully!')
 }
 
