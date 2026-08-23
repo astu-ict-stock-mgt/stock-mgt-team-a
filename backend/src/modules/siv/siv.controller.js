@@ -1,7 +1,7 @@
 /**
  * Store Issue Voucher (SIV/ISIV) Controller
- * Tasks: BE-105, BE-106, BE-107, BE-111 (Gate/Dispatch Verification API)
- * SRS Traceability: Section 6 (Store Issue Module)
+ * Tasks: BE-105, BE-106, BE-107, BE-111, BE-112 (Issue Transaction Audit)
+ * SRS Traceability: Section 6 (Store Issue Module), Section 13 (Auditability)
  */
 
 import {
@@ -12,6 +12,7 @@ import {
   finalizeSIV,
   amendSIV,
   verifyDispatchSIV,
+  getSivAuditHistory,
 } from './siv.service.js'
 import { sendCreated, sendSuccess } from '../../utils/response.js'
 
@@ -118,6 +119,18 @@ export const verifyDispatch = async (req, res, next) => {
       ...req.body,
     })
     sendSuccess(res, result)
+  } catch (err) {
+    next(err)
+  }
+}
+
+/**
+ * Handle GET /api/sivs/:id/audit endpoint (BE-112)
+ */
+export const getAudit = async (req, res, next) => {
+  try {
+    const auditHistory = await getSivAuditHistory(req.params.id)
+    sendSuccess(res, auditHistory)
   } catch (err) {
     next(err)
   }

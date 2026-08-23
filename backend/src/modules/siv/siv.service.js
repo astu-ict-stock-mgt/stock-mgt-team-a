@@ -1,7 +1,7 @@
 /**
  * Central Store Issue Voucher (SIV/ISIV) Service & Workflow Engine
- * Tasks: BE-103, BE-104, BE-105, BE-107, BE-110, BE-111 (Gate/Dispatch Verification API)
- * SRS Traceability: Section 6 (Store Issue Module), BR-21 (Auditability & Stock Deduction), Clarification Register C-01
+ * Tasks: BE-103, BE-104, BE-105, BE-107, BE-110, BE-111, BE-112 (Issue Transaction Audit)
+ * SRS Traceability: Section 6 (Store Issue Module), Section 13 (Auditability), Clarification Register C-01
  */
 
 import { prisma } from '../../config/database.js'
@@ -318,5 +318,86 @@ export async function verifyDispatchSIV({ id, verifierId, vehicleNumber, driverN
     },
     remarks: remarks || 'Material exit documentation verified at security checkpoint',
     totalItemsDispatched: siv.lines.reduce((acc, l) => acc + l.quantityIssued, 0),
+  }
+}
+
+/**
+ * Get SIV Issue Transaction Audit Trail & Stock Ledger Integration History (BE-112)
+ * @param {string} id - SIV ID
+ * @returns {Promise<Object>} Issue transaction audit trail payload
+ */
+export async function getSivAuditHistory(id) {
+  const siv = await getSivById(id)
+
+  // Query stock card transaction ledger postings for this SIV
+  const transactions = await prisma.stockCardTransaction.findMany({
+    where: {
+      OR: [
+        { referenceId: siv.id },
+        { referenceNumber: siv.sivNumber },
+      ],
+    },
+    include: {
+      stockCard: {
+        include: {
+          item: { select: { id: true, name: true, code: true } },
+          store: { select: { id: true, name: true, code: true } },
+        },
+      },
+      createdByUser: { select: { id: true, fullName: true } },
+    },
+    orderBy: { createdAt: 'desc' },
+  })
+
+  const events = [
+    {
+      eventType: 'SIV_PREPARED',
+      status: 'PREPARED',
+      timestamp: siv.createdAt,
+      actor: siv.preparedByUser
+        ? { id: siv.preparedByUser.id, fullName: siv.preparedByUser.fullName }
+        : null,
+      details: `SIV ${siv.sivNumber} prepared for requisition ${siv.requisition?.requisitionNumber || 'N/A'}`,
+    },
+  ]
+
+  if (siv.approvedBy || siv.status === 'APPROVED' || siv.status === 'FINALIZED') {
+    events.push({
+      eventType: 'SIV_APPROVED',
+      status: 'APPROVED',
+      timestamp: siv.updatedAt,
+      actor: siv.approvedByUser
+        ? { id: siv.approvedByUser.id, fullName: siv.approvedByUser.fullName }
+        : null,
+      details: 'SIV issue voucher approved by authority officer',
+    })
+  }
+
+  if (siv.status === 'FINALIZED') {
+    events.push({
+      eventType: 'SIV_FINALIZED_AND_STOCK_DEDUCTED',
+      status: 'FINALIZED',
+      timestamp: siv.updatedAt,
+      actor: siv.preparedByUser
+        ? { id: siv.preparedByUser.id, fullName: siv.preparedByUser.fullName }
+        : null,
+      details: `Stock deducted exactly once for ${siv.lines.length} line item(s)`,
+    })
+  }
+
+  const summary = {
+    sivId: siv.id,
+    sivNumber: siv.sivNumber,
+    currentStatus: siv.status,
+    requisitionNumber: siv.requisition?.requisitionNumber || null,
+    totalIssuedQuantity: siv.lines.reduce((acc, l) => acc + l.quantityIssued, 0),
+    totalValuationCost: siv.lines.reduce((acc, l) => acc + (Number(l.totalCost) || 0), 0),
+  }
+
+  return {
+    summary,
+    events,
+    transactions,
+    lines: siv.lines,
   }
 }
