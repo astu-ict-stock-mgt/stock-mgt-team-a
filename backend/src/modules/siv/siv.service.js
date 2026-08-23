@@ -1,7 +1,7 @@
 /**
  * Central Store Issue Voucher (SIV/ISIV) Service & Workflow Engine
- * Tasks: BE-103, BE-104, BE-105, BE-107 (Implement SIV/ISIV Amendment API)
- * SRS Traceability: Section 6 (Store Issue Module), Clarification Register C-01
+ * Tasks: BE-103, BE-104, BE-105, BE-107, BE-110 (Implement Issue Posting Service)
+ * SRS Traceability: Section 6 (Store Issue Module), BR-21 (Auditability & Stock Deduction), Clarification Register C-01
  */
 
 import { prisma } from '../../config/database.js'
@@ -175,11 +175,17 @@ export async function approveSIV({ id, approverId }) {
 }
 
 /**
- * Finalize SIV Voucher & Update Requisition Line Issued Quantities
+ * Finalize SIV Voucher & Execute Idempotent Issue Stock Posting (BE-110)
  * @param {Object} params - { id, finalizerId }
+ * @returns {Promise<Object>} Finalized SIV record
  */
-export async function finalizeSIV({ id }) {
+export async function finalizeSIV({ id, finalizerId }) {
   const siv = await getSivById(id)
+
+  // Enforce strict Idempotency Rule: Prevent double posting on already finalized SIVs
+  if (siv.status === 'FINALIZED') {
+    throw new ConflictError('SIV is already finalized. Stock has already been deducted.')
+  }
 
   if (siv.status !== 'APPROVED') {
     throw new ConflictError(`SIV cannot be finalized from current status '${siv.status}'`)
@@ -187,6 +193,45 @@ export async function finalizeSIV({ id }) {
 
   return prisma.$transaction(async (tx) => {
     for (const line of siv.lines) {
+      // 1. Reduce StockCard balance for item in store
+      const stockCard = await tx.stockCard.findUnique({
+        where: {
+          itemId_storeId: {
+            itemId: line.itemId,
+            storeId: siv.storeId,
+          },
+        },
+      })
+
+      if (stockCard) {
+        const newQty = Math.max(0, stockCard.quantity - line.quantityIssued)
+        const newAvailable = Math.max(0, stockCard.availableQty - line.quantityIssued)
+
+        await tx.stockCard.update({
+          where: { id: stockCard.id },
+          data: {
+            quantity: newQty,
+            availableQty: newAvailable,
+          },
+        })
+
+        // Record stock card transaction ledger entry
+        await tx.stockCardTransaction.create({
+          data: {
+            stockCardId: stockCard.id,
+            transactionType: 'ISSUE',
+            quantity: -line.quantityIssued,
+            balanceAfter: newQty,
+            referenceType: 'SIV',
+            referenceId: siv.id,
+            referenceNumber: siv.sivNumber,
+            notes: line.remarks || `Stock issue posting for SIV ${siv.sivNumber}`,
+            createdBy: finalizerId || siv.preparedBy,
+          },
+        })
+      }
+
+      // 2. Increment requisition line issued quantity
       await tx.requisitionLine.updateMany({
         where: {
           requisitionId: siv.requisitionId,
@@ -198,6 +243,7 @@ export async function finalizeSIV({ id }) {
       })
     }
 
+    // 3. Mark SIV status as FINALIZED
     return tx.sIV.update({
       where: { id },
       data: {
