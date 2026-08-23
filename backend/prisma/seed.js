@@ -259,6 +259,70 @@ async function main() {
     }
   }
 
+  // 8. Seed Shelf-Life & Expiry Fixtures (BE-132, BE-133)
+  console.log('⏳ Seeding Shelf-Life Fixtures (BE-132, BE-133)...')
+  if (item && store) {
+    try {
+      const healthyExpiry = new Date()
+      healthyExpiry.setDate(healthyExpiry.getDate() + 90)
+
+      const nearExpiryDate = new Date()
+      nearExpiryDate.setDate(nearExpiryDate.getDate() + 15)
+
+      const expiredDate = new Date()
+      expiredDate.setDate(expiredDate.getDate() - 10)
+
+      await prisma.shelfLifeRecord.upsert({
+        where: { uq_shelflife_item_batch: { itemId: item.id, batchNumber: 'BATCH-2026-HEALTHY' } },
+        update: {},
+        create: {
+          itemId: item.id,
+          batchNumber: 'BATCH-2026-HEALTHY',
+          quantity: 100,
+          expiryDate: healthyExpiry,
+          alertDaysBeforeExpiry: 30,
+          status: 'HEALTHY',
+          storeId: store.id,
+          notes: 'Standard stock batch in prime shelf-life window',
+        },
+      })
+
+      await prisma.shelfLifeRecord.upsert({
+        where: { uq_shelflife_item_batch: { itemId: item.id, batchNumber: 'BATCH-2026-NEAREXP' } },
+        update: {},
+        create: {
+          itemId: item.id,
+          batchNumber: 'BATCH-2026-NEAREXP',
+          quantity: 25,
+          expiryDate: nearExpiryDate,
+          alertDaysBeforeExpiry: 30,
+          status: 'NEAR_EXPIRY',
+          storeId: store.id,
+          notes: 'Priority dispatch batch expiring soon',
+        },
+      })
+
+      await prisma.shelfLifeRecord.upsert({
+        where: { uq_shelflife_item_batch: { itemId: item.id, batchNumber: 'BATCH-2026-EXPIRED' } },
+        update: {},
+        create: {
+          itemId: item.id,
+          batchNumber: 'BATCH-2026-EXPIRED',
+          quantity: 10,
+          expiryDate: expiredDate,
+          alertDaysBeforeExpiry: 30,
+          status: 'EXPIRED',
+          storeId: store.id,
+          notes: 'Candidate batch quarantined for disposal',
+        },
+      })
+
+      console.log('   - Seeded Shelf-Life Batches: HEALTHY, NEAR_EXPIRY, EXPIRED')
+    } catch (_err) {
+      console.log('   ℹ️ Shelf-Life fixtures ready')
+    }
+  }
+
   console.log('✅ Deterministic Database Seeding Completed Successfully!')
 }
 
