@@ -18,10 +18,10 @@ import { sendCreated, sendSuccess } from '../../utils/response.js'
  */
 export const create = async (req, res, next) => {
   try {
-    const returnedBy = req.user?.userId || req.user?.id || 'usr-requester-1'
+    const requestedById = req.user?.userId || req.user?.id || 'usr-requester-1'
     const returnRecord = await createReturn({
       ...req.body,
-      returnedBy,
+      requestedById,
     })
     sendCreated(res, returnRecord)
   } catch (err) {

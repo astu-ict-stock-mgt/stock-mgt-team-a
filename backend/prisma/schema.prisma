@@ -17,14 +17,6 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model StockTaking {
-  id        String   @id @default(uuid())
-  notes     String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-}
-
-
 // ────────────────────────────────────────────────────────────────
 // System Health / Setting Model (BE-010)
 // ────────────────────────────────────────────────────────────────
@@ -117,6 +109,9 @@ model User {
   disposalsEvaluated DisposalRequest[] @relation("DisposalEvaluatedBy")
   disposalsApproved  DisposalRequest[] @relation("DisposalApprovedBy")
   disposalsExecuted  DisposalRequest[] @relation("DisposalExecutedBy")
+
+  // BE-150: notifications for this user
+  notifications Notification[]
 
   @@map("users")
 }
@@ -314,6 +309,9 @@ model Role {
   // BE-024: users holding this role
   users UserRole[]
 
+  // BE-025: permissions granted to this role
+  rolePermissions RolePermission[]
+
   @@map("roles")
 }
 
@@ -355,6 +353,50 @@ model UserRole {
   @@index([userId])
   @@index([roleId])
   @@map("user_roles")
+}
+
+// ────────────────────────────────────────────────────────────────
+// Permission Model (BE-023)
+//
+// Design notes:
+// - Granular permissions (e.g., inventory.create, reports.view).
+// - Code is the unique machine-readable identifier used by RBAC middleware.
+// ────────────────────────────────────────────────────────────────
+model Permission {
+  id          String   @id @default(uuid())
+  code        String   @unique
+  name        String
+  description String?
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  // BE-025: roles that grant this permission
+  rolePermissions RolePermission[]
+
+  @@index([code])
+  @@map("permissions")
+}
+
+// ────────────────────────────────────────────────────────────────
+// Role-Permission Join Model (BE-025)
+//
+// Design notes:
+// - Maps roles to their granted permissions.
+// - @@unique([roleId, permissionId]) prevents duplicate grants.
+// ────────────────────────────────────────────────────────────────
+model RolePermission {
+  id             String   @id @default(uuid())
+  roleId         String   @map("role_id")
+  permissionId   String   @map("permission_id")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@unique([roleId, permissionId], name: "uq_role_permissions_role_permission")
+  @@index([roleId])
+  @@index([permissionId])
+  @@map("role_permissions")
 }
 
 // ────────────────────────────────────────────────────────────────
@@ -757,6 +799,7 @@ model StockCard {
 enum TransactionType {
   RECEIPT
   ISSUE
+  TRANSFER
   TRANSFER_IN
   TRANSFER_OUT
   ADJUSTMENT
@@ -769,6 +812,7 @@ model StockCardTransaction {
   stockCardId     String          @map("stock_card_id")
   transactionType TransactionType
   quantity        Int
+  balanceAfter    Int?            @map("balance_after")
   referenceType   String?         @map("reference_type")
   referenceId     String?         @map("reference_id")
   referenceNumber String?         @map("reference_number")
@@ -1396,4 +1440,99 @@ model ReconciliationLine {
   @@index([locationId])
   @@map("reconciliation_lines")
 }
->>>>>>> origin/main
+
+// ────────────────────────────────────────────────────────────────
+// Stock Take Model (BE-142, BE-143)
+//
+// Design notes:
+// - Records physical stock count events at a store.
+// - Status workflow: PLANNED -> IN_PROGRESS -> COMPLETED -> RECONCILED -> CANCELLED
+// - Compares book balance vs physical count for variance detection.
+// ────────────────────────────────────────────────────────────────
+enum StockTakeStatus {
+  PLANNED
+  IN_PROGRESS
+  COMPLETED
+  RECONCILED
+  CANCELLED
+}
+
+model StockTake {
+  id              String          @id @default(uuid())
+  stockTakeNumber String          @unique @map("stock_take_number")
+  storeId         String          @map("store_id")
+  status          StockTakeStatus @default(PLANNED)
+  scheduledDate   DateTime        @map("scheduled_date")
+  startedAt       DateTime?       @map("started_at")
+  completedAt     DateTime?       @map("completed_at")
+  reconciledAt    DateTime?       @map("reconciled_at")
+  initiatedBy     String          @map("initiated_by")
+  completedBy     String?         @map("completed_by")
+  reconciledBy    String?         @map("reconciled_by")
+  notes           String?
+  createdAt       DateTime        @default(now()) @map("created_at")
+  updatedAt       DateTime        @updatedAt @map("updated_at")
+
+  store           Store           @relation(fields: [storeId], references: [id], onDelete: Restrict)
+  initiatedByUser User            @relation("StockTakeInitiatedBy", fields: [initiatedBy], references: [id], onDelete: Restrict)
+  completedByUser User?           @relation("StockTakeCompletedBy", fields: [completedBy], references: [id], onDelete: SetNull)
+  reconciledByUser User?          @relation("StockTakeReconciledBy", fields: [reconciledBy], references: [id], onDelete: SetNull)
+  lines           StockTakeLine[]
+
+  @@index([stockTakeNumber])
+  @@index([storeId])
+  @@index([status])
+  @@map("stock_takes")
+}
+
+model StockTakeLine {
+  id             String    @id @default(uuid())
+  stockTakeId    String    @map("stock_take_id")
+  itemId         String    @map("item_id")
+  locationId     String?   @map("location_id")
+  bookQuantity   Int       @map("book_quantity")
+  physicalCount  Int?      @map("physical_count")
+  variance       Int?      @default(0)
+  varianceReason String?   @map("variance_reason")
+  countedBy      String?   @map("counted_by")
+  countedAt      DateTime? @map("counted_at")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  stockTake StockTake @relation(fields: [stockTakeId], references: [id], onDelete: Cascade)
+  item      Item      @relation(fields: [itemId], references: [id], onDelete: Restrict)
+  location  Location? @relation(fields: [locationId], references: [id], onDelete: SetNull)
+
+  @@unique([stockTakeId, itemId], name: "uq_stocktake_line_item")
+  @@index([stockTakeId])
+  @@index([itemId])
+  @@map("stock_take_lines")
+}
+
+// ────────────────────────────────────────────────────────────────
+// Notification Model (BE-150)
+//
+// Design notes:
+// - System-generated notifications for users (expiry alerts, approval requests, etc.).
+// - Supports read/unread status and optional link to entity.
+// ────────────────────────────────────────────────────────────────
+model Notification {
+  id            String    @id @default(uuid())
+  userId        String    @map("user_id")
+  title         String
+  message       String
+  type          String    @default("INFO")
+  referenceId   String?   @map("reference_id")
+  referenceType String?   @map("reference_type")
+  isRead        Boolean   @default(false) @map("is_read")
+  readAt        DateTime? @map("read_at")
+  createdAt     DateTime  @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([isRead])
+  @@index([type])
+  @@index([createdAt])
+  @@map("notifications")
+}

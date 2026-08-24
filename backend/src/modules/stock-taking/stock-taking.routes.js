@@ -1,37 +1,26 @@
- const express = require("express");
+import { Router } from 'express'
+import { authenticate } from '../../middleware/auth.middleware.js'
+import { authorize } from '../../middleware/rbac.middleware.js'
+import * as controller from './stock-taking.controller.js'
+import { validateRequest } from '../../middleware/validate.middleware.js'
+import {
+  createStockTakeSchema,
+  recordCountSchema,
+  stockTakeQuerySchema,
+} from './dto/stock-taking.dto.js'
 
-const router = express.Router();
+const router = Router()
 
-const stockTakingController = require("./stock-taking.controller");
+router.use(authenticate)
 
-// Create a stock-taking session
-router.post(
-  "/",
-  stockTakingController.createSession
-);
+router.get('/', validateRequest(stockTakeQuerySchema, 'query'), controller.list)
+router.get('/:id', controller.getById)
+router.get('/:id/variance-summary', controller.varianceSummary)
 
-// Get all stock-taking sessions
-router.get(
-  "/",
-  stockTakingController.getSessions
-);
+router.post('/', authorize(['inventory.create']), validateRequest(createStockTakeSchema), controller.create)
+router.post('/:id/start', authorize(['inventory.update']), controller.start)
+router.post('/:id/record-count', authorize(['inventory.update']), validateRequest(recordCountSchema), controller.recordCount)
+router.post('/:id/complete', authorize(['inventory.update']), controller.complete)
+router.post('/:id/reconcile', authorize(['inventory.update']), controller.reconcile)
 
-// Get one stock-taking session
-router.get(
-  "/:id",
-  stockTakingController.getSessionById
-);
-
-// Submit a stock-taking session
-router.post(
-  "/:id/submit",
-  stockTakingController.submitSession
-);
-
-// Reconcile a stock-taking session
-router.post(
-  "/:id/reconcile",
-  stockTakingController.reconcileSession
-);
-
-module.exports = router;
+export default router

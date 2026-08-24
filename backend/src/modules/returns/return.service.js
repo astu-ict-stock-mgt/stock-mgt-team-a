@@ -21,12 +21,16 @@ export async function generateReturnNumber() {
 /**
  * Create a new Store Return Note (SRN / Material Return Request)
  * Note per SRS BR-13: Creating a return request NEVER increases stock card balance.
- * @param {Object} data - { requisitionId, storeId, returnedBy, reason, notes, lines }
+ * @param {Object} data - { sivId, storeId, requestedById, reason, notes, lines }
  * @returns {Promise<Object>} Created Return record
  */
-export async function createReturn({ requisitionId, storeId, returnedBy, reason = 'UNUSED', notes, lines }) {
-  if (!storeId || !returnedBy) {
-    throw new ValidationError('Store ID and returnedBy user ID are required')
+export async function createReturn({ sivId, storeId, requestedById, reason = 'UNUSED', notes, lines }) {
+  if (!storeId || !requestedById) {
+    throw new ValidationError('Store ID and requestedById user ID are required')
+  }
+
+  if (!sivId) {
+    throw new ValidationError('SIV ID is required for a return request')
   }
 
   if (!Array.isArray(lines) || lines.length === 0) {
@@ -45,25 +49,24 @@ export async function createReturn({ requisitionId, storeId, returnedBy, reason 
     const returnRecord = await tx.return.create({
       data: {
         returnNumber,
-        requisitionId: requisitionId || null,
+        sivId,
         storeId,
-        returnedBy,
+        requestedById,
         reason,
         notes: notes || null,
         status: 'SUBMITTED',
         lines: {
           create: lines.map((l) => ({
             itemId: l.itemId,
-            quantityReturned: l.quantityReturned,
-            condition: l.condition || 'GOOD',
+            returnedQuantity: l.quantityReturned,
             remarks: l.remarks || null,
           })),
         },
       },
       include: {
-        requisition: { select: { id: true, requisitionNumber: true } },
+        siv: { select: { id: true, sivNumber: true } },
         store: { select: { id: true, name: true, code: true } },
-        returnedByUser: { select: { id: true, fullName: true, email: true } },
+        requestedByUser: { select: { id: true, fullName: true, email: true } },
         lines: { include: { item: { select: { id: true, name: true, code: true } } } },
       },
     })
@@ -81,9 +84,9 @@ export async function getReturnById(id) {
   const returnRecord = await prisma.return.findUnique({
     where: { id },
     include: {
-      requisition: { select: { id: true, requisitionNumber: true } },
+      siv: { select: { id: true, sivNumber: true } },
       store: { select: { id: true, name: true, code: true } },
-      returnedByUser: { select: { id: true, fullName: true, email: true } },
+      requestedByUser: { select: { id: true, fullName: true, email: true } },
       evaluatedByUser: { select: { id: true, fullName: true } },
       approvedByUser: { select: { id: true, fullName: true } },
       lines: { include: { item: { select: { id: true, name: true, code: true } } } },
@@ -99,16 +102,16 @@ export async function getReturnById(id) {
 
 /**
  * List Return requests with filters and pagination
- * @param {Object} [filters={}] - { status, storeId, returnedBy, page, limit }
+ * @param {Object} [filters={}] - { status, storeId, requestedById, page, limit }
  * @returns {Promise<Object>} { returns, total, page, totalPages }
  */
 export async function listReturns(filters = {}) {
-  const { status, storeId, returnedBy, page = 1, limit = 10 } = filters
+  const { status, storeId, requestedById, page = 1, limit = 10 } = filters
 
   const where = {
     ...(status && { status }),
     ...(storeId && { storeId }),
-    ...(returnedBy && { returnedBy }),
+    ...(requestedById && { requestedById }),
   }
 
   const pageNum = parseInt(String(page), 10) || 1
@@ -123,7 +126,7 @@ export async function listReturns(filters = {}) {
       orderBy: { createdAt: 'desc' },
       include: {
         store: { select: { id: true, name: true, code: true } },
-        returnedByUser: { select: { id: true, fullName: true } },
+        requestedByUser: { select: { id: true, fullName: true } },
         lines: true,
       },
     }),
@@ -237,8 +240,8 @@ export async function postReturnStock({ id, postingUserId }) {
           })
         }
 
-        const newQty = stockCard.quantity + line.quantityReturned
-        const newAvailable = stockCard.availableQty + line.quantityReturned
+        const newQty = stockCard.quantity + line.returnedQuantity
+        const newAvailable = stockCard.availableQty + line.returnedQuantity
 
         await tx.stockCard.update({
           where: { id: stockCard.id },
@@ -253,13 +256,13 @@ export async function postReturnStock({ id, postingUserId }) {
           data: {
             stockCardId: stockCard.id,
             transactionType: 'RETURN',
-            quantity: line.quantityReturned,
+            quantity: line.returnedQuantity,
             balanceAfter: newQty,
             referenceType: 'SRN',
             referenceId: returnRecord.id,
             referenceNumber: returnRecord.returnNumber,
             notes: line.remarks || `Restock entry for return ${returnRecord.returnNumber}`,
-            createdBy: postingUserId || returnRecord.returnedBy,
+            createdBy: postingUserId || returnRecord.requestedById,
           },
         })
       }

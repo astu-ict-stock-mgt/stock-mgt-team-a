@@ -1,100 +1,101 @@
-const stockTakingService = require("./stock-taking.service");
+/**
+ * Stock Take Controller
+ * Tasks: BE-142 to BE-148
+ * SRS Traceability: Section 8 (Stock Taking)
+ */
 
-async function createSession(req, res) {
+import {
+  createStockTake,
+  getStockTakeById,
+  listStockTakes,
+  startStockTake,
+  recordPhysicalCount,
+  completeStockTake,
+  reconcileStockTake,
+  getVarianceSummary,
+} from './stock-taking.service.js'
+import { sendCreated, sendSuccess } from '../../utils/response.js'
+
+export const create = async (req, res, next) => {
   try {
-    const result = await stockTakingService.createSession(
-      req.body,
-      req.user
-    );
-
-    return res.status(201).json({
-      success: true,
-      data: result
-    });
-  } catch (error) {
-    return res.status(error.statusCode || 500).json({
-      success: false,
-      error: error.message
-    });
+    const initiatedBy = req.user?.userId || req.user?.id
+    const result = await createStockTake({ ...req.body, initiatedBy })
+    return sendCreated(res, result)
+  } catch (err) {
+    return next(err)
   }
 }
 
-async function getSessions(req, res) {
+export const getById = async (req, res, next) => {
   try {
-    const result = await stockTakingService.getSessions();
-
-    return res.status(200).json({
-      success: true,
-      data: result
-    });
-  } catch (error) {
-    return res.status(error.statusCode || 500).json({
-      success: false,
-      error: error.message
-    });
+    const result = await getStockTakeById(req.params.id)
+    return sendSuccess(res, result)
+  } catch (err) {
+    return next(err)
   }
 }
 
-async function getSessionById(req, res) {
+export const list = async (req, res, next) => {
   try {
-    const result = await stockTakingService.getSessionById(
-      req.params.id
-    );
-
-    return res.status(200).json({
-      success: true,
-      data: result
-    });
-  } catch (error) {
-    return res.status(error.statusCode || 500).json({
-      success: false,
-      error: error.message
-    });
+    const result = await listStockTakes(req.query)
+    return sendSuccess(res, result.stockTakes, 200, {
+      total: result.total,
+      page: result.page,
+      totalPages: result.totalPages,
+    })
+  } catch (err) {
+    return next(err)
   }
 }
 
-async function submitSession(req, res) {
+export const start = async (req, res, next) => {
   try {
-    const result = await stockTakingService.submitSession(
-      req.params.id,
-      req.user
-    );
-
-    return res.status(200).json({
-      success: true,
-      data: result
-    });
-  } catch (error) {
-    return res.status(error.statusCode || 500).json({
-      success: false,
-      error: error.message
-    });
+    const result = await startStockTake(req.params.id)
+    return sendSuccess(res, result)
+  } catch (err) {
+    return next(err)
   }
 }
 
-async function reconcileSession(req, res) {
+export const recordCount = async (req, res, next) => {
   try {
-    const result = await stockTakingService.reconcileSession(
-      req.params.id,
-      req.user
-    );
-
-    return res.status(200).json({
-      success: true,
-      data: result
-    });
-  } catch (error) {
-    return res.status(error.statusCode || 500).json({
-      success: false,
-      error: error.message
-    });
+    const countedBy = req.user?.userId || req.user?.id
+    const result = await recordPhysicalCount({
+      stockTakeId: req.params.id,
+      ...req.body,
+      countedBy,
+    })
+    return sendSuccess(res, result)
+  } catch (err) {
+    return next(err)
   }
 }
 
-module.exports = {
-  createSession,
-  getSessions,
-  getSessionById,
-  submitSession,
-  reconcileSession
-};
+export const complete = async (req, res, next) => {
+  try {
+    const completedBy = req.user?.userId || req.user?.id
+    const result = await completeStockTake(req.params.id, completedBy)
+    return sendSuccess(res, result)
+  } catch (err) {
+    return next(err)
+  }
+}
+
+export const reconcile = async (req, res, next) => {
+  try {
+    const reconciledBy = req.user?.userId || req.user?.id
+    const result = await reconcileStockTake(req.params.id, reconciledBy)
+    return sendSuccess(res, result)
+  } catch (err) {
+    return next(err)
+  }
+}
+
+export const varianceSummary = async (req, res, next) => {
+  try {
+    const result = await getVarianceSummary(req.params.id)
+    return sendSuccess(res, result)
+  } catch (err) {
+    return next(err)
+  }
+}
