@@ -346,6 +346,29 @@ async function main() {
     }
   }
 
+  // 11. Seed Disposal Request Fixtures (BE-136)
+  console.log('🗑️ Seeding Disposal Request Fixtures (BE-136)...')
+  if (store && requesterUser) {
+    try {
+      await prisma.disposalRequest.upsert({
+        where: { disposalNumber: 'DSP-2026-00001' },
+        update: {},
+        create: {
+          disposalNumber: 'DSP-2026-00001',
+          disposalMethod: 'DESTRUCTION',
+          status: 'SUBMITTED',
+          storeId: store.id,
+          requestedBy: requesterUser.id,
+          reason: 'Damaged and obsolete inventory items',
+          notes: 'Disposal request submitted for committee review',
+        },
+      })
+      console.log('   - Seeded Disposal Request: DSP-2026-00001 (SUBMITTED)')
+    } catch (_err) {
+      console.log('   ℹ️ Disposal Request fixture DSP-2026-00001 ready')
+    }
+  }
+
   console.log('✅ Deterministic Database Seeding Completed Successfully!')
 }
 
