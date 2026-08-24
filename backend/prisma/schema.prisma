@@ -94,6 +94,11 @@ model User {
   // BE-129: fixed assets custodied by this user
   fixedAssetsCustody FixedAsset[] @relation("FixedAssetCustodian")
 
+  // BE-146: reconciliations initiated / approved / posted by this user
+  reconciliationsInitiated Reconciliation[] @relation("ReconciliationInitiatedBy")
+  reconciliationsApproved  Reconciliation[] @relation("ReconciliationApprovedBy")
+  reconciliationsPosted    Reconciliation[] @relation("ReconciliationPostedBy")
+
   // BE-136: disposals requested / evaluated / approved / executed by this user
   disposalsRequested DisposalRequest[] @relation("DisposalRequestedBy")
   disposalsEvaluated DisposalRequest[] @relation("DisposalEvaluatedBy")
@@ -270,6 +275,7 @@ model Item {
   fixedAssets       FixedAsset[]
   shelfLifeRecords  ShelfLifeRecord[]
   disposalLines     DisposalRequestLine[]
+  reconciliationLines ReconciliationLine[]
 
   @@index([code])
   @@index([categoryId])
@@ -391,6 +397,9 @@ model Store {
 
   // BE-136: disposal requests for this store
   disposalRequests DisposalRequest[]
+
+  // BE-146: reconciliations for this store
+  reconciliations Reconciliation[]
 
   @@index([code])
   @@index([status])
@@ -514,6 +523,7 @@ model Location {
 
   // BE-136: disposal lines at this location
   disposalLines DisposalRequestLine[]
+  reconciliationLines ReconciliationLine[]
 
   @@index([code])
   @@index([storeId])
@@ -1296,4 +1306,78 @@ model DisposalRequestLine {
   @@index([itemId])
   @@index([locationId])
   @@map("disposal_request_lines")
+}
+
+// ────────────────────────────────────────────────────────────────
+// Stock Taking & Reconciliation Models (BE-146)
+//
+// Design notes:
+// - Models physical inventory stock-taking sessions and variance calculations.
+// - Status workflow: DRAFT -> SUBMITTED -> PENDING_APPROVAL -> APPROVED / REJECTED -> POSTED
+// - BR-19: Calculates variance = physicalCount - systemQuantity before adjustment posting.
+// ────────────────────────────────────────────────────────────────
+enum ReconciliationStatus {
+  DRAFT
+  SUBMITTED
+  PENDING_APPROVAL
+  APPROVED
+  REJECTED
+  POSTED
+  CANCELLED
+}
+
+model Reconciliation {
+  id               String               @id @default(uuid())
+  reconciliationNo String               @unique @map("reconciliation_no")
+  storeId          String               @map("store_id")
+  status           ReconciliationStatus @default(DRAFT)
+  countDate        DateTime             @default(now()) @map("count_date")
+  reason           String?
+  notes            String?
+
+  initiatedBy String    @map("initiated_by")
+  approvedBy  String?   @map("approved_by")
+  approvedAt  DateTime? @map("approved_at")
+  postedBy    String?   @map("posted_by")
+  postedAt    DateTime? @map("posted_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  store           Store                @relation(fields: [storeId], references: [id], onDelete: Restrict)
+  initiatedByUser User                 @relation("ReconciliationInitiatedBy", fields: [initiatedBy], references: [id], onDelete: Restrict)
+  approvedByUser  User?                @relation("ReconciliationApprovedBy", fields: [approvedBy], references: [id], onDelete: SetNull)
+  postedByUser    User?                @relation("ReconciliationPostedBy", fields: [postedBy], references: [id], onDelete: SetNull)
+  lines           ReconciliationLine[]
+
+  @@index([reconciliationNo])
+  @@index([status])
+  @@index([storeId])
+  @@index([initiatedBy])
+  @@map("reconciliations")
+}
+
+model ReconciliationLine {
+  id               String   @id @default(uuid())
+  reconciliationId String   @map("reconciliation_id")
+  itemId           String   @map("item_id")
+  locationId       String?  @map("location_id")
+  systemQuantity   Int      @map("system_quantity")
+  physicalCount    Int      @map("physical_count")
+  variance         Int      @default(0)
+  unitCost         Decimal? @map("unit_cost")
+  varianceValue    Decimal? @map("variance_value")
+  remarks          String?
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  reconciliation Reconciliation @relation(fields: [reconciliationId], references: [id], onDelete: Cascade)
+  item           Item           @relation(fields: [itemId], references: [id], onDelete: Restrict)
+  location       Location?      @relation(fields: [locationId], references: [id], onDelete: SetNull)
+
+  @@unique([reconciliationId, itemId], name: "uq_reconciliation_line_item")
+  @@index([reconciliationId])
+  @@index([itemId])
+  @@index([locationId])
+  @@map("reconciliation_lines")
 }

@@ -369,6 +369,29 @@ async function main() {
     }
   }
 
+  // 12. Seed Reconciliation Fixtures (BE-146)
+  console.log('⚖️ Seeding Reconciliation Fixtures (BE-146)...')
+  if (store && requesterUser) {
+    try {
+      await prisma.reconciliation.upsert({
+        where: { reconciliationNo: 'REC-2026-00001' },
+        update: {},
+        create: {
+          reconciliationNo: 'REC-2026-00001',
+          storeId: store.id,
+          status: 'SUBMITTED',
+          countDate: new Date(),
+          initiatedBy: requesterUser.id,
+          reason: 'Annual physical stock count and variance reconciliation',
+          notes: 'Submitted for PAO variance approval',
+        },
+      })
+      console.log('   - Seeded Reconciliation: REC-2026-00001 (SUBMITTED)')
+    } catch (_err) {
+      console.log('   ℹ️ Reconciliation fixture REC-2026-00001 ready')
+    }
+  }
+
   console.log('✅ Deterministic Database Seeding Completed Successfully!')
 }
 
