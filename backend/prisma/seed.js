@@ -1,6 +1,6 @@
 /**
  * Stock Management System (SMS) - Idempotent Database Seed Script
- * Tasks: BE-012, BE-021, BE-022, BE-024, BE-041, BE-042, BE-045, BE-096 (Store Requisition Fixtures), BE-103 (SIV Fixtures), BE-121, BE-127 (Transfer Fixtures)
+ * Tasks: BE-012, BE-021, BE-022, BE-024, BE-041, BE-042, BE-045, BE-096 (Store Requisition Fixture)
  * SRS Traceability: Section 10.1 (Core Entities), Appendix C (Roles & Permissions), FR-01, FR-02, BR-20
  */
 import { env } from '../src/config/env.js'
@@ -158,17 +158,6 @@ async function main() {
     },
   })
 
-  const destStore = await prisma.store.upsert({
-    where: { code: 'STORE-BRANCH-02' },
-    update: { name: 'Regional Branch Store 02' },
-    create: {
-      code: 'STORE-BRANCH-02',
-      name: 'Regional Branch Store 02',
-      type: 'DEPARTMENT_STORE',
-      status: 'ACTIVE',
-    },
-  })
-
   const dept = await prisma.department.upsert({
     where: { code: 'DEPT-PAO-01' },
     update: { name: 'Property Administration & Purchasing Department' },
@@ -270,38 +259,35 @@ async function main() {
     }
   }
 
-  // 8. Seed Material Transfer Fixtures (BE-121, BE-127)
-  console.log('🚚 Seeding Transfer Fixtures (BE-121, BE-127)...')
-  if (store && destStore && requesterUser && item) {
+  // 8. Seed Stock Transfer Request & Lines Fixtures (BE-121, BE-122)
+  console.log('🔄 Seeding Transfer Request & Lines Fixtures (BE-121, BE-122)...')
+  if (store && requesterUser && item) {
     try {
       await prisma.transferRequest.upsert({
-        where: { transferNumber: 'TRF-2026-00001' },
+        where: { transferNumber: 'STR-2026-00001' },
         update: {},
         create: {
-          transferNumber: 'TRF-2026-00001',
+          transferNumber: 'STR-2026-00001',
           transferType: 'STORE_TO_STORE',
+          status: 'SUBMITTED',
           sourceStoreId: store.id,
-          destinationStoreId: destStore.id,
+          destinationStoreId: store.id,
           requestedBy: requesterUser.id,
-          status: 'APPROVED',
-          reason: 'Inter-store inventory rebalancing for regional branch',
-          approvedBy: adminUser?.id ?? requesterUser.id,
-          approvedAt: new Date(),
-          notes: 'Standard priority transfer',
+          notes: 'Inter-store transfer of hardware accessories',
           lines: {
             create: [
               {
                 itemId: item.id,
-                quantity: 2,
-                remarks: 'Stock rebalance allocation',
+                quantityRequested: 5,
+                remarks: 'Transfer for project deployment',
               },
             ],
           },
         },
       })
-      console.log('   - Seeded Transfer Request: TRF-2026-00001 (APPROVED)')
+      console.log('   - Seeded Transfer Request & Lines: STR-2026-00001 (SUBMITTED)')
     } catch (_err) {
-      console.log('   ℹ️ Transfer fixture TRF-2026-00001 ready')
+      console.log('   ℹ️ Transfer Request fixture STR-2026-00001 ready')
     }
   }
 
