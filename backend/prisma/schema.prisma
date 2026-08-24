@@ -1326,68 +1326,7 @@ model DisposalRequestLine {
   @@map("disposal_request_lines")
 }
 
-// ────────────────────────────────────────────────────────────────
-// Stock Taking Model (BE-142)
-// ────────────────────────────────────────────────────────────────
-enum StockTakeStatus {
-  PLANNED
-  IN_PROGRESS
-  COMPLETED
-  RECONCILED
-  CANCELLED
-}
-
-model StockTake {
-  id              String          @id @default(uuid())
-  stockTakeNumber String          @unique @map("stock_take_number")
-  storeId         String          @map("store_id")
-  status          StockTakeStatus @default(PLANNED)
-  scheduledDate   DateTime        @map("scheduled_date")
-  startedAt       DateTime?       @map("started_at")
-  completedAt     DateTime?       @map("completed_at")
-  reconciledAt    DateTime?       @map("reconciled_at")
-  initiatedBy     String          @map("initiated_by")
-  completedBy     String?         @map("completed_by")
-  reconciledBy    String?         @map("reconciled_by")
-  notes           String?
-  createdAt       DateTime        @default(now()) @map("created_at")
-  updatedAt       DateTime        @updatedAt @map("updated_at")
-
-  store            Store            @relation(fields: [storeId], references: [id], onDelete: Restrict)
-  initiatedByUser  User             @relation("StockTakeInitiatedBy", fields: [initiatedBy], references: [id], onDelete: Restrict)
-  completedByUser  User?            @relation("StockTakeCompletedBy", fields: [completedBy], references: [id], onDelete: SetNull)
-  reconciledByUser User?            @relation("StockTakeReconciledBy", fields: [reconciledBy], references: [id], onDelete: SetNull)
-  lines            StockTakeLine[]
-
-  @@index([stockTakeNumber])
-  @@index([storeId])
-  @@index([status])
-  @@map("stock_takes")
-}
-
-model StockTakeLine {
-  id             String    @id @default(uuid())
-  stockTakeId    String    @map("stock_take_id")
-  itemId         String    @map("item_id")
-  locationId     String?   @map("location_id")
-  bookQuantity   Int       @map("book_quantity")
-  physicalCount  Int?      @map("physical_count")
-  variance       Int?      @default(0)
-  varianceReason String?   @map("variance_reason")
-  countedBy      String?   @map("counted_by")
-  countedAt      DateTime? @map("counted_at")
-  createdAt      DateTime  @default(now()) @map("created_at")
-  updatedAt      DateTime  @updatedAt @map("updated_at")
-
-  stockTake StockTake @relation(fields: [stockTakeId], references: [id], onDelete: Cascade)
-  item      Item      @relation(fields: [itemId], references: [id], onDelete: Restrict)
-  location  Location? @relation(fields: [locationId], references: [id], onDelete: SetNull)
-
-  @@unique([stockTakeId, itemId], name: "uq_stocktake_line_item")
-  @@index([stockTakeId])
-  @@index([itemId])
-  @@map("stock_take_lines")
-}
+// Stock Taking models already defined above as StockTake/StockTakeLine (BE-142)
 
 // ────────────────────────────────────────────────────────────────
 // Stock Taking & Reconciliation Models (BE-146)
@@ -1457,3 +1396,4 @@ model ReconciliationLine {
   @@index([locationId])
   @@map("reconciliation_lines")
 }
+>>>>>>> origin/main
