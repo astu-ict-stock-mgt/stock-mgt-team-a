@@ -1,6 +1,6 @@
 /**
  * Reconciliation Request Controller
- * Task: BE-146 (Implement Reconciliation Approval API)
+ * Tasks: BE-146, BE-147 (Implement Inventory Adjustment Posting)
  * SRS Traceability: Section 12 (Stock Taking & Reconciliation)
  */
 
@@ -9,6 +9,7 @@ import {
   getReconciliationById,
   listReconciliations,
   approveReconciliation,
+  postReconciliationAdjustments,
 } from './reconciliation.service.js'
 import { sendCreated, sendSuccess } from '../../utils/response.js'
 
@@ -64,6 +65,21 @@ export const approve = async (req, res, next) => {
       id: req.params.id,
       approvedBy: req.user.id || req.user.userId,
       ...req.body,
+    })
+    sendSuccess(res, result)
+  } catch (err) {
+    next(err)
+  }
+}
+
+/**
+ * Handle POST /api/reconciliations/:id/post endpoint (BE-147)
+ */
+export const postAdjustments = async (req, res, next) => {
+  try {
+    const result = await postReconciliationAdjustments({
+      id: req.params.id,
+      postedBy: req.user.id || req.user.userId,
     })
     sendSuccess(res, result)
   } catch (err) {

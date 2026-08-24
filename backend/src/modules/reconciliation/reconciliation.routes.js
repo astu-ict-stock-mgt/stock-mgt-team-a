@@ -1,10 +1,10 @@
 /**
  * Reconciliation Request Router & OpenAPI Specs
- * Task: BE-146 (Implement Reconciliation Approval API)
+ * Tasks: BE-146, BE-147 (Implement Inventory Adjustment Posting)
  */
 
 import { Router } from 'express'
-import { create, getById, list, approve } from './reconciliation.controller.js'
+import { create, getById, list, approve, postAdjustments } from './reconciliation.controller.js'
 import { validateRequest } from '../../middleware/validate.middleware.js'
 import { authenticate } from '../../middleware/auth.middleware.js'
 import { authorize } from '../../middleware/rbac.middleware.js'
@@ -82,6 +82,26 @@ router.patch(
   authorize(PERMISSIONS.RECONCILIATION_APPROVE),
   validateRequest({ body: approveReconciliationSchema }),
   approve
+)
+
+/**
+ * @openapi
+ * /reconciliations/{id}/post:
+ *   post:
+ *     summary: Post approved inventory adjustments through the transaction posting engine (BE-086, SRS BR-19)
+ *     tags:
+ *       - Stock Taking & Reconciliation
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Approved reconciliation variances posted as stock card adjustments in POSTED state
+ */
+router.post(
+  '/:id/post',
+  authenticate,
+  authorize(PERMISSIONS.RECONCILIATION_POST),
+  postAdjustments
 )
 
 router.get('/', authenticate, authorize(PERMISSIONS.RECONCILIATION_READ), list)
