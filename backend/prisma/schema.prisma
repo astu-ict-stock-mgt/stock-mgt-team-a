@@ -17,6 +17,14 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+model StockTaking {
+  id        String   @id @default(uuid())
+  notes     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+
 // ────────────────────────────────────────────────────────────────
 // System Health / Setting Model (BE-010)
 // ────────────────────────────────────────────────────────────────
@@ -98,6 +106,11 @@ model User {
   reconciliationsInitiated Reconciliation[] @relation("ReconciliationInitiatedBy")
   reconciliationsApproved  Reconciliation[] @relation("ReconciliationApprovedBy")
   reconciliationsPosted    Reconciliation[] @relation("ReconciliationPostedBy")
+
+  // BE-142: stock takes initiated / completed / reconciled by this user
+  stockTakesInitiated   StockTake[] @relation("StockTakeInitiatedBy")
+  stockTakesCompleted   StockTake[] @relation("StockTakeCompletedBy")
+  stockTakesReconciled  StockTake[] @relation("StockTakeReconciledBy")
 
   // BE-136: disposals requested / evaluated / approved / executed by this user
   disposalsRequested DisposalRequest[] @relation("DisposalRequestedBy")
@@ -276,6 +289,7 @@ model Item {
   shelfLifeRecords  ShelfLifeRecord[]
   disposalLines     DisposalRequestLine[]
   reconciliationLines ReconciliationLine[]
+  stockTakeLines   StockTakeLine[]
 
   @@index([code])
   @@index([categoryId])
@@ -401,6 +415,9 @@ model Store {
   // BE-146: reconciliations for this store
   reconciliations Reconciliation[]
 
+  // BE-142: stock takes for this store
+  stockTakes StockTake[]
+
   @@index([code])
   @@index([status])
   @@map("stores")
@@ -524,6 +541,7 @@ model Location {
   // BE-136: disposal lines at this location
   disposalLines DisposalRequestLine[]
   reconciliationLines ReconciliationLine[]
+  stockTakeLines StockTakeLine[]
 
   @@index([code])
   @@index([storeId])
@@ -1309,12 +1327,70 @@ model DisposalRequestLine {
 }
 
 // ────────────────────────────────────────────────────────────────
+// Stock Taking Model (BE-142)
+// ────────────────────────────────────────────────────────────────
+enum StockTakeStatus {
+  PLANNED
+  IN_PROGRESS
+  COMPLETED
+  RECONCILED
+  CANCELLED
+}
+
+model StockTake {
+  id              String          @id @default(uuid())
+  stockTakeNumber String          @unique @map("stock_take_number")
+  storeId         String          @map("store_id")
+  status          StockTakeStatus @default(PLANNED)
+  scheduledDate   DateTime        @map("scheduled_date")
+  startedAt       DateTime?       @map("started_at")
+  completedAt     DateTime?       @map("completed_at")
+  reconciledAt    DateTime?       @map("reconciled_at")
+  initiatedBy     String          @map("initiated_by")
+  completedBy     String?         @map("completed_by")
+  reconciledBy    String?         @map("reconciled_by")
+  notes           String?
+  createdAt       DateTime        @default(now()) @map("created_at")
+  updatedAt       DateTime        @updatedAt @map("updated_at")
+
+  store            Store            @relation(fields: [storeId], references: [id], onDelete: Restrict)
+  initiatedByUser  User             @relation("StockTakeInitiatedBy", fields: [initiatedBy], references: [id], onDelete: Restrict)
+  completedByUser  User?            @relation("StockTakeCompletedBy", fields: [completedBy], references: [id], onDelete: SetNull)
+  reconciledByUser User?            @relation("StockTakeReconciledBy", fields: [reconciledBy], references: [id], onDelete: SetNull)
+  lines            StockTakeLine[]
+
+  @@index([stockTakeNumber])
+  @@index([storeId])
+  @@index([status])
+  @@map("stock_takes")
+}
+
+model StockTakeLine {
+  id             String    @id @default(uuid())
+  stockTakeId    String    @map("stock_take_id")
+  itemId         String    @map("item_id")
+  locationId     String?   @map("location_id")
+  bookQuantity   Int       @map("book_quantity")
+  physicalCount  Int?      @map("physical_count")
+  variance       Int?      @default(0)
+  varianceReason String?   @map("variance_reason")
+  countedBy      String?   @map("counted_by")
+  countedAt      DateTime? @map("counted_at")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  stockTake StockTake @relation(fields: [stockTakeId], references: [id], onDelete: Cascade)
+  item      Item      @relation(fields: [itemId], references: [id], onDelete: Restrict)
+  location  Location? @relation(fields: [locationId], references: [id], onDelete: SetNull)
+
+  @@unique([stockTakeId, itemId], name: "uq_stocktake_line_item")
+  @@index([stockTakeId])
+  @@index([itemId])
+  @@map("stock_take_lines")
+}
+
+// ────────────────────────────────────────────────────────────────
 // Stock Taking & Reconciliation Models (BE-146)
-//
-// Design notes:
-// - Models physical inventory stock-taking sessions and variance calculations.
-// - Status workflow: DRAFT -> SUBMITTED -> PENDING_APPROVAL -> APPROVED / REJECTED -> POSTED
-// - BR-19: Calculates variance = physicalCount - systemQuantity before adjustment posting.
 // ────────────────────────────────────────────────────────────────
 enum ReconciliationStatus {
   DRAFT
