@@ -203,15 +203,15 @@ export async function postReconciliationAdjustments({ id, postedBy }) {
   }
 
   // Iterate over lines and post non-zero variances through transaction posting engine (BE-086)
+  // Pass signed variance: positive = stock increase (physical > system), negative = stock decrease (physical < system)
   for (const line of record.lines) {
     if (line.variance !== 0) {
-      const postingQty = Math.abs(line.variance)
       try {
         await transactionPostingEngine.postTransaction({
           itemId: line.itemId,
           storeId: record.storeId,
           transactionType: 'ADJUSTMENT',
-          quantity: postingQty,
+          quantity: line.variance,
           referenceType: 'RECONCILIATION',
           referenceId: record.id,
           referenceNumber: record.reconciliationNo,
