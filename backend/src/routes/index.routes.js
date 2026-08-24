@@ -1,10 +1,6 @@
 /**
  * Master Router Aggregator
-<<<<<<< HEAD
- * Tasks: BE-006, BE-028, BE-099, BE-106 (Preliminary SIV/ISIV API)
-=======
- * Tasks: BE-006, BE-028, BE-099, BE-106, BE-117, BE-124, BE-130, BE-134 (Shelf-Life APIs)
->>>>>>> origin/main
+ * Tasks: BE-006, BE-028, BE-099, BE-106, BE-117, BE-124, BE-130, BE-134, BE-137 (Disposal APIs)
  */
 
 import { Router } from 'express'
@@ -23,14 +19,11 @@ import { goodsReceiptRoutes, evaluationRoutes, grnRoutes } from '../modules/good
 import { inventoryRoutes } from '../modules/inventory/index.js'
 import requisitionRoutes from '../modules/requisitions/requisition.routes.js'
 import sivRoutes from '../modules/siv/siv.routes.js'
-<<<<<<< HEAD
-import disposalRoutes from '../modules/disposal/disposal.routes.js'
-=======
 import returnRoutes from '../modules/returns/return.routes.js'
 import transferRoutes from '../modules/transfers/transfer.routes.js'
 import assetRoutes from '../modules/assets/asset.routes.js'
 import shelflifeRoutes from '../modules/shelflife/shelflife.routes.js'
->>>>>>> origin/main
+import disposalRoutes from '../modules/disposals/disposal.routes.js'
 
 const router = Router()
 
@@ -52,14 +45,10 @@ router.use('/grns', grnRoutes)
 router.use('/inventory', inventoryRoutes)
 router.use('/requisitions', requisitionRoutes)
 router.use('/sivs', sivRoutes)
-<<<<<<< HEAD
-router.use('/disposal-requests', disposalRoutes)
-router.use('/disposal', disposalRoutes)
-=======
 router.use('/returns', returnRoutes)
 router.use('/transfers', transferRoutes)
 router.use('/assets', assetRoutes)
 router.use('/shelflife', shelflifeRoutes)
->>>>>>> origin/main
+router.use('/disposals', disposalRoutes)
 
 export default router
