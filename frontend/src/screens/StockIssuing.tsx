@@ -20,6 +20,22 @@ const steps = [
   "Issue Voucher",
 ];
 
+const createId = () => {
+  if (typeof crypto !== "undefined" && crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+
+  return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+};
+
+const createId = () => {
+  if (typeof crypto !== "undefined" && crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+
+  return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+};
+
 interface IssueLine {
   id: string;
   itemName: string;
@@ -41,7 +57,7 @@ export default function StockIssuing() {
   });
   const [lines, setLines] = useState<IssueLine[]>([
     {
-      id: "1",
+      id: createId(),
       itemName: "Welding Electrodes 3.2mm",
       sku: "WE-E6013-3.2",
       requestedQty: "5",
@@ -124,7 +140,7 @@ export default function StockIssuing() {
     } else {
       lines.forEach((line) => {
         addStockMovement({
-          id: `TXN-${Math.floor(Math.random() * 1000000)}`,
+          id: `TXN-${createId()}`,
           date: new Date().toISOString().slice(0, 16).replace("T", " "),
           type: "issued",
           item: line.itemName,
@@ -453,7 +469,7 @@ export default function StockIssuing() {
                   setLines((ls) => [
                     ...ls,
                     {
-                      id: Math.random().toString(36).slice(2),
+                      id: createId(),
                       itemName: "",
                       sku: "",
                       requestedQty: "",
