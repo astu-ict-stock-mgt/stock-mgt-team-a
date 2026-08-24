@@ -1,6 +1,6 @@
 /**
  * Stock Management System (SMS) - Idempotent Database Seed Script
- * Tasks: BE-012, BE-021, BE-022, BE-024, BE-041, BE-042, BE-045, BE-096 (Store Requisition Fixtures)
+ * Tasks: BE-012, BE-021, BE-022, BE-024, BE-041, BE-042, BE-045, BE-096 (Store Requisition Fixture)
  * SRS Traceability: Section 10.1 (Core Entities), Appendix C (Roles & Permissions), FR-01, FR-02, BR-20
  */
 import { env } from '../src/config/env.js'
@@ -259,67 +259,35 @@ async function main() {
     }
   }
 
-  // 8. Seed Shelf-Life & Expiry Fixtures (BE-132, BE-133)
-  console.log('⏳ Seeding Shelf-Life Fixtures (BE-132, BE-133)...')
-  if (item && store) {
+  // 8. Seed Stock Transfer Request & Lines Fixtures (BE-121, BE-122)
+  console.log('🔄 Seeding Transfer Request & Lines Fixtures (BE-121, BE-122)...')
+  if (store && requesterUser && item) {
     try {
-      const healthyExpiry = new Date()
-      healthyExpiry.setDate(healthyExpiry.getDate() + 90)
-
-      const nearExpiryDate = new Date()
-      nearExpiryDate.setDate(nearExpiryDate.getDate() + 15)
-
-      const expiredDate = new Date()
-      expiredDate.setDate(expiredDate.getDate() - 10)
-
-      await prisma.shelfLifeRecord.upsert({
-        where: { uq_shelflife_item_batch: { itemId: item.id, batchNumber: 'BATCH-2026-HEALTHY' } },
+      await prisma.transferRequest.upsert({
+        where: { transferNumber: 'STR-2026-00001' },
         update: {},
         create: {
-          itemId: item.id,
-          batchNumber: 'BATCH-2026-HEALTHY',
-          quantity: 100,
-          expiryDate: healthyExpiry,
-          alertDaysBeforeExpiry: 30,
-          status: 'HEALTHY',
-          storeId: store.id,
-          notes: 'Standard stock batch in prime shelf-life window',
+          transferNumber: 'STR-2026-00001',
+          transferType: 'STORE_TO_STORE',
+          status: 'SUBMITTED',
+          sourceStoreId: store.id,
+          destinationStoreId: store.id,
+          requestedBy: requesterUser.id,
+          notes: 'Inter-store transfer of hardware accessories',
+          lines: {
+            create: [
+              {
+                itemId: item.id,
+                quantityRequested: 5,
+                remarks: 'Transfer for project deployment',
+              },
+            ],
+          },
         },
       })
-
-      await prisma.shelfLifeRecord.upsert({
-        where: { uq_shelflife_item_batch: { itemId: item.id, batchNumber: 'BATCH-2026-NEAREXP' } },
-        update: {},
-        create: {
-          itemId: item.id,
-          batchNumber: 'BATCH-2026-NEAREXP',
-          quantity: 25,
-          expiryDate: nearExpiryDate,
-          alertDaysBeforeExpiry: 30,
-          status: 'NEAR_EXPIRY',
-          storeId: store.id,
-          notes: 'Priority dispatch batch expiring soon',
-        },
-      })
-
-      await prisma.shelfLifeRecord.upsert({
-        where: { uq_shelflife_item_batch: { itemId: item.id, batchNumber: 'BATCH-2026-EXPIRED' } },
-        update: {},
-        create: {
-          itemId: item.id,
-          batchNumber: 'BATCH-2026-EXPIRED',
-          quantity: 10,
-          expiryDate: expiredDate,
-          alertDaysBeforeExpiry: 30,
-          status: 'EXPIRED',
-          storeId: store.id,
-          notes: 'Candidate batch quarantined for disposal',
-        },
-      })
-
-      console.log('   - Seeded Shelf-Life Batches: HEALTHY, NEAR_EXPIRY, EXPIRED')
+      console.log('   - Seeded Transfer Request & Lines: STR-2026-00001 (SUBMITTED)')
     } catch (_err) {
-      console.log('   ℹ️ Shelf-Life fixtures ready')
+      console.log('   ℹ️ Transfer Request fixture STR-2026-00001 ready')
     }
   }
 

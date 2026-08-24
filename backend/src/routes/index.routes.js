@@ -1,6 +1,6 @@
 /**
  * Master Router Aggregator
- * Tasks: BE-006, BE-028, BE-099, BE-106 (Preliminary SIV/ISIV API)
+ * Tasks: BE-006, BE-028, BE-099, BE-106, BE-117, BE-124 (Transfer Request APIs)
  */
 
 import { Router } from 'express'
@@ -19,6 +19,8 @@ import { goodsReceiptRoutes, evaluationRoutes, grnRoutes } from '../modules/good
 import { inventoryRoutes } from '../modules/inventory/index.js'
 import requisitionRoutes from '../modules/requisitions/requisition.routes.js'
 import sivRoutes from '../modules/siv/siv.routes.js'
+import returnRoutes from '../modules/returns/return.routes.js'
+import transferRoutes from '../modules/transfers/transfer.routes.js'
 
 const router = Router()
 
@@ -40,5 +42,7 @@ router.use('/grns', grnRoutes)
 router.use('/inventory', inventoryRoutes)
 router.use('/requisitions', requisitionRoutes)
 router.use('/sivs', sivRoutes)
+router.use('/returns', returnRoutes)
+router.use('/transfers', transferRoutes)
 
 export default router
