@@ -1,6 +1,6 @@
 /**
  * Stock Management System (SMS) - Idempotent Database Seed Script
- * Tasks: BE-012, BE-021, BE-022, BE-024, BE-041, BE-042, BE-045, BE-096 (Store Requisition Fixtures), BE-103 (SIV Fixtures), BE-114, BE-115 (Return & Return Lines Fixtures)
+ * Tasks: BE-012, BE-021, BE-022, BE-024, BE-041, BE-042, BE-045, BE-096 (Store Requisition Fixture)
  * SRS Traceability: Section 10.1 (Core Entities), Appendix C (Roles & Permissions), FR-01, FR-02, BR-20
  */
 import { env } from '../src/config/env.js'
@@ -256,50 +256,6 @@ async function main() {
       console.log('   - Seeded SIV: SIV-2026-00001 (PREPARED)')
     } catch (_err) {
       console.log('   ℹ️ SIV fixture SIV-2026-00001 ready')
-    }
-  }
-
-  // 8. Seed Store Return Note (SRN) & Return Lines Fixtures (BE-114, BE-115)
-  console.log('🔄 Seeding Return & Return Lines Fixtures (BE-114, BE-115)...')
-  const sivRecord = await prisma.sIV.findUnique({
-    where: { sivNumber: 'SIV-2026-00001' },
-    include: { lines: true },
-  })
-  if (store && requesterUser && item) {
-    const sivLine = sivRecord?.lines?.find((l) => l.itemId === item.id)
-    try {
-      await prisma.return.upsert({
-        where: { returnNumber: 'SRN-2026-00001' },
-        update: {},
-        create: {
-          returnNumber: 'SRN-2026-00001',
-          sivId: sivRecord?.id ?? null,
-          storeId: store.id,
-          departmentId: dept?.id ?? null,
-          returnedBy: requesterUser.id,
-          status: 'SUBMITTED',
-          reason: 'Surplus equipment returned following department restructuring',
-          requiresEvaluation: true,
-          notes: 'Unit in good condition with original accessories',
-          lines: {
-            create: [
-              {
-                itemId: item.id,
-                sivLineId: sivLine?.id ?? null,
-                quantityReturned: 1,
-                unitCost: 1500.0,
-                totalCost: 1500.0,
-                condition: 'GOOD',
-                disposition: 'RESTOCK',
-                remarks: 'Verified working condition, ready for restocking',
-              },
-            ],
-          },
-        },
-      })
-      console.log('   - Seeded Store Return Note: SRN-2026-00001 (SUBMITTED) with Return Lines')
-    } catch (_err) {
-      console.log('   ℹ️ Return fixture SRN-2026-00001 ready')
     }
   }
 
