@@ -1,3 +1,13 @@
+// Stock Management System (SMS) - Prisma Database Schema
+// Tasks: BE-010, BE-021 (Users Schema), BE-022 (Roles Schema), BE-024 (User-Role Relationships),
+//        BE-041 (Stores Schema)
+// SRS Traceability: Section 10.1 (Core Entities: users, roles, user_roles, stores),
+//                   FR-01 (authenticate registered users), FR-02 (RBAC / least privilege),
+//                   FR-05 (manage store information),
+//                   BR-21 (no hard-delete of records that are part of an auditable relationship),
+//                   Appendix C (Initial Permission Matrix)
+// Depends on: BE-021, BE-022, BE-041
+
 generator client {
   provider = "prisma-client-js"
 }
@@ -6,9 +16,1293 @@ datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
+
 model StockTaking {
   id        String   @id @default(uuid())
   notes     String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
+=======
+
+// ────────────────────────────────────────────────────────────────
+// System Health / Setting Model (BE-010)
+// ────────────────────────────────────────────────────────────────
+model SystemSetting {
+  id        String   @id @default(uuid())
+  key       String   @unique
+  value     String
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("system_settings")
+}
+
+// ────────────────────────────────────────────────────────────────
+// User Identity Model (BE-021)
+// ────────────────────────────────────────────────────────────────
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+}
+
+model User {
+  id           String     @id @default(uuid())
+  email        String     @unique
+  passwordHash String     @map("password_hash")
+  fullName     String     @map("full_name")
+  status       UserStatus @default(ACTIVE)
+  createdAt    DateTime   @default(now()) @map("created_at")
+  updatedAt    DateTime   @updatedAt @map("updated_at")
+
+  // BE-024: roles held by this user
+  roles UserRole[] @relation("UserRoles")
+
+  // BE-024: role-assignment events this user performed on others (audit trail, FR-04 / BR-21)
+  roleAssignmentsMade UserRole[] @relation("RoleAssignedBy")
+
+  // BE-041: stores where this user is responsible officer
+  managedStores Store[] @relation("StoreResponsibleOfficer")
+
+  // BE-042: departments where this user is department head
+  headedDepartments Department[] @relation("DepartmentHead")
+
+  // BE-063: goods receipts received by this user
+  goodsReceiptsReceived GoodsReceipt[] @relation("GoodsReceiptReceivedBy")
+
+  // BE-070: technical evaluations performed by this user
+  evaluationsPerformed TechnicalEvaluation[] @relation("EvaluationEvaluator")
+
+  // BE-077: GRNs finalized by this user
+  grnsFinalized GRN[] @relation("GRNFinalizedBy")
+
+  // BE-082: stock card transactions created by this user
+  stockTransactionsCreated StockCardTransaction[] @relation("StockTransactionCreatedBy")
+
+  // BE-084: bin transactions created by this user
+  binTransactionsCreated BinTransaction[] @relation("BinTransactionCreatedBy")
+
+  // BE-096: requisitions requested or approved by this user
+  requisitionsRequested    Requisition[] @relation("RequisitionRequester")
+  requisitionsDeptApproved Requisition[] @relation("RequisitionDeptApprover")
+  requisitionsPaoApproved  Requisition[] @relation("RequisitionPAOApprover")
+  preparedSIVs             SIV[]         @relation("SIVPreparedBy")
+  approvedSIVs             SIV[]         @relation("SIVApprovedBy")
+  issuedToSIVs             SIV[]         @relation("SIVIssuedTo")
+
+  // BE-114: returns requested / evaluated / approved by this user
+  returnsRequested Return[] @relation("ReturnRequestedBy")
+  returnsEvaluated Return[] @relation("ReturnEvaluatedBy")
+  returnsApproved  Return[] @relation("ReturnApprovedBy")
+
+  // BE-121: transfers requested / approved by this user
+  transfersRequested TransferRequest[] @relation("TransferRequestedBy")
+  transfersApproved  TransferRequest[] @relation("TransferApprovedBy")
+
+  // BE-129: fixed assets custodied by this user
+  fixedAssetsCustody FixedAsset[] @relation("FixedAssetCustodian")
+
+  // BE-136: disposals requested / evaluated / approved / executed by this user
+  disposalsRequested DisposalRequest[] @relation("DisposalRequestedBy")
+  disposalsEvaluated DisposalRequest[] @relation("DisposalEvaluatedBy")
+  disposalsApproved  DisposalRequest[] @relation("DisposalApprovedBy")
+  disposalsExecuted  DisposalRequest[] @relation("DisposalExecutedBy")
+
+  @@map("users")
+}
+
+// ────────────────────────────────────────────────────────────────
+// Category Model (BE-043)
+//
+// Design notes:
+// - Hierarchical categories for organizing items (e.g., Electronics -> Phones).
+// - Self-referential parent-child relationship for category hierarchy.
+// - BR-21: No hard-delete; status field used for deactivation.
+// - SRS FR-06: Maintain categories for item classification.
+// ────────────────────────────────────────────────────────────────
+enum CategoryStatus {
+  ACTIVE
+  INACTIVE
+}
+
+model Category {
+  id          String         @id @default(uuid())
+  code        String         @unique
+  name        String
+  parentId    String?        @map("parent_id")
+  status      CategoryStatus @default(ACTIVE)
+  description String?
+  createdAt   DateTime       @default(now()) @map("created_at")
+  updatedAt   DateTime       @updatedAt @map("updated_at")
+
+  // Relationships
+  parent   Category?  @relation("CategoryHierarchy", fields: [parentId], references: [id], onDelete: SetNull)
+  children Category[] @relation("CategoryHierarchy")
+  items    Item[]
+
+  @@index([code])
+  @@index([parentId])
+  @@index([status])
+  @@map("categories")
+}
+
+// ────────────────────────────────────────────────────────────────
+// Unit of Measure Model (BE-044)
+//
+// Design notes:
+// - Standard units for measuring items (e.g., KG, LTR, PCS, BOX).
+// - Conversion factor to base unit for cross-unit calculations.
+// - BR-21: No hard-delete; status field used for deactivation.
+// - SRS FR-06: Maintain standardized units of measure.
+// ────────────────────────────────────────────────────────────────
+enum UnitStatus {
+  ACTIVE
+  INACTIVE
+}
+
+model Unit {
+  id               String     @id @default(uuid())
+  code             String     @unique
+  name             String
+  symbol           String
+  conversionFactor Float?     @map("conversion_factor")
+  status           UnitStatus @default(ACTIVE)
+  description      String?
+  createdAt        DateTime   @default(now()) @map("created_at")
+  updatedAt        DateTime   @updatedAt @map("updated_at")
+
+  // Relationships
+  items             Item[]
+  goodsReceiptLines GoodsReceiptLine[]
+
+  @@index([code])
+  @@index([status])
+  @@map("units")
+}
+
+// ────────────────────────────────────────────────────────────────
+// Supplier Model (BE-046)
+//
+// Design notes:
+// - External suppliers or donors who provide items to the organization.
+// - Contact information and performance tracking fields.
+// - BR-21: No hard-delete; status field used for deactivation.
+// - SRS FR-08: Maintain supplier information.
+// ────────────────────────────────────────────────────────────────
+enum SupplierStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+}
+
+model Supplier {
+  id            String         @id @default(uuid())
+  code          String         @unique
+  name          String
+  type          SupplierType   @default(COMPANY)
+  status        SupplierStatus @default(ACTIVE)
+  contactPerson String?        @map("contact_person")
+  email         String?
+  phone         String?
+  address       String?
+  taxId         String?        @map("tax_id")
+  paymentTerms  String?        @map("payment_terms")
+  leadTimeDays  Int?           @map("lead_time_days")
+  rating        Float?
+  notes         String?
+  createdAt     DateTime       @default(now()) @map("created_at")
+  updatedAt     DateTime       @updatedAt @map("updated_at")
+
+  // Relationships
+  items         Item[]
+  goodsReceipts GoodsReceipt[]
+
+  @@index([code])
+  @@index([status])
+  @@index([type])
+  @@map("suppliers")
+}
+
+enum SupplierType {
+  COMPANY
+  DONOR
+  GOVERNMENT
+  NGO
+}
+
+// ────────────────────────────────────────────────────────────────
+// Item Model (BE-045)
+//
+// Design notes:
+// - Master record for each distinct material/product in the system.
+// - References category, unit, and optionally supplier.
+// - BR-21: No hard-delete; status field used for deactivation.
+// - SRS FR-07: Maintain item master data.
+// ────────────────────────────────────────────────────────────────
+enum ItemStatus {
+  ACTIVE
+  INACTIVE
+  DISCONTINUED
+}
+
+model Item {
+  id           String     @id @default(uuid())
+  code         String     @unique
+  name         String
+  description  String?
+  categoryId   String?    @map("category_id")
+  unitId       String     @map("unit_id")
+  supplierId   String?    @map("supplier_id")
+  status       ItemStatus @default(ACTIVE)
+  minimumStock Int?       @map("minimum_stock")
+  maximumStock Int?       @map("maximum_stock")
+  reorderPoint Int?       @map("reorder_point")
+  unitCost     Decimal?   @map("unit_cost")
+  weight       String?    @map("weight")
+  dimensions   String?
+  barcode      String?
+  createdAt    DateTime   @default(now()) @map("created_at")
+  updatedAt    DateTime   @updatedAt @map("updated_at")
+
+  // Relationships
+  category          Category?             @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  unit              Unit                  @relation(fields: [unitId], references: [id], onDelete: Restrict)
+  supplier          Supplier?             @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+  goodsReceiptLines GoodsReceiptLine[]
+  stockCards        StockCard[]
+  binCards          BinCard[]
+  requisitionLines  RequisitionLine[]
+  sivLines          SIVLine[]
+  returnLines       ReturnLine[]
+  transferLines     TransferLine[]
+  fixedAssets       FixedAsset[]
+  shelfLifeRecords  ShelfLifeRecord[]
+  disposalLines     DisposalRequestLine[]
+
+  @@index([code])
+  @@index([categoryId])
+  @@index([unitId])
+  @@index([supplierId])
+  @@index([status])
+  @@map("items")
+}
+
+// ────────────────────────────────────────────────────────────────
+// Role Model (BE-022)
+// ────────────────────────────────────────────────────────────────
+model Role {
+  id            String   @id @default(uuid())
+  code          String   @unique
+  name          String
+  description   String?
+  securityLevel Int      @default(10) @map("security_level")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  // BE-024: users holding this role
+  users UserRole[]
+
+  @@map("roles")
+}
+
+// ────────────────────────────────────────────────────────────────
+// User-Role Join Model (BE-024)
+//
+// Design notes:
+// - Surrogate UUID PK (`id`) rather than a composite PK, so the row itself
+//   can be referenced (e.g. from audit_logs / notifications) and so a role
+//   assignment is a first-class, individually revocable/auditable record —
+//   consistent with BR-04 (evaluator/date/decision on records) and
+//   BR-21 (no hard delete of records that become part of an audit trail).
+// - `@@unique([userId, roleId])` enforces "a user cannot hold the same role
+//   twice" at the database level, not just in application code.
+// - `assignedBy` is nullable + SetNull on delete: if the assigning admin
+//   account is later removed, the grant itself must survive (BR-21) — we
+//   just lose the "who granted it" pointer, not the grant.
+// - `role` FK uses Restrict: a role that is currently assigned to any user
+//   cannot be deleted out from under them (must be unassigned first).
+// - `user` FK uses Cascade: deleting a user record removes their role
+//   grants (their own grants are junk data with no meaning once orphaned;
+//   this does not touch users.status which is how BR-21 handles
+//   deactivation instead of hard delete in the first place).
+// ────────────────────────────────────────────────────────────────
+model UserRole {
+  id         String   @id @default(uuid())
+  userId     String   @map("user_id")
+  roleId     String   @map("role_id")
+  assignedBy String?  @map("assigned_by")
+  assignedAt DateTime @default(now()) @map("assigned_at")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  user           User  @relation("UserRoles", fields: [userId], references: [id], onDelete: Cascade)
+  role           Role  @relation(fields: [roleId], references: [id], onDelete: Restrict)
+  assignedByUser User? @relation("RoleAssignedBy", fields: [assignedBy], references: [id], onDelete: SetNull)
+
+  @@unique([userId, roleId], name: "uq_user_roles_user_role")
+  @@index([userId])
+  @@index([roleId])
+  @@map("user_roles")
+}
+
+// ────────────────────────────────────────────────────────────────
+// Store Model (BE-041)
+//
+// Design notes:
+// - Stores represent physical storage locations (main stores, department stores, warehouses).
+// - Each store has a unique code and can be linked to a responsible officer.
+// - Store type classification supports different organizational storage patterns.
+// - BR-21: No hard-delete; status field used for deactivation.
+// - SRS FR-05: Create, update, activate/deactivate store information.
+// ────────────────────────────────────────────────────────────────
+enum StoreType {
+  MAIN_STORE
+  DEPARTMENT_STORE
+  WAREHOUSE
+  TRANSIT_STORE
+  QUARANTINE_STORE
+}
+
+enum StoreStatus {
+  ACTIVE
+  INACTIVE
+}
+
+model Store {
+  id                   String      @id @default(uuid())
+  code                 String      @unique
+  name                 String
+  type                 StoreType   @default(MAIN_STORE)
+  status               StoreStatus @default(ACTIVE)
+  description          String?
+  address              String?
+  responsibleOfficerId String?     @map("responsible_officer_id")
+  createdAt            DateTime    @default(now()) @map("created_at")
+  updatedAt            DateTime    @updatedAt @map("updated_at")
+
+  // Relationships
+  responsibleOfficer User?             @relation("StoreResponsibleOfficer", fields: [responsibleOfficerId], references: [id], onDelete: SetNull)
+  departments        StoreDepartment[]
+  locations          Location[]
+  goodsReceipts      GoodsReceipt[]
+  stockCards         StockCard[]
+  requisitions       Requisition[]
+  sivs               SIV[]
+  returns            Return[]
+
+  // BE-121: transfers from/to this store
+  transfersSource      TransferRequest[] @relation("TransferSourceStore")
+  transfersDestination TransferRequest[] @relation("TransferDestinationStore")
+
+  // BE-132: shelf-life records in this store
+  shelfLifeRecords ShelfLifeRecord[]
+
+  // BE-136: disposal requests for this store
+  disposalRequests DisposalRequest[]
+
+  @@index([code])
+  @@index([status])
+  @@map("stores")
+}
+
+// ────────────────────────────────────────────────────────────────
+// Department Model (BE-042)
+//
+// Design notes:
+// - Departments represent organizational units that interact with stores.
+// - Many-to-many relationship with stores via StoreDepartment.
+// - BR-21: No hard-delete; status field used for deactivation.
+// ────────────────────────────────────────────────────────────────
+enum DepartmentStatus {
+  ACTIVE
+  INACTIVE
+}
+
+model Department {
+  id          String           @id @default(uuid())
+  code        String           @unique
+  name        String
+  status      DepartmentStatus @default(ACTIVE)
+  description String?
+  headUserId  String?          @map("head_user_id")
+  createdAt   DateTime         @default(now()) @map("created_at")
+  updatedAt   DateTime         @updatedAt @map("updated_at")
+
+  // Relationships
+  headUser      User?             @relation("DepartmentHead", fields: [headUserId], references: [id], onDelete: SetNull)
+  stores        StoreDepartment[]
+  goodsReceipts GoodsReceipt[]
+  requisitions  Requisition[]
+
+  // BE-129: fixed assets in this department
+  fixedAssets FixedAsset[]
+
+  @@index([code])
+  @@index([status])
+  @@map("departments")
+}
+
+// ────────────────────────────────────────────────────────────────
+// Store-Department Join Model (BE-042)
+//
+// Design notes:
+// - Many-to-many relationship between stores and departments.
+// - Allows departments to be associated with multiple stores.
+// ────────────────────────────────────────────────────────────────
+model StoreDepartment {
+  id           String   @id @default(uuid())
+  storeId      String   @map("store_id")
+  departmentId String   @map("department_id")
+  isPrimary    Boolean  @default(false) @map("is_primary")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  // Relationships
+  store      Store      @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  department Department @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+
+  @@unique([storeId, departmentId], name: "uq_store_department")
+  @@index([storeId])
+  @@index([departmentId])
+  @@map("store_departments")
+}
+
+// ────────────────────────────────────────────────────────────────
+// Location Model (BE-047)
+//
+// Design notes:
+// - Hierarchical physical locations within stores (area -> shelf -> rack -> bin).
+// - Self-referential parent-child relationship for hierarchy.
+// - Each location belongs to a specific store.
+// - BR-21: No hard-delete; status field used for deactivation.
+// - SRS FR-09: Maintain hierarchical physical locations for materials.
+// ────────────────────────────────────────────────────────────────
+enum LocationType {
+  STORE
+  AREA
+  SHELF
+  RACK
+  BIN
+}
+
+enum LocationStatus {
+  ACTIVE
+  INACTIVE
+}
+
+model Location {
+  id          String         @id @default(uuid())
+  code        String         @unique
+  name        String
+  type        LocationType   @default(BIN)
+  storeId     String         @map("store_id")
+  parentId    String?        @map("parent_id")
+  status      LocationStatus @default(ACTIVE)
+  capacity    Int?
+  description String?
+  createdAt   DateTime       @default(now()) @map("created_at")
+  updatedAt   DateTime       @updatedAt @map("updated_at")
+
+  // Relationships
+  store             Store              @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  parent            Location?          @relation("LocationHierarchy", fields: [parentId], references: [id], onDelete: SetNull)
+  children          Location[]         @relation("LocationHierarchy")
+  goodsReceiptLines GoodsReceiptLine[]
+  binCards          BinCard[]
+
+  // BE-121: transfers from/to this location
+  transfersSource      TransferRequest[] @relation("TransferSourceLocation")
+  transfersDestination TransferRequest[] @relation("TransferDestinationLocation")
+
+  // BE-129: fixed assets at this location
+  fixedAssets FixedAsset[]
+
+  // BE-132: shelf-life records at this location
+  shelfLifeRecords ShelfLifeRecord[]
+
+  // BE-136: disposal lines at this location
+  disposalLines DisposalRequestLine[]
+
+  @@index([code])
+  @@index([storeId])
+  @@index([parentId])
+  @@index([type])
+  @@map("locations")
+}
+
+// ────────────────────────────────────────────────────────────────
+// Goods Receipt Model (BE-063)
+//
+// Design notes:
+// - Records receipt of goods from suppliers/donors.
+// - Linked to supplier, store, and purchase order (if applicable).
+// - Status workflow: DRAFT -> PENDING_EVALUATION -> EVALUATED -> APPROVED -> REJECTED
+// - BR-21: No hard-delete; status field used for lifecycle.
+// - SRS FR-10: Record goods receipt information.
+// ────────────────────────────────────────────────────────────────
+enum GoodsReceiptStatus {
+  DRAFT
+  PENDING_EVALUATION
+  EVALUATED
+  APPROVED
+  REJECTED
+}
+
+model GoodsReceipt {
+  id                  String             @id @default(uuid())
+  receiptNumber       String             @unique @map("receipt_number")
+  supplierId          String             @map("supplier_id")
+  storeId             String             @map("store_id")
+  departmentId        String?            @map("department_id")
+  purchaseOrderNumber String?            @map("purchase_order_number")
+  status              GoodsReceiptStatus @default(DRAFT)
+  receivedDate        DateTime           @default(now()) @map("received_date")
+  receivedBy          String             @map("received_by")
+  notes               String?
+  totalAmount         Decimal?           @map("total_amount")
+  currency            String?            @default("ETB")
+  createdAt           DateTime           @default(now()) @map("created_at")
+  updatedAt           DateTime           @updatedAt @map("updated_at")
+
+  // Relationships
+  supplier       Supplier              @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+  store          Store                 @relation(fields: [storeId], references: [id], onDelete: Restrict)
+  department     Department?           @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  receivedByUser User                  @relation("GoodsReceiptReceivedBy", fields: [receivedBy], references: [id], onDelete: Restrict)
+  lines          GoodsReceiptLine[]
+  evaluations    TechnicalEvaluation[]
+  grn            GRN?
+
+  @@index([receiptNumber])
+  @@index([supplierId])
+  @@index([storeId])
+  @@index([status])
+  @@index([receivedDate])
+  @@map("goods_receipts")
+}
+
+// ────────────────────────────────────────────────────────────────
+// Goods Receipt Line Model (BE-064)
+//
+// Design notes:
+// - Individual line items on a goods receipt.
+// - References item, unit, and location for storage.
+// - Quantity and cost tracking for valuation.
+// ────────────────────────────────────────────────────────────────
+model GoodsReceiptLine {
+  id             String    @id @default(uuid())
+  goodsReceiptId String    @map("goods_receipt_id")
+  itemId         String    @map("item_id")
+  unitId         String    @map("unit_id")
+  locationId     String?   @map("location_id")
+  quantity       Int
+  unitCost       Decimal   @map("unit_cost")
+  totalCost      Decimal   @map("total_cost")
+  condition      String?
+  batchNumber    String?   @map("batch_number")
+  expiryDate     DateTime? @map("expiry_date")
+  notes          String?
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  // Relationships
+  goodsReceipt GoodsReceipt @relation(fields: [goodsReceiptId], references: [id], onDelete: Cascade)
+  item         Item         @relation(fields: [itemId], references: [id], onDelete: Restrict)
+  unit         Unit         @relation(fields: [unitId], references: [id], onDelete: Restrict)
+  location     Location?    @relation(fields: [locationId], references: [id], onDelete: SetNull)
+
+  @@index([goodsReceiptId])
+  @@index([itemId])
+  @@index([unitId])
+  @@map("goods_receipt_lines")
+}
+
+// ────────────────────────────────────────────────────────────────
+// Technical Evaluation Model (BE-070)
+//
+// Design notes:
+// - Technical evaluation of received goods.
+// - Linked to goods receipt and evaluator user.
+// - Status workflow: PENDING -> IN_PROGRESS -> COMPLETED
+// ────────────────────────────────────────────────────────────────
+enum EvaluationStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+}
+
+model TechnicalEvaluation {
+  id             String              @id @default(uuid())
+  goodsReceiptId String              @map("goods_receipt_id")
+  evaluatorId    String              @map("evaluator_id")
+  status         EvaluationStatus    @default(PENDING)
+  decision       EvaluationDecision?
+  decisionDate   DateTime?           @map("decision_date")
+  notes          String?
+  createdAt      DateTime            @default(now()) @map("created_at")
+  updatedAt      DateTime            @updatedAt @map("updated_at")
+
+  // Relationships
+  goodsReceipt GoodsReceipt @relation(fields: [goodsReceiptId], references: [id], onDelete: Cascade)
+  evaluator    User         @relation("EvaluationEvaluator", fields: [evaluatorId], references: [id], onDelete: Restrict)
+
+  @@index([goodsReceiptId])
+  @@index([evaluatorId])
+  @@index([status])
+  @@map("technical_evaluations")
+}
+
+enum EvaluationDecision {
+  APPROVED
+  REJECTED
+  CONDITIONAL
+}
+
+// ────────────────────────────────────────────────────────────────
+// GRN Model (BE-077)
+//
+// Design notes:
+// - Goods Receipt Note - final document after evaluation approval.
+// - Unique GRN number for tracking.
+// - Links to goods receipt and evaluation.
+// ────────────────────────────────────────────────────────────────
+enum GRNStatus {
+  DRAFT
+  FINALIZED
+  CANCELLED
+}
+
+model GRN {
+  id             String    @id @default(uuid())
+  grnNumber      String    @unique @map("grn_number")
+  goodsReceiptId String    @map("goods_receipt_id")
+  status         GRNStatus @default(DRAFT)
+  finalizedDate  DateTime? @map("finalized_date")
+  finalizedBy    String?   @map("finalized_by")
+  notes          String?
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  // Relationships
+  goodsReceipt    GoodsReceipt @relation(fields: [goodsReceiptId], references: [id], onDelete: Restrict)
+  finalizedByUser User?        @relation("GRNFinalizedBy", fields: [finalizedBy], references: [id], onDelete: SetNull)
+
+  // BE-129: fixed assets from this GRN
+  fixedAssets FixedAsset[]
+
+  @@unique([goodsReceiptId])
+  @@index([grnNumber])
+  @@index([status])
+  @@map("grns")
+}
+
+// ────────────────────────────────────────────────────────────────
+// Stock Card Model (BE-081)
+//
+// Design notes:
+// - Tracks current stock balance per item per store.
+// - Single record per item-store combination.
+// - Updated by transaction posting engine.
+// ────────────────────────────────────────────────────────────────
+model StockCard {
+  id             String    @id @default(uuid())
+  itemId         String    @map("item_id")
+  storeId        String    @map("store_id")
+  quantity       Int       @default(0)
+  reservedQty    Int       @default(0) @map("reserved_qty")
+  availableQty   Int       @default(0) @map("available_qty")
+  averageCost    Decimal?  @map("average_cost")
+  lastMovementAt DateTime? @map("last_movement_at")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  // Relationships
+  item         Item                   @relation(fields: [itemId], references: [id], onDelete: Restrict)
+  store        Store                  @relation(fields: [storeId], references: [id], onDelete: Restrict)
+  transactions StockCardTransaction[]
+
+  @@unique([itemId, storeId], name: "uq_stock_card_item_store")
+  @@index([itemId])
+  @@index([storeId])
+  @@map("stock_cards")
+}
+
+// ────────────────────────────────────────────────────────────────
+// Stock Card Transaction Model (BE-082)
+//
+// Design notes:
+// - Immutable record of each stock movement.
+// - Referenced by stock card for balance calculation.
+// ────────────────────────────────────────────────────────────────
+enum TransactionType {
+  RECEIPT
+  ISSUE
+  TRANSFER_IN
+  TRANSFER_OUT
+  ADJUSTMENT
+  RETURN
+  DISPOSAL
+}
+
+model StockCardTransaction {
+  id              String          @id @default(uuid())
+  stockCardId     String          @map("stock_card_id")
+  transactionType TransactionType
+  quantity        Int
+  referenceType   String?         @map("reference_type")
+  referenceId     String?         @map("reference_id")
+  referenceNumber String?         @map("reference_number")
+  notes           String?
+  createdBy       String          @map("created_by")
+  createdAt       DateTime        @default(now()) @map("created_at")
+
+  // Relationships
+  stockCard     StockCard @relation(fields: [stockCardId], references: [id], onDelete: Restrict)
+  createdByUser User      @relation("StockTransactionCreatedBy", fields: [createdBy], references: [id], onDelete: Restrict)
+
+  @@index([stockCardId])
+  @@index([transactionType])
+  @@index([referenceType, referenceId])
+  @@index([createdAt])
+  @@map("stock_card_transactions")
+}
+
+// ────────────────────────────────────────────────────────────────
+// Bin Card Model (BE-083)
+//
+// Design notes:
+// - Tracks stock balance per item per location (bin).
+// - More granular than stock card (location-level).
+// ────────────────────────────────────────────────────────────────
+model BinCard {
+  id             String    @id @default(uuid())
+  itemId         String    @map("item_id")
+  locationId     String    @map("location_id")
+  quantity       Int       @default(0)
+  lastMovementAt DateTime? @map("last_movement_at")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  // Relationships
+  item         Item             @relation(fields: [itemId], references: [id], onDelete: Restrict)
+  location     Location         @relation(fields: [locationId], references: [id], onDelete: Restrict)
+  transactions BinTransaction[]
+
+  @@unique([itemId, locationId], name: "uq_bin_card_item_location")
+  @@index([itemId])
+  @@index([locationId])
+  @@map("bin_cards")
+}
+
+// ────────────────────────────────────────────────────────────────
+// Bin Transaction Model (BE-084)
+//
+// Design notes:
+// - Immutable record of each bin-level stock movement.
+// ────────────────────────────────────────────────────────────────
+model BinTransaction {
+  id              String          @id @default(uuid())
+  binCardId       String          @map("bin_card_id")
+  transactionType TransactionType
+  quantity        Int
+  referenceType   String?         @map("reference_type")
+  referenceId     String?         @map("reference_id")
+  referenceNumber String?         @map("reference_number")
+  notes           String?
+  createdBy       String          @map("created_by")
+  createdAt       DateTime        @default(now()) @map("created_at")
+
+  // Relationships
+  binCard       BinCard @relation(fields: [binCardId], references: [id], onDelete: Restrict)
+  createdByUser User    @relation("BinTransactionCreatedBy", fields: [createdBy], references: [id], onDelete: Restrict)
+
+  @@index([binCardId])
+  @@index([transactionType])
+  @@index([referenceType, referenceId])
+  @@index([createdAt])
+  @@map("bin_transactions")
+}
+
+// ────────────────────────────────────────────────────────────────
+// User Model Additional Relations & Requisition Schema (BE-096)
+// ────────────────────────────────────────────────────────────────
+
+enum RequisitionStatus {
+  DRAFT
+  SUBMITTED
+  DEPARTMENT_APPROVED
+  DEPARTMENT_REJECTED
+  PAO_APPROVED
+  PAO_REJECTED
+  CANCELLED
+  COMPLETED
+  PARTIALLY_ISSUED
+}
+
+model Requisition {
+  id                   String            @id @default(uuid())
+  requisitionNumber    String            @unique @map("requisition_number")
+  requesterId          String            @map("requester_id")
+  departmentId         String            @map("department_id")
+  storeId              String            @map("store_id")
+  status               RequisitionStatus @default(DRAFT)
+  purpose              String
+  rejectionReason      String?           @map("rejection_reason")
+  departmentApprovedAt DateTime?         @map("department_approved_at")
+  departmentApprovedBy String?           @map("department_approved_by")
+  paoApprovedAt        DateTime?         @map("pao_approved_at")
+  paoApprovedBy        String?           @map("pao_approved_by")
+  createdAt            DateTime          @default(now()) @map("created_at")
+  updatedAt            DateTime          @updatedAt @map("updated_at")
+
+  requester                User              @relation("RequisitionRequester", fields: [requesterId], references: [id], onDelete: Restrict)
+  department               Department        @relation(fields: [departmentId], references: [id], onDelete: Restrict)
+  store                    Store             @relation(fields: [storeId], references: [id], onDelete: Restrict)
+  departmentApprovedByUser User?             @relation("RequisitionDeptApprover", fields: [departmentApprovedBy], references: [id], onDelete: SetNull)
+  paoApprovedByUser        User?             @relation("RequisitionPAOApprover", fields: [paoApprovedBy], references: [id], onDelete: SetNull)
+  lines                    RequisitionLine[]
+  sivs                     SIV[]
+
+  @@index([requisitionNumber])
+  @@index([requesterId])
+  @@index([departmentId])
+  @@index([storeId])
+  @@index([status])
+  @@map("requisitions")
+}
+
+model RequisitionLine {
+  id                String   @id @default(uuid())
+  requisitionId     String   @map("requisition_id")
+  itemId            String   @map("item_id")
+  requestedQuantity Int      @map("requested_quantity")
+  approvedQuantity  Int?     @map("approved_quantity")
+  issuedQuantity    Int      @default(0) @map("issued_quantity")
+  remarks           String?
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  requisition Requisition @relation(fields: [requisitionId], references: [id], onDelete: Cascade)
+  item        Item        @relation(fields: [itemId], references: [id], onDelete: Restrict)
+
+  @@unique([requisitionId, itemId], name: "uq_requisition_line_item")
+  @@index([requisitionId])
+  @@index([itemId])
+  @@map("requisition_lines")
+}
+
+// ────────────────────────────────────────────────────────────────
+// Store Issue Voucher (SIV/ISIV) Model (BE-103)
+//
+// Design notes:
+// - Document lifecycle: DRAFT -> PREPARED -> APPROVED -> FINALIZED -> CANCELLED
+// - Linked to requisition, store, recipient user, preparedBy, and approvedBy.
+// - SIVLine links items and quantities issued.
+// ────────────────────────────────────────────────────────────────
+enum SIVStatus {
+  DRAFT
+  PREPARED
+  APPROVED
+  FINALIZED
+  CANCELLED
+}
+
+model SIV {
+  id             String    @id @default(uuid())
+  sivNumber      String    @unique @map("siv_number")
+  requisitionId  String    @map("requisition_id")
+  storeId        String    @map("store_id")
+  issuedToUserId String    @map("issued_to_user_id")
+  status         SIVStatus @default(DRAFT)
+  issueDate      DateTime  @default(now()) @map("issue_date")
+  preparedBy     String    @map("prepared_by")
+  approvedBy     String?   @map("approved_by")
+  notes          String?
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  requisition    Requisition @relation(fields: [requisitionId], references: [id], onDelete: Restrict)
+  store          Store       @relation(fields: [storeId], references: [id], onDelete: Restrict)
+  issuedToUser   User        @relation("SIVIssuedTo", fields: [issuedToUserId], references: [id], onDelete: Restrict)
+  preparedByUser User        @relation("SIVPreparedBy", fields: [preparedBy], references: [id], onDelete: Restrict)
+  approvedByUser User?       @relation("SIVApprovedBy", fields: [approvedBy], references: [id], onDelete: SetNull)
+  lines          SIVLine[]
+  returns        Return[]
+
+  @@index([sivNumber])
+  @@index([requisitionId])
+  @@index([storeId])
+  @@index([status])
+  @@map("sivs")
+}
+
+model SIVLine {
+  id             String   @id @default(uuid())
+  sivId          String   @map("siv_id")
+  itemId         String   @map("item_id")
+  quantityIssued Int      @map("quantity_issued")
+  unitCost       Decimal? @map("unit_cost")
+  totalCost      Decimal? @map("total_cost")
+  remarks        String?
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  siv  SIV  @relation(fields: [sivId], references: [id], onDelete: Cascade)
+  item Item @relation(fields: [itemId], references: [id], onDelete: Restrict)
+
+  @@unique([sivId, itemId], name: "uq_siv_line_item")
+  @@index([sivId])
+  @@index([itemId])
+  @@map("siv_lines")
+}
+
+// ────────────────────────────────────────────────────────────────
+// Store Return Note (SRN) / Return Model (BE-114)
+//
+// Design notes:
+// - No existing Return/ReturnLine model was present before this addition —
+//   this is a new design, not a transcription of something already built.
+// - ReturnStatus values are taken verbatim from SRS §7.1's Material Return
+//   state model: "Draft → Submitted → Under Evaluation → Approved /
+//   Rejected → Received → Dispositioned → Closed". No states were added
+//   beyond that list.
+// - evaluationResult reuses the existing `EvaluationDecision` enum
+//   (APPROVED / REJECTED / CONDITIONAL) already defined for
+//   TechnicalEvaluation, rather than inventing a parallel enum.
+// - `disposition` values (RESTOCK / QUARANTINE / REPAIR / DISPOSAL /
+//   REPLACEMENT) are taken verbatim from SRS clarification C-09, which is
+//   explicitly still OPEN. The column exists so the schema can express a
+//   disposition once decided — the enum's exact membership is NOT
+//   confirmed policy. Flag against C-09 before this is frozen for
+//   production.
+// - `sivId` (original issue reference) is REQUIRED (NOT NULL / Restrict).
+//   ASSUMPTION: if a return can ever exist without a traceable original
+//   issue, this FK needs to become nullable — flag alongside C-09.
+// - BR-13: "Returns shall not increase stock until the return is approved
+//   and the disposition is known" — enforced at the application/posting
+//   layer (BE-086), not by this schema; the schema only records status
+//   and disposition, it does not itself move stock.
+// ────────────────────────────────────────────────────────────────
+enum ReturnStatus {
+  DRAFT
+  SUBMITTED
+  UNDER_EVALUATION
+  APPROVED
+  REJECTED
+  RECEIVED
+  DISPOSITIONED
+  CLOSED
+}
+
+enum ReturnDisposition {
+  RESTOCK
+  QUARANTINE
+  REPAIR
+  DISPOSAL
+  REPLACEMENT
+}
+
+model Return {
+  id               String              @id @default(uuid())
+  returnNumber     String              @unique @map("return_number")
+  sivId            String              @map("siv_id")
+  requestedById    String              @map("requested_by")
+  storeId          String              @map("store_id")
+  status           ReturnStatus        @default(DRAFT)
+  reason           String
+  evaluationResult EvaluationDecision? @map("evaluation_result")
+  evaluatedBy      String?             @map("evaluated_by")
+  evaluatedAt      DateTime?           @map("evaluated_at")
+  approvedBy       String?             @map("approved_by")
+  approvedAt       DateTime?           @map("approved_at")
+  rejectionReason  String?             @map("rejection_reason")
+  disposition      ReturnDisposition?  @map("disposition")
+  receivedAt       DateTime?           @map("received_at")
+  notes            String?
+  createdAt        DateTime            @default(now()) @map("created_at")
+  updatedAt        DateTime            @updatedAt @map("updated_at")
+
+  siv             SIV          @relation(fields: [sivId], references: [id], onDelete: Restrict)
+  requestedByUser User         @relation("ReturnRequestedBy", fields: [requestedById], references: [id], onDelete: Restrict)
+  store           Store        @relation(fields: [storeId], references: [id], onDelete: Restrict)
+  evaluatedByUser User?        @relation("ReturnEvaluatedBy", fields: [evaluatedBy], references: [id], onDelete: SetNull)
+  approvedByUser  User?        @relation("ReturnApprovedBy", fields: [approvedBy], references: [id], onDelete: SetNull)
+  lines           ReturnLine[]
+
+  @@index([returnNumber])
+  @@index([sivId])
+  @@index([requestedById])
+  @@index([storeId])
+  @@index([status])
+  @@map("returns")
+}
+
+model ReturnLine {
+  id               String   @id @default(uuid())
+  returnId         String   @map("return_id")
+  itemId           String   @map("item_id")
+  returnedQuantity Int      @map("returned_quantity")
+  acceptedQuantity Int?     @map("accepted_quantity")
+  remarks          String?
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  return Return @relation(fields: [returnId], references: [id], onDelete: Cascade)
+  item   Item   @relation(fields: [itemId], references: [id], onDelete: Restrict)
+
+  @@unique([returnId, itemId], name: "uq_return_line_item")
+  @@index([returnId])
+  @@index([itemId])
+  @@map("return_lines")
+}
+
+// ────────────────────────────────────────────────────────────────
+// Transfer Request Model (BE-121)
+//
+// Design notes:
+// - Records stock transfer requests between stores.
+// - Supports store-to-store and department-to-department transfers.
+// - Status workflow: DRAFT -> PENDING_APPROVAL -> APPROVED -> IN_TRANSIT -> COMPLETED -> CANCELLED
+// ────────────────────────────────────────────────────────────────
+enum TransferType {
+  STORE_TO_STORE
+  DEPARTMENT_TO_DEPARTMENT
+  WAREHOUSE_TO_STORE
+}
+
+enum TransferStatus {
+  DRAFT
+  PENDING_APPROVAL
+  APPROVED
+  IN_TRANSIT
+  COMPLETED
+  CANCELLED
+}
+
+model TransferRequest {
+  id                    String         @id @default(uuid())
+  transferNumber        String         @unique @map("transfer_number")
+  transferType          TransferType   @default(STORE_TO_STORE) @map("transfer_type")
+  status                TransferStatus @default(DRAFT)
+  sourceStoreId         String         @map("source_store_id")
+  destinationStoreId    String         @map("destination_store_id")
+  sourceLocationId      String?        @map("source_location_id")
+  destinationLocationId String?        @map("destination_location_id")
+  requestedBy           String         @map("requested_by")
+  approvedBy            String?        @map("approved_by")
+  approvedAt            DateTime?      @map("approved_at")
+  notes                 String?
+  createdAt             DateTime       @default(now()) @map("created_at")
+  updatedAt             DateTime       @updatedAt @map("updated_at")
+
+  sourceStore         Store          @relation("TransferSourceStore", fields: [sourceStoreId], references: [id], onDelete: Restrict)
+  destinationStore    Store          @relation("TransferDestinationStore", fields: [destinationStoreId], references: [id], onDelete: Restrict)
+  sourceLocation      Location?      @relation("TransferSourceLocation", fields: [sourceLocationId], references: [id], onDelete: SetNull)
+  destinationLocation Location?      @relation("TransferDestinationLocation", fields: [destinationLocationId], references: [id], onDelete: SetNull)
+  requestedByUser     User           @relation("TransferRequestedBy", fields: [requestedBy], references: [id], onDelete: Restrict)
+  approvedByUser      User?          @relation("TransferApprovedBy", fields: [approvedBy], references: [id], onDelete: SetNull)
+  lines               TransferLine[]
+
+  @@index([transferNumber])
+  @@index([sourceStoreId])
+  @@index([destinationStoreId])
+  @@index([status])
+  @@map("transfer_requests")
+}
+
+model TransferLine {
+  id                  String   @id @default(uuid())
+  transferId          String   @map("transfer_id")
+  itemId              String   @map("item_id")
+  quantityRequested   Int      @map("quantity_requested")
+  quantityTransferred Int?     @default(0) @map("quantity_transferred")
+  remarks             String?
+  createdAt           DateTime @default(now()) @map("created_at")
+  updatedAt           DateTime @updatedAt @map("updated_at")
+
+  transfer TransferRequest @relation(fields: [transferId], references: [id], onDelete: Cascade)
+  item     Item            @relation(fields: [itemId], references: [id], onDelete: Restrict)
+
+  @@unique([transferId, itemId], name: "uq_transfer_line_item")
+  @@index([transferId])
+  @@index([itemId])
+  @@map("transfer_lines")
+}
+
+// ────────────────────────────────────────────────────────────────
+// Fixed Asset Model (BE-129)
+//
+// Design notes:
+// - Tracks fixed assets (equipment, vehicles, furniture, etc.).
+// - Linked to items, GRNs, custodians, departments, and locations.
+// - Status workflow: REGISTERED -> IN_USE -> UNDER_REPAIR -> RETIRED -> DISPOSED
+// ────────────────────────────────────────────────────────────────
+enum AssetStatus {
+  REGISTERED
+  IN_USE
+  UNDER_REPAIR
+  RETIRED
+  DISPOSED
+}
+
+model FixedAsset {
+  id           String      @id @default(uuid())
+  assetTag     String      @unique @map("asset_tag")
+  name         String
+  itemId       String?     @map("item_id")
+  grnId        String?     @map("grn_id")
+  serialNumber String?     @map("serial_number")
+  category     String?
+  status       AssetStatus @default(REGISTERED)
+  custodianId  String?     @map("custodian_id")
+  departmentId String?     @map("department_id")
+  locationId   String?     @map("location_id")
+  purchaseDate DateTime?   @map("purchase_date")
+  purchaseCost Decimal?    @map("purchase_cost")
+  currentValue Decimal?    @map("current_value")
+  notes        String?
+  createdAt    DateTime    @default(now()) @map("created_at")
+  updatedAt    DateTime    @updatedAt @map("updated_at")
+
+  item       Item?       @relation(fields: [itemId], references: [id], onDelete: SetNull)
+  grn        GRN?        @relation(fields: [grnId], references: [id], onDelete: SetNull)
+  custodian  User?       @relation("FixedAssetCustodian", fields: [custodianId], references: [id], onDelete: SetNull)
+  department Department? @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  location   Location?   @relation(fields: [locationId], references: [id], onDelete: SetNull)
+
+  @@index([assetTag])
+  @@index([status])
+  @@index([itemId])
+  @@index([custodianId])
+  @@index([departmentId])
+  @@map("fixed_assets")
+}
+
+// ────────────────────────────────────────────────────────────────
+// Shelf-Life & Expiry Model (BE-132)
+//
+// Design notes:
+// - Tracks shelf-life and expiry information for items.
+// - Monitors batch numbers and expiry dates.
+// - Status workflow: HEALTHY -> APPROACHING_EXPIRY -> EXPIRED -> DISPOSED
+// ────────────────────────────────────────────────────────────────
+enum ShelfLifeStatus {
+  HEALTHY
+  APPROACHING_EXPIRY
+  EXPIRED
+  DISPOSED
+}
+
+model ShelfLifeRecord {
+  id                    String          @id @default(uuid())
+  itemId                String          @map("item_id")
+  batchNumber           String          @map("batch_number")
+  quantity              Int
+  expiryDate            DateTime        @map("expiry_date")
+  alertDaysBeforeExpiry Int             @default(30) @map("alert_days_before_expiry")
+  status                ShelfLifeStatus @default(HEALTHY)
+  storeId               String?         @map("store_id")
+  locationId            String?         @map("location_id")
+  notes                 String?
+  createdAt             DateTime        @default(now()) @map("created_at")
+  updatedAt             DateTime        @updatedAt @map("updated_at")
+
+  item     Item      @relation(fields: [itemId], references: [id], onDelete: Restrict)
+  store    Store?    @relation(fields: [storeId], references: [id], onDelete: SetNull)
+  location Location? @relation(fields: [locationId], references: [id], onDelete: SetNull)
+
+  @@unique([itemId, batchNumber], name: "uq_shelflife_item_batch")
+  @@index([itemId])
+  @@index([batchNumber])
+  @@index([expiryDate])
+  @@index([status])
+  @@index([storeId])
+  @@map("shelflife_records")
+}
+
+// ────────────────────────────────────────────────────────────────
+// Disposal Request Model (BE-136)
+//
+// Design notes:
+// - Records disposal requests for expired or damaged items.
+// - Status workflow: DRAFT -> UNDER_EVALUATION -> APPROVED -> REJECTED -> EXECUTED -> COMPLETED
+// - Supports multiple disposal methods (DESTRUCTION, DONATION, SALE, RECYCLING, OTHER)
+// ────────────────────────────────────────────────────────────────
+enum DisposalMethod {
+  DESTRUCTION
+  DONATION
+  SALE
+  RECYCLING
+  OTHER
+}
+
+enum DisposalStatus {
+  DRAFT
+  UNDER_EVALUATION
+  APPROVED
+  REJECTED
+  EXECUTED
+  COMPLETED
+}
+
+model DisposalRequest {
+  id             String         @id @default(uuid())
+  disposalNumber String         @unique @map("disposal_number")
+  disposalMethod DisposalMethod @map("disposal_method")
+  status         DisposalStatus @default(DRAFT)
+  storeId        String?        @map("store_id")
+
+  requestedBy String    @map("requested_by")
+  evaluatedBy String?   @map("evaluated_by")
+  evaluatedAt DateTime? @map("evaluated_at")
+  approvedBy  String?   @map("approved_by")
+  approvedAt  DateTime? @map("approved_at")
+  executedBy  String?   @map("executed_by")
+  executedAt  DateTime? @map("executed_at")
+
+  reason    String?
+  notes     String?
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  store           Store?                @relation(fields: [storeId], references: [id], onDelete: SetNull)
+  requestedByUser User                  @relation("DisposalRequestedBy", fields: [requestedBy], references: [id], onDelete: Restrict)
+  evaluatedByUser User?                 @relation("DisposalEvaluatedBy", fields: [evaluatedBy], references: [id], onDelete: SetNull)
+  approvedByUser  User?                 @relation("DisposalApprovedBy", fields: [approvedBy], references: [id], onDelete: SetNull)
+  executedByUser  User?                 @relation("DisposalExecutedBy", fields: [executedBy], references: [id], onDelete: SetNull)
+  lines           DisposalRequestLine[]
+
+  @@index([disposalNumber])
+  @@index([status])
+  @@index([storeId])
+  @@index([requestedBy])
+  @@map("disposal_requests")
+}
+
+model DisposalRequestLine {
+  id                String    @id @default(uuid())
+  disposalRequestId String    @map("disposal_request_id")
+  itemId            String    @map("item_id")
+  locationId        String?   @map("location_id")
+  quantity          Int
+  unitCost          Decimal?  @map("unit_cost")
+  totalCost         Decimal?  @map("total_cost")
+  condition         String?
+  batchNumber       String?   @map("batch_number")
+  expiryDate        DateTime? @map("expiry_date")
+  remarks           String?
+  status            String    @default("PENDING")
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
+
+  disposalRequest DisposalRequest @relation(fields: [disposalRequestId], references: [id], onDelete: Cascade)
+  item            Item            @relation(fields: [itemId], references: [id], onDelete: Restrict)
+  location        Location?       @relation(fields: [locationId], references: [id], onDelete: SetNull)
+
+  @@unique([disposalRequestId, itemId], name: "uq_disposal_line_item")
+  @@index([disposalRequestId])
+  @@index([itemId])
+  @@index([locationId])
+  @@map("disposal_request_lines")
+}
+

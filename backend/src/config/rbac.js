@@ -102,6 +102,9 @@ export const PERMISSIONS = Object.freeze({
   SIV_AMEND: { key: 'siv:amend', module: 'Issue', description: 'Amend preliminary SIV/ISIV lines' },
   SIV_APPROVE: { key: 'siv:approve', module: 'Issue', description: 'Approve SIV/ISIV issue documents' },
   SIV_FINALIZE: { key: 'siv:finalize', module: 'Issue', description: 'Finalize issue voucher and trigger stock ledger deduction' },
+  ISSUES_CREATE: { key: 'siv:prepare', module: 'Issue', description: 'Prepare draft Store Issue Voucher (SIV/ISIV)' },
+  ISSUES_READ: { key: 'requisitions:read', module: 'Issue', description: 'View SIV issue vouchers' },
+  ISSUES_APPROVE: { key: 'siv:approve', module: 'Issue', description: 'Approve SIV issue vouchers' },
 
   // --- FIXED ASSETS REGISTRATION ---
   ASSETS_REGISTER: { key: 'assets:register', module: 'Assets', description: 'Register accepted materials as fixed assets' },
@@ -122,6 +125,11 @@ export const PERMISSIONS = Object.freeze({
   DISPOSAL_REQUEST: { key: 'disposal:request', module: 'Disposal', description: 'Flag candidate items and create disposal requests' },
   DISPOSAL_APPROVE: { key: 'disposal:approve', module: 'Disposal', description: 'Approve disposal requests (PAO / Committee)' },
   DISPOSAL_EXECUTE: { key: 'disposal:execute', module: 'Disposal', description: 'Execute final disposal and record disposal evidence' },
+  DISPOSALS_CREATE: { key: 'disposal:request', module: 'Disposal', description: 'Create disposal requests' },
+  DISPOSALS_READ: { key: 'shelflife:read', module: 'Disposal', description: 'View disposal requests' },
+  DISPOSALS_EVALUATE: { key: 'disposal:approve', module: 'Disposal', description: 'Evaluate disposal requests' },
+  DISPOSALS_APPROVE: { key: 'disposal:approve', module: 'Disposal', description: 'Approve disposal requests' },
+  DISPOSALS_EXECUTE: { key: 'disposal:execute', module: 'Disposal', description: 'Execute disposal requests' },
 
   // --- GATE & DISPATCH CONTROL ---
   DISPATCH_VERIFY: { key: 'dispatch:verify', module: 'Gate', description: 'Verify authorized material movement at entry/exit points' },
@@ -202,6 +210,7 @@ const MATRIX = {
     PERMISSIONS.TRANSFERS_CREATE.key,
     PERMISSIONS.TRANSFERS_EXECUTE.key,
     PERMISSIONS.SHELFLIFE_READ.key,
+    PERMISSIONS.DISPOSAL_REQUEST.key,
     PERMISSIONS.REPORTS_VIEW.key,
   ],
 
