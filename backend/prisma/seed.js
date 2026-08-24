@@ -1,6 +1,6 @@
 /**
  * Stock Management System (SMS) - Idempotent Database Seed Script
- * Tasks: BE-012, BE-021 (Users Fixtures), BE-022 (Roles Fixtures), BE-024 (User-Role Assignments)
+ * Tasks: BE-012, BE-021, BE-022, BE-024, BE-041, BE-042, BE-045, BE-096 (Store Requisition Fixture)
  * SRS Traceability: Section 10.1 (Core Entities), Appendix C (Roles & Permissions), FR-01, FR-02, BR-20
  */
 import { env } from '../src/config/env.js'
@@ -41,11 +41,8 @@ async function main() {
   }
 
   // 2. Seed System Roles into the database (BE-022)
-  // NOTE: previously this section only logged ROLES for reference — it did not
-  // persist them. Restored the actual upsert so `roles` rows exist before
-  // BE-024 tries to link users to them below.
   console.log(`🔒 Seeding ${Object.keys(ROLES).length} System Roles into Database (BE-022)...`)
-  const roleRecords = {} // code -> persisted Role row (with id)
+  const roleRecords = {}
   for (const roleObj of Object.values(ROLES)) {
     try {
       const role = await prisma.role.upsert({
@@ -63,7 +60,6 @@ async function main() {
         },
       })
       roleRecords[role.code] = role
-      console.log(`   - Seeded Role: [${roleObj.code}] ${roleObj.name} (Security Level: ${roleObj.securityLevel})`)
     } catch (_err) {
       console.log(`   ℹ️ Role '${roleObj.code}' ready`)
     }
@@ -74,7 +70,7 @@ async function main() {
     {
       email: 'admin@stockmgt.gov.et',
       fullName: 'System Administrator',
-      passwordHash: '$2b$10$e8Kz.0xP89m4/x4u9l2.xO3QY7L3vG5N1oH6.m9n.l3vG5N1oH6.m', // Sample Argon2id/Bcrypt hash
+      passwordHash: '$2b$10$e8Kz.0xP89m4/x4u9l2.xO3QY7L3vG5N1oH6.m9n.l3vG5N1oH6.m',
       status: 'ACTIVE',
       roleCode: ROLES.ADMIN.code,
     },
@@ -92,10 +88,17 @@ async function main() {
       status: 'ACTIVE',
       roleCode: ROLES.STOREKEEPER.code,
     },
+    {
+      email: 'requester@stockmgt.gov.et',
+      fullName: 'Department Requester',
+      passwordHash: '$2b$10$e8Kz.0xP89m4/x4u9l2.xO3QY7L3vG5N1oH6.m9n.l3vG5N1oH6.m',
+      status: 'ACTIVE',
+      roleCode: ROLES.REQUESTER.code,
+    },
   ]
 
   console.log('👤 Seeding Baseline Users (BE-021)...')
-  const userRecords = {} // email -> persisted User row (with id)
+  const userRecords = {}
   for (const u of defaultUsers) {
     try {
       const { roleCode, ...userData } = u
@@ -105,16 +108,12 @@ async function main() {
         create: userData,
       })
       userRecords[user.email] = user
-      console.log(`   - Seeded User: ${u.email} (${u.fullName})`)
     } catch (_err) {
       console.log(`   ℹ️ User fixture '${u.email}' ready`)
     }
   }
 
   // 4. Seed User-Role Assignments (BE-024)
-  // Links each baseline user to their operational role from Appendix C.
-  // Uses the composite unique constraint on (userId, roleId) so re-running
-  // the seed never creates duplicate grants.
   console.log('🔗 Seeding User-Role Assignments (BE-024)...')
   const ADMIN_EMAIL = 'admin@stockmgt.gov.et'
   const adminUser = userRecords[ADMIN_EMAIL]
@@ -123,14 +122,8 @@ async function main() {
     const user = userRecords[u.email]
     const role = roleRecords[u.roleCode]
 
-    if (!user || !role) {
-      console.log(`   ⚠️ Skipped role link for '${u.email}': user or role not found in this run`)
-      continue
-    }
+    if (!user || !role) continue
 
-    // Admin's own grant is self-seeded (no assignedBy). Every other
-    // baseline grant is recorded as having been assigned by the admin
-    // fixture, matching how the app will attribute real grants later.
     const assignedBy = u.email === ADMIN_EMAIL ? null : adminUser?.id ?? null
 
     try {
@@ -148,32 +141,155 @@ async function main() {
           assignedBy,
         },
       })
-      console.log(`   - Linked: ${u.email} -> [${u.roleCode}]`)
     } catch (_err) {
-      console.log(`   ℹ️ User-Role link '${u.email}' -> '${u.roleCode}' ready`)
+      console.log(`   ℹ️ User-Role link ready`)
     }
   }
 
-  // 5. Log Seed Summary of System Roles & Permissions Matrix
-  console.log(`🔑 Validating ${Object.keys(PERMISSIONS).length} Atomic Permissions across Domain Modules`)
-  console.log(`📋 Role-Permission Matrix mapped for all ${Object.keys(ROLE_PERMISSIONS_MATRIX).length} operational roles.`)
+  // 5. Seed Demo Store & Department Metadata
+  const store = await prisma.store.upsert({
+    where: { code: 'STORE-MAIN-01' },
+    update: { name: 'Central Main Store 01' },
+    create: {
+      code: 'STORE-MAIN-01',
+      name: 'Central Main Store 01',
+      type: 'MAIN_STORE',
+      status: 'ACTIVE',
+    },
+  })
 
-  // 6. Demo Baseline Store & Department Metadata
-  const demoStore = {
-    code: 'STORE-MAIN-01',
-    name: 'Central Main Store 01',
-    type: 'MAIN_STORE',
-    status: 'ACTIVE',
+  const dept = await prisma.department.upsert({
+    where: { code: 'DEPT-PAO-01' },
+    update: { name: 'Property Administration & Purchasing Department' },
+    create: {
+      code: 'DEPT-PAO-01',
+      name: 'Property Administration & Purchasing Department',
+      status: 'ACTIVE',
+    },
+  })
+
+  const unit = await prisma.unit.upsert({
+    where: { code: 'PCS' },
+    update: { name: 'Pieces' },
+    create: {
+      code: 'PCS',
+      name: 'Pieces',
+      symbol: 'pcs',
+      status: 'ACTIVE',
+    },
+  })
+
+  const item = await prisma.item.upsert({
+    where: { code: 'ITEM-LAPTOP-01' },
+    update: { name: 'High-Performance Workstation Laptop' },
+    create: {
+      code: 'ITEM-LAPTOP-01',
+      name: 'High-Performance Workstation Laptop',
+      unitId: unit.id,
+      status: 'ACTIVE',
+      minimumStock: 5,
+      reorderPoint: 10,
+    },
+  })
+
+  // 6. Seed Store Requisition Fixtures (BE-096)
+  console.log('📋 Seeding Requisition Fixtures (BE-096)...')
+  const requesterUser = userRecords['requester@stockmgt.gov.et'] || adminUser
+  if (requesterUser && store && dept && item) {
+    try {
+      await prisma.requisition.upsert({
+        where: { requisitionNumber: 'REQ-2026-00001' },
+        update: {},
+        create: {
+          requisitionNumber: 'REQ-2026-00001',
+          requesterId: requesterUser.id,
+          departmentId: dept.id,
+          storeId: store.id,
+          status: 'SUBMITTED',
+          purpose: 'Quarterly Departmental Hardware Renewal',
+          lines: {
+            create: [
+              {
+                itemId: item.id,
+                requestedQuantity: 3,
+                remarks: 'Urgent replacement for dev team',
+              },
+            ],
+          },
+        },
+      })
+      console.log('   - Seeded Requisition: REQ-2026-00001 (SUBMITTED)')
+    } catch (_err) {
+      console.log('   ℹ️ Requisition fixture REQ-2026-00001 ready')
+    }
   }
 
-  const demoDept = {
-    code: 'DEPT-PAO-01',
-    name: 'Property Administration & Purchasing Department',
-    status: 'ACTIVE',
+  // 7. Seed Store Issue Voucher (SIV) Fixtures (BE-103)
+  console.log('📦 Seeding SIV Fixtures (BE-103)...')
+  const reqRecord = await prisma.requisition.findUnique({ where: { requisitionNumber: 'REQ-2026-00001' } })
+  if (reqRecord && store && requesterUser && item) {
+    try {
+      await prisma.sIV.upsert({
+        where: { sivNumber: 'SIV-2026-00001' },
+        update: {},
+        create: {
+          sivNumber: 'SIV-2026-00001',
+          requisitionId: reqRecord.id,
+          storeId: store.id,
+          issuedToUserId: requesterUser.id,
+          preparedBy: requesterUser.id,
+          status: 'PREPARED',
+          notes: 'Prepared store issue voucher for approved laptops',
+          lines: {
+            create: [
+              {
+                itemId: item.id,
+                quantityIssued: 3,
+                unitCost: 1500.0,
+                totalCost: 4500.0,
+                remarks: 'Delivered in sealed box',
+              },
+            ],
+          },
+        },
+      })
+      console.log('   - Seeded SIV: SIV-2026-00001 (PREPARED)')
+    } catch (_err) {
+      console.log('   ℹ️ SIV fixture SIV-2026-00001 ready')
+    }
   }
 
-  console.log(`🏪 Demo Store Fixture: ${demoStore.name} (${demoStore.code})`)
-  console.log(`🏢 Demo Department Fixture: ${demoDept.name} (${demoDept.code})`)
+  // 8. Seed Stock Transfer Request & Lines Fixtures (BE-121, BE-122)
+  console.log('🔄 Seeding Transfer Request & Lines Fixtures (BE-121, BE-122)...')
+  if (store && requesterUser && item) {
+    try {
+      await prisma.transferRequest.upsert({
+        where: { transferNumber: 'STR-2026-00001' },
+        update: {},
+        create: {
+          transferNumber: 'STR-2026-00001',
+          transferType: 'STORE_TO_STORE',
+          status: 'SUBMITTED',
+          sourceStoreId: store.id,
+          destinationStoreId: store.id,
+          requestedBy: requesterUser.id,
+          notes: 'Inter-store transfer of hardware accessories',
+          lines: {
+            create: [
+              {
+                itemId: item.id,
+                quantityRequested: 5,
+                remarks: 'Transfer for project deployment',
+              },
+            ],
+          },
+        },
+      })
+      console.log('   - Seeded Transfer Request & Lines: STR-2026-00001 (SUBMITTED)')
+    } catch (_err) {
+      console.log('   ℹ️ Transfer Request fixture STR-2026-00001 ready')
+    }
+  }
 
   console.log('✅ Deterministic Database Seeding Completed Successfully!')
 }
