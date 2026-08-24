@@ -1,7 +1,7 @@
 /**
  * Central Stock Return Note (SRN / Return) Service & Workflow Engine
- * Tasks: BE-114, BE-115, BE-116 (Implement Return Service)
- * SRS Traceability: Section 7 (Stock Return Module), Clarification Register C-09
+ * Tasks: BE-114, BE-115, BE-116, BE-120 (Implement Return Stock Posting)
+ * SRS Traceability: Section 7 (Stock Return Module), SRS BR-13, Clarification Register C-09
  */
 
 import { prisma } from '../../config/database.js'
@@ -20,6 +20,7 @@ export async function generateReturnNumber() {
 
 /**
  * Create a new Store Return Note (SRN / Material Return Request)
+ * Note per SRS BR-13: Creating a return request NEVER increases stock card balance.
  * @param {Object} data - { requisitionId, storeId, returnedBy, reason, notes, lines }
  * @returns {Promise<Object>} Created Return record
  */
@@ -191,5 +192,79 @@ export async function approveReturn({ id, approverId, disposition = 'RESTOCK', r
       ...(remarks && { notes: remarks }),
     },
     include: { lines: true },
+  })
+}
+
+/**
+ * Post Return Stock Card Ledger Entries (SRS BR-13 & BE-120)
+ * Increases store active balance ONLY if disposition is RESTOCK after approval.
+ * @param {Object} params - { id, postingUserId }
+ * @returns {Promise<Object>} Updated Return record
+ */
+export async function postReturnStock({ id, postingUserId }) {
+  const returnRecord = await getReturnById(id)
+
+  if (returnRecord.status === 'APPROVED' && !returnRecord.disposition) {
+    throw new ValidationError('Return disposition must be set before executing stock posting')
+  }
+
+  if (returnRecord.status !== 'APPROVED') {
+    throw new ConflictError(`Return stock posting cannot be executed for status '${returnRecord.status}'`)
+  }
+
+  return prisma.$transaction(async (tx) => {
+    // Execute stock increment ONLY if disposition is RESTOCK (BR-13)
+    if (returnRecord.disposition === 'RESTOCK') {
+      for (const line of returnRecord.lines) {
+        let stockCard = await tx.stockCard.findUnique({
+          where: {
+            itemId_storeId: {
+              itemId: line.itemId,
+              storeId: returnRecord.storeId,
+            },
+          },
+        })
+
+        if (!stockCard) {
+          stockCard = await tx.stockCard.create({
+            data: {
+              itemId: line.itemId,
+              storeId: returnRecord.storeId,
+              quantity: 0,
+              availableQty: 0,
+              reservedQty: 0,
+            },
+          })
+        }
+
+        const newQty = stockCard.quantity + line.quantityReturned
+        const newAvailable = stockCard.availableQty + line.quantityReturned
+
+        await tx.stockCard.update({
+          where: { id: stockCard.id },
+          data: {
+            quantity: newQty,
+            availableQty: newAvailable,
+          },
+        })
+
+        // Record stock card ledger entry with transactionType = RETURN
+        await tx.stockCardTransaction.create({
+          data: {
+            stockCardId: stockCard.id,
+            transactionType: 'RETURN',
+            quantity: line.quantityReturned,
+            balanceAfter: newQty,
+            referenceType: 'SRN',
+            referenceId: returnRecord.id,
+            referenceNumber: returnRecord.returnNumber,
+            notes: line.remarks || `Restock entry for return ${returnRecord.returnNumber}`,
+            createdBy: postingUserId || returnRecord.returnedBy,
+          },
+        })
+      }
+    }
+
+    return returnRecord
   })
 }
