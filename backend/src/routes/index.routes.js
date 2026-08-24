@@ -24,6 +24,7 @@ import transferRoutes from '../modules/transfers/transfer.routes.js'
 import assetRoutes from '../modules/assets/asset.routes.js'
 import shelflifeRoutes from '../modules/shelflife/shelflife.routes.js'
 import disposalRoutes from '../modules/disposals/disposal.routes.js'
+import reconciliationRoutes from '../modules/reconciliation/reconciliation.routes.js'
 
 const router = Router()
 
@@ -50,5 +51,6 @@ router.use('/transfers', transferRoutes)
 router.use('/assets', assetRoutes)
 router.use('/shelflife', shelflifeRoutes)
 router.use('/disposals', disposalRoutes)
+router.use('/reconciliations', reconciliationRoutes)
 
 export default router
