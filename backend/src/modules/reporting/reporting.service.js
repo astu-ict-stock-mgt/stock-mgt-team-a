@@ -284,3 +284,38 @@ export async function getReturnsReport(filters = {}) {
 export async function getTransfersReport(filters = {}) {
   return listTransfers(filters)
 }
+
+/**
+ * Fixed asset register report.
+ *
+ * ASSUMPTION: delegates to listAssets() in an assumed asset.service.js —
+ * only BE-130's Zod DTO was supplied, not the service itself. Replace
+ * the import at the top of this file once the real service/export name
+ * is available.
+ * @param {Object} filters
+ */
+export async function getAssetsReport(filters = {}) {
+  return listAssets(filters)
+}
+
+/**
+ * Disposal report — delegates to the real disposal.service.js
+ * (function name confirmed via disposal.controller.js's import, BE-137).
+ * @param {Object} filters
+ */
+export async function getDisposalReport(filters = {}) {
+  return listDisposalRequests(filters)
+}
+
+/**
+ * Stock-take report — BLOCKED. BE-144 (Implement Stock-Taking
+ * Service/API) is still an open ticket; no stock_takes /
+ * stock_take_lines schema or service exists yet to query. This throws
+ * rather than returning fabricated or empty-looking data that could be
+ * mistaken for "no stock-take activity" instead of "not built yet."
+ */
+export async function getStockTakeReport() {
+  throw new ConflictError(
+    'Stock-take reporting is unavailable: BE-144 (Stock-Taking Service/API) has not been implemented yet.'
+  )
+}
