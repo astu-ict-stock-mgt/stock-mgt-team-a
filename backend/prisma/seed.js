@@ -319,6 +319,33 @@ async function main() {
     }
   }
 
+  // 10. Seed Shelf-Life Fixtures (BE-132)
+  console.log('⏳ Seeding Shelf-Life Fixtures (BE-132)...')
+  if (item && store) {
+    try {
+      const futureExpiry = new Date()
+      futureExpiry.setDate(futureExpiry.getDate() + 90)
+
+      await prisma.shelfLifeRecord.upsert({
+        where: { uq_shelflife_item_batch: { itemId: item.id, batchNumber: 'BATCH-2026-001' } },
+        update: {},
+        create: {
+          itemId: item.id,
+          batchNumber: 'BATCH-2026-001',
+          quantity: 100,
+          expiryDate: futureExpiry,
+          alertDaysBeforeExpiry: 30,
+          status: 'HEALTHY',
+          storeId: store.id,
+          notes: 'Seeded shelf-life batch record (HEALTHY)',
+        },
+      })
+      console.log('   - Seeded Shelf-Life Batch: BATCH-2026-001 (HEALTHY)')
+    } catch (_err) {
+      console.log('   ℹ️ Shelf-Life fixture BATCH-2026-001 ready')
+    }
+  }
+
   console.log('✅ Deterministic Database Seeding Completed Successfully!')
 }
 
