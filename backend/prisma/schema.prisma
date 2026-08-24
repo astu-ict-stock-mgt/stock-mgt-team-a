@@ -17,12 +17,23 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model StockTaking {
-  id        String   @id @default(uuid())
-  notes     String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+model StockTake {
+  id            String    @id @default(uuid())
+  storeId       String?
+  status        String    @default("DRAFT")
+  countedById   String?
+  startedAt     DateTime?
+  completedAt   DateTime?
+  notes         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  store         Store?    @relation(fields: [storeId], references: [id])
+  countedBy     User?     @relation(fields: [countedById], references: [id])
+
+  @@map("stock_takes")
 }
+
 
 
 // ────────────────────────────────────────────────────────────────
@@ -108,9 +119,10 @@ model User {
   reconciliationsPosted    Reconciliation[] @relation("ReconciliationPostedBy")
 
   // BE-142: stock takes initiated / completed / reconciled by this user
-  stockTakesInitiated   StockTake[] @relation("StockTakeInitiatedBy")
-  stockTakesCompleted   StockTake[] @relation("StockTakeCompletedBy")
-  stockTakesReconciled  StockTake[] @relation("StockTakeReconciledBy")
+  //stockTakesInitiated   StockTake[] @relation("StockTakeInitiatedBy")
+  //stockTakesCompleted   StockTake[] @relation("StockTakeCompletedBy")
+  //stockTakesReconciled  StockTake[] @relation("StockTakeReconciledBy")
+  stockTakes  StockTake[]
 
   // BE-136: disposals requested / evaluated / approved / executed by this user
   disposalsRequested DisposalRequest[] @relation("DisposalRequestedBy")
@@ -289,7 +301,7 @@ model Item {
   shelfLifeRecords  ShelfLifeRecord[]
   disposalLines     DisposalRequestLine[]
   reconciliationLines ReconciliationLine[]
-  stockTakeLines   StockTakeLine[]
+  //stockTakeLines   StockTakeLine[]
 
   @@index([code])
   @@index([categoryId])
@@ -541,7 +553,7 @@ model Location {
   // BE-136: disposal lines at this location
   disposalLines DisposalRequestLine[]
   reconciliationLines ReconciliationLine[]
-  stockTakeLines StockTakeLine[]
+  //stockTakeLines StockTakeLine[]
 
   @@index([code])
   @@index([storeId])
@@ -1396,4 +1408,4 @@ model ReconciliationLine {
   @@index([locationId])
   @@map("reconciliation_lines")
 }
->>>>>>> origin/main
+
