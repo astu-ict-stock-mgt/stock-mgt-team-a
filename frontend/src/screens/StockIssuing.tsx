@@ -48,6 +48,7 @@ interface IssueLine {
 export default function StockIssuing() {
   const [step, setStep] = useState(0);
   const [submitted, setSubmitted] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [form, setForm] = useState({
     department: "",
     requestedBy: "",
@@ -138,26 +139,55 @@ export default function StockIssuing() {
     if (step < 3) {
       setStep((s) => s + 1);
     } else {
-      lines.forEach((line) => {
-        addStockMovement({
-          id: `TXN-${createId()}`,
-          date: new Date().toISOString().slice(0, 16).replace("T", " "),
-          type: "issued",
-          item: line.itemName,
-          itemId: line.sku,
-          qty: Number(line.requestedQty),
-          unit: line.unit,
-          warehouse: form.warehouse,
-          reference: issueRef,
-          user: "James Okafor",
-          dept: form.department,
-        });
-      });
+  if (approvalStatus !== 'approved') {
+    toast.error('Stock cannot be issued without approval')
+    return
+  }
 
-      toast.success("Stock issued successfully");
-      setSubmitted(true);
-    }
-  };
+  const finalErrors = {
+    ...validateStep0(),
+    ...validateLines()
+  }
+
+  if (Object.keys(finalErrors).length > 0) {
+    setErrors(finalErrors)
+    toast.error('Please correct the errors before submitting')
+    return
+  }
+
+  setIsSubmitting(true)
+
+  try {
+    const transactionDate = new Date()
+      .toISOString()
+      .slice(0, 16)
+      .replace('T', ' ')
+
+    lines.forEach(line => {
+      addStockMovement({
+        id: `TXN-${createId()}`,
+        date: transactionDate,
+        type: 'issued',
+        item: line.itemName.trim(),
+        itemId: line.sku,
+        qty: Number(line.requestedQty),
+        unit: line.unit,
+        warehouse: form.warehouse,
+        reference: issueRef,
+        user: 'James Okafor',
+        dept: form.department.trim()
+      })
+    })
+
+    toast.success('Stock issued successfully')
+    setSubmitted(true)
+  } catch (error) {
+    console.error('Failed to issue stock:', error)
+    toast.error('Failed to issue stock. Please try again.')
+  } finally {
+    setIsSubmitting(false)
+  }
+}
 
   if (submitted) {
     return (
@@ -630,18 +660,23 @@ export default function StockIssuing() {
               ← Back
             </Button>
             <Button
-              variant="primary"
-              onClick={handleNext}
-              disabled={step === 2 && approvalStatus !== "approved"}
-            >
-              {step === 3
-                ? "Confirm Issue"
-                : step === 2
-                  ? approvalStatus === "approved"
-                    ? "Continue →"
-                    : "Awaiting approval..."
-                  : "Continue →"}
-            </Button>
+  variant="primary"
+  onClick={handleNext}
+  disabled={
+    isSubmitting ||
+    (step === 2 && approvalStatus !== 'approved')
+  }
+>
+  {isSubmitting
+    ? 'Issuing...'
+    : step === 3
+      ? 'Confirm Issue'
+      : step === 2
+        ? approvalStatus === 'approved'
+          ? 'Continue →'
+          : 'Awaiting approval...'
+        : 'Continue →'}
+</Button>
           </div>
         </Card>
       </div>
