@@ -20,22 +20,28 @@ class TransactionPostingEngine {
 
     return await prisma.$transaction(async (tx) => {
       // 1. Validate quantity
-      if (quantity <= 0) {
+      // ADJUSTMENT transactions accept signed quantities (positive = increase, negative = decrease)
+      if (transactionType !== 'ADJUSTMENT' && quantity <= 0) {
         throw new ValidationError('Transaction quantity must be positive');
       }
+      if (transactionType === 'ADJUSTMENT' && quantity === 0) {
+        throw new ValidationError('Adjustment quantity must not be zero');
+      }
 
-      // 2. For outbound transactions, check available balance
+      // 2. For outbound transactions (and negative adjustments), check available balance
       const outboundTypes = ['ISSUE', 'TRANSFER_OUT', 'DISPOSAL'];
-      if (outboundTypes.includes(transactionType)) {
+      const isNegativeAdjustment = transactionType === 'ADJUSTMENT' && quantity < 0;
+      if (outboundTypes.includes(transactionType) || isNegativeAdjustment) {
         const stockCard = await tx.stockCard.findUnique({
           where: {
             itemId_storeId: { itemId, storeId },
           },
         });
 
-        if (!stockCard || stockCard.availableQty < quantity) {
+        const requiredQty = Math.abs(quantity);
+        if (!stockCard || stockCard.availableQty < requiredQty) {
           throw new ValidationError(
-            `Insufficient stock. Available: ${stockCard?.availableQty || 0}, Requested: ${quantity}`
+            `Insufficient stock. Available: ${stockCard?.availableQty || 0}, Requested: ${requiredQty}`
           );
         }
       }
@@ -73,7 +79,7 @@ class TransactionPostingEngine {
         newQuantity -= quantity;
         newAvailableQty -= quantity;
       } else if (transactionType === 'ADJUSTMENT') {
-        // Adjustment can be positive or negative
+        // Adjustment uses signed quantity: positive = increase, negative = decrease
         newQuantity += quantity;
         newAvailableQty += quantity;
       }
@@ -88,12 +94,12 @@ class TransactionPostingEngine {
         },
       });
 
-      // 6. Create stock card transaction
+      // 6. Create stock card transaction (store absolute quantity for display, signed for balance)
       const stockTransaction = await tx.stockCardTransaction.create({
         data: {
           stockCardId: stockCard.id,
           transactionType,
-          quantity,
+          quantity: Math.abs(quantity),
           referenceType,
           referenceId,
           referenceNumber,
@@ -141,7 +147,7 @@ class TransactionPostingEngine {
           data: {
             binCardId: binCard.id,
             transactionType,
-            quantity,
+            quantity: Math.abs(quantity),
             referenceType,
             referenceId,
             referenceNumber,

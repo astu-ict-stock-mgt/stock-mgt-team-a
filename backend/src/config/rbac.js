@@ -131,6 +131,12 @@ export const PERMISSIONS = Object.freeze({
   DISPOSALS_APPROVE: { key: 'disposal:approve', module: 'Disposal', description: 'Approve disposal requests' },
   DISPOSALS_EXECUTE: { key: 'disposal:execute', module: 'Disposal', description: 'Execute disposal requests' },
 
+  // --- STOCK TAKING & RECONCILIATION ---
+  RECONCILIATION_CREATE: { key: 'reconciliation:create', module: 'StockTaking', description: 'Initiate physical count session' },
+  RECONCILIATION_READ: { key: 'reconciliation:read', module: 'StockTaking', description: 'View reconciliation sessions and variances' },
+  RECONCILIATION_APPROVE: { key: 'reconciliation:approve', module: 'StockTaking', description: 'Approve or reject stock count reconciliation (PAO / Admin)' },
+  RECONCILIATION_POST: { key: 'reconciliation:post', module: 'StockTaking', description: 'Post inventory balance adjustments from approved reconciliation' },
+
   // --- GATE & DISPATCH CONTROL ---
   DISPATCH_VERIFY: { key: 'dispatch:verify', module: 'Gate', description: 'Verify authorized material movement at entry/exit points' },
 
@@ -183,6 +189,10 @@ const MATRIX = {
     PERMISSIONS.DISPOSAL_REQUEST.key,
     PERMISSIONS.DISPOSAL_APPROVE.key,
     PERMISSIONS.DISPOSAL_EXECUTE.key,
+    PERMISSIONS.RECONCILIATION_CREATE.key,
+    PERMISSIONS.RECONCILIATION_READ.key,
+    PERMISSIONS.RECONCILIATION_APPROVE.key,
+    PERMISSIONS.RECONCILIATION_POST.key,
     PERMISSIONS.REPORTS_VIEW.key,
     PERMISSIONS.AUDIT_READ.key,
   ],
@@ -211,6 +221,8 @@ const MATRIX = {
     PERMISSIONS.TRANSFERS_EXECUTE.key,
     PERMISSIONS.SHELFLIFE_READ.key,
     PERMISSIONS.DISPOSAL_REQUEST.key,
+    PERMISSIONS.RECONCILIATION_CREATE.key,
+    PERMISSIONS.RECONCILIATION_READ.key,
     PERMISSIONS.REPORTS_VIEW.key,
   ],
 
