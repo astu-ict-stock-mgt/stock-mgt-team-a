@@ -23,7 +23,7 @@ model StockTaking {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
-=======
+
 
 // ────────────────────────────────────────────────────────────────
 // System Health / Setting Model (BE-010)
