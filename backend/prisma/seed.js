@@ -1,6 +1,6 @@
 /**
  * Stock Management System (SMS) - Idempotent Database Seed Script
- * Tasks: BE-012, BE-021, BE-022, BE-024, BE-041, BE-042, BE-045, BE-096 (Store Requisition Fixtures)
+ * Tasks: BE-012, BE-021, BE-022, BE-024, BE-041, BE-042, BE-045, BE-096 (Store Requisition Fixture)
  * SRS Traceability: Section 10.1 (Core Entities), Appendix C (Roles & Permissions), FR-01, FR-02, BR-20
  */
 import { env } from '../src/config/env.js'
@@ -256,6 +256,38 @@ async function main() {
       console.log('   - Seeded SIV: SIV-2026-00001 (PREPARED)')
     } catch (_err) {
       console.log('   ℹ️ SIV fixture SIV-2026-00001 ready')
+    }
+  }
+
+  // 8. Seed Stock Transfer Request & Lines Fixtures (BE-121, BE-122)
+  console.log('🔄 Seeding Transfer Request & Lines Fixtures (BE-121, BE-122)...')
+  if (store && requesterUser && item) {
+    try {
+      await prisma.transferRequest.upsert({
+        where: { transferNumber: 'STR-2026-00001' },
+        update: {},
+        create: {
+          transferNumber: 'STR-2026-00001',
+          transferType: 'STORE_TO_STORE',
+          status: 'SUBMITTED',
+          sourceStoreId: store.id,
+          destinationStoreId: store.id,
+          requestedBy: requesterUser.id,
+          notes: 'Inter-store transfer of hardware accessories',
+          lines: {
+            create: [
+              {
+                itemId: item.id,
+                quantityRequested: 5,
+                remarks: 'Transfer for project deployment',
+              },
+            ],
+          },
+        },
+      })
+      console.log('   - Seeded Transfer Request & Lines: STR-2026-00001 (SUBMITTED)')
+    } catch (_err) {
+      console.log('   ℹ️ Transfer Request fixture STR-2026-00001 ready')
     }
   }
 
