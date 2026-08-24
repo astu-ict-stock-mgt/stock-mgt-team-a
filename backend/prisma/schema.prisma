@@ -1297,3 +1297,42 @@ model DisposalRequestLine {
   @@index([locationId])
   @@map("disposal_request_lines")
 }
+enum StockTakingStatus {
+  OPEN
+  SUBMITTED
+  RECONCILED
+  CANCELLED
+}
+model StockTakingSession {
+  id            String            @id @default(uuid())
+  sessionNumber String            @unique
+  storeId       String
+  countDate     DateTime
+  notes         String?
+  status        StockTakingStatus @default(OPEN)
+  createdById   String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  lines StockTakingLine[]
+
+  @@index([storeId])
+  @@index([status])
+}
+model StockTakingLine {
+  id               String @id @default(uuid())
+  sessionId        String
+  itemId           String
+  systemQuantity   Int
+  physicalQuantity Int
+  variance         Int
+  notes            String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  session StockTakingSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@unique([sessionId, itemId])
+}                                                                                                                                                                                                                                                                
