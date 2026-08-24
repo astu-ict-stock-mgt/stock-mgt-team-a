@@ -1,6 +1,6 @@
 /**
  * Master Router Aggregator
- * Tasks: BE-006, BE-028, BE-099, BE-106, BE-117, BE-124, BE-130 (Asset Registration APIs)
+ * Tasks: BE-006, BE-028, BE-099, BE-106, BE-117, BE-124, BE-130, BE-134, BE-137 (Disposal APIs)
  */
 
 import { Router } from 'express'
@@ -22,6 +22,8 @@ import sivRoutes from '../modules/siv/siv.routes.js'
 import returnRoutes from '../modules/returns/return.routes.js'
 import transferRoutes from '../modules/transfers/transfer.routes.js'
 import assetRoutes from '../modules/assets/asset.routes.js'
+import shelflifeRoutes from '../modules/shelflife/shelflife.routes.js'
+import disposalRoutes from '../modules/disposals/disposal.routes.js'
 
 const router = Router()
 
@@ -46,5 +48,7 @@ router.use('/sivs', sivRoutes)
 router.use('/returns', returnRoutes)
 router.use('/transfers', transferRoutes)
 router.use('/assets', assetRoutes)
+router.use('/shelflife', shelflifeRoutes)
+router.use('/disposals', disposalRoutes)
 
 export default router
