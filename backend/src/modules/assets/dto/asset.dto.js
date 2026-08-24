@@ -1,6 +1,6 @@
 /**
  * Fixed Asset DTO Schemas (Zod)
- * Task: BE-130 (Implement Asset Registration Service/API)
+ * Tasks: BE-130, BE-131 (Implement Asset Lifecycle API)
  * SRS Traceability: Section 9 (Fixed Assets Register), Clarification Register C-11
  */
 
@@ -33,5 +33,12 @@ export const assignCustodySchema = z.object({
 
   departmentId: z.string().optional(),
   locationId: z.string().optional(),
+  notes: z.string().optional(),
+})
+
+export const updateAssetStatusSchema = z.object({
+  status: z.enum(['REGISTERED', 'IN_SERVICE', 'UNDER_MAINTENANCE', 'DISPOSED', 'WRITTEN_OFF'], {
+    errorMap: () => ({ message: 'Invalid asset status code' }),
+  }),
   notes: z.string().optional(),
 })
