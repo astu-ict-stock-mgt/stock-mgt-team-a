@@ -9,6 +9,7 @@ import {
   create,
   getById,
   list,
+  evaluate,
   approve,
   reject,
   execute,
@@ -20,6 +21,7 @@ import { authorize } from '../../middleware/rbac.middleware.js'
 import { PERMISSIONS } from '../../config/rbac.js'
 import {
   createDisposalSchema,
+  evaluateDisposalSchema,
   approveDisposalSchema,
   rejectDisposalSchema,
   executeDisposalSchema,
@@ -29,9 +31,9 @@ const router = Router()
 
 /**
  * @openapi
- * /disposal-requests:
+ * /disposals:
  *   post:
- *     summary: Create a new Disposal Request
+ *     summary: Create a new Disposal Request (BE-137)
  *     tags:
  *       - Disposal
  *     security:
@@ -43,37 +45,17 @@ const router = Router()
  *           schema:
  *             type: object
  *             required:
- *               - storeId
- *               - reason
- *               - lines
+ *               - disposalMethod
  *             properties:
- *               storeId:
- *                 type: string
  *               disposalMethod:
  *                 type: string
- *                 enum: [AUCTION, DONATION, DESTRUCTION, RECYCLE, TRANSFER, WRITE_OFF]
+ *                 enum: [AUCTION, DONATION, DESTRUCTION, RECYCLING, TRANSFER_OUT, WRITE_OFF]
+ *               storeId:
+ *                 type: string
  *               reason:
  *                 type: string
- *               remarks:
+ *               notes:
  *                 type: string
- *               lines:
- *                 type: array
- *                 items:
- *                   type: object
- *                   required:
- *                     - itemId
- *                     - quantity
- *                   properties:
- *                     itemId:
- *                       type: string
- *                     locationId:
- *                       type: string
- *                     quantity:
- *                       type: integer
- *                     unitCost:
- *                       type: number
- *                     condition:
- *                       type: string
  *     responses:
  *       201:
  *         description: Disposal request created successfully
@@ -81,16 +63,16 @@ const router = Router()
 router.post(
   '/',
   authenticate,
-  authorize(PERMISSIONS.DISPOSAL_REQUEST),
+  authorize(PERMISSIONS.DISPOSALS_CREATE),
   validateRequest({ body: createDisposalSchema }),
   create
 )
 
 /**
  * @openapi
- * /disposal-requests/{id}/approve:
+ * /disposals/{id}/evaluate:
  *   patch:
- *     summary: Approve Disposal Request (PAO / Authorized Committee)
+ *     summary: Disposal Committee Evaluation (BE-137)
  *     tags:
  *       - Disposal
  *     security:
@@ -107,27 +89,62 @@ router.post(
  *           schema:
  *             type: object
  *             properties:
- *               approvalNotes:
+ *               notes:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Disposal Request evaluated successfully
+ */
+router.patch(
+  '/:id/evaluate',
+  authenticate,
+  authorize(PERMISSIONS.DISPOSALS_EVALUATE),
+  validateRequest({ body: evaluateDisposalSchema }),
+  evaluate
+)
+
+/**
+ * @openapi
+ * /disposals/{id}/approve:
+ *   patch:
+ *     summary: PAO Officer Approval (BE-138)
+ *     tags:
+ *       - Disposal
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               notes:
  *                 type: string
  *               disposalMethod:
  *                 type: string
  *     responses:
  *       200:
- *         description: Disposal request approved successfully
+ *         description: Disposal Request approved successfully
  */
 router.patch(
   '/:id/approve',
   authenticate,
-  authorize(PERMISSIONS.DISPOSAL_APPROVE),
+  authorize(PERMISSIONS.DISPOSALS_APPROVE),
   validateRequest({ body: approveDisposalSchema }),
   approve
 )
 
 /**
  * @openapi
- * /disposal-requests/{id}/reject:
+ * /disposals/{id}/reject:
  *   patch:
- *     summary: Reject Disposal Request
+ *     summary: Reject Disposal Request (BE-138)
  *     tags:
  *       - Disposal
  *     security:
@@ -151,21 +168,21 @@ router.patch(
  *                 type: string
  *     responses:
  *       200:
- *         description: Disposal request rejected successfully
+ *         description: Disposal Request rejected successfully
  */
 router.patch(
   '/:id/reject',
   authenticate,
-  authorize(PERMISSIONS.DISPOSAL_APPROVE),
+  authorize(PERMISSIONS.DISPOSALS_APPROVE),
   validateRequest({ body: rejectDisposalSchema }),
   reject
 )
 
 /**
  * @openapi
- * /disposal-requests/{id}/execute:
+ * /disposals/{id}/execute:
  *   post:
- *     summary: Execute Disposal Request and Post Stock-Out Transaction (BE-139)
+ *     summary: Execute Disposal and Post Stock-Out (BE-139)
  *     tags:
  *       - Disposal
  *     security:
@@ -193,26 +210,22 @@ router.patch(
  *     responses:
  *       200:
  *         description: Disposal executed successfully and stock deducted
- *       403:
- *         description: Forbidden - Requires disposal:execute permission
- *       404:
- *         description: Disposal request not found
  *       409:
  *         description: Conflict - Invalid status or insufficient stock
  */
 router.post(
   '/:id/execute',
   authenticate,
-  authorize(PERMISSIONS.DISPOSAL_EXECUTE),
+  authorize(PERMISSIONS.DISPOSALS_EXECUTE),
   validateRequest({ body: executeDisposalSchema }),
   execute
 )
 
 /**
  * @openapi
- * /disposal-requests/{id}/history:
+ * /disposals/{id}/history:
  *   get:
- *     summary: Get Disposal Request Audit Trail and Ledger Postings (BE-140)
+ *     summary: Get Disposal Audit Trail (BE-140)
  *     tags:
  *       - Disposal
  *     security:
@@ -230,22 +243,11 @@ router.post(
 router.get(
   '/:id/history',
   authenticate,
-  authorize(PERMISSIONS.DISPOSAL_REQUEST),
+  authorize(PERMISSIONS.DISPOSALS_READ),
   getAuditHistory
 )
 
-router.get(
-  '/',
-  authenticate,
-  authorize(PERMISSIONS.DISPOSAL_REQUEST),
-  list
-)
-
-router.get(
-  '/:id',
-  authenticate,
-  authorize(PERMISSIONS.DISPOSAL_REQUEST),
-  getById
-)
+router.get('/', authenticate, authorize(PERMISSIONS.DISPOSALS_READ), list)
+router.get('/:id', authenticate, authorize(PERMISSIONS.DISPOSALS_READ), getById)
 
 export default router

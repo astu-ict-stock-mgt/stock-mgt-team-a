@@ -21,165 +21,112 @@ export async function generateDisposalNumber() {
 
 /**
  * Create a new Disposal Request (BE-137)
- * @param {Object} data - { storeId, requesterId, disposalMethod, reason, remarks, totalEstimatedValue, lines }
+ * @param {Object} data - { storeId, requestedBy, disposalMethod, reason, notes, lines }
  * @returns {Promise<Object>} Created Disposal Request record
  */
 export async function createDisposalRequest({
   storeId,
-  requesterId,
+  requestedBy,
   disposalMethod = 'WRITE_OFF',
   reason,
-  remarks,
-  totalEstimatedValue,
-  lines,
+  notes,
 }) {
-  if (!storeId || !requesterId || !reason) {
-    throw new ValidationError('Store, requester, and disposal reason are required')
+  if (!requestedBy) {
+    throw new ValidationError('requestedBy user ID is required')
+  }
+  if (!disposalMethod) {
+    throw new ValidationError('disposalMethod is required')
   }
 
-  if (!Array.isArray(lines) || lines.length === 0) {
-    throw new ValidationError('Disposal request must contain at least one item line')
+  const validMethods = ['AUCTION', 'DONATION', 'DESTRUCTION', 'RECYCLING', 'TRANSFER_OUT', 'WRITE_OFF']
+  if (!validMethods.includes(disposalMethod)) {
+    throw new ValidationError(`Invalid disposal method '${disposalMethod}'`)
   }
 
-  const store = await prisma.store.findUnique({
-    where: { id: storeId },
+  const disposalNumber = await generateDisposalNumber()
+
+  const record = await prisma.disposalRequest.create({
+    data: {
+      disposalNumber,
+      disposalMethod,
+      status: 'DRAFT',
+      storeId: storeId || null,
+      requestedBy,
+      reason: reason || null,
+      notes: notes || null,
+    },
+    include: {
+      store: { select: { id: true, name: true, code: true } },
+      requestedByUser: { select: { id: true, fullName: true, email: true } },
+    },
   })
 
-  if (!store) {
-    throw new NotFoundError(`Store with ID '${storeId}' not found`)
-  }
-
-  for (const line of lines) {
-    if (!line.itemId || !line.quantity || line.quantity <= 0) {
-      throw new ValidationError('Each disposal line requires a valid itemId and positive quantity')
-    }
-
-    const item = await prisma.item.findUnique({
-      where: { id: line.itemId },
-    })
-
-    if (!item) {
-      throw new NotFoundError(`Item with ID '${line.itemId}' not found`)
-    }
-  }
-
-  const requestNumber = await generateDisposalNumber()
-
-  return prisma.$transaction(async (tx) => {
-    let computedTotalValue = totalEstimatedValue ? Number(totalEstimatedValue) : 0
-
-    const linesData = lines.map((l) => {
-      const unitCost = l.unitCost !== undefined && l.unitCost !== null ? Number(l.unitCost) : null
-      const totalCost = unitCost !== null ? unitCost * l.quantity : null
-
-      if (!totalEstimatedValue && totalCost !== null) {
-        computedTotalValue += totalCost
-      }
-
-      return {
-        itemId: l.itemId,
-        locationId: l.locationId || null,
-        quantity: l.quantity,
-        unitCost: unitCost !== null ? unitCost : null,
-        totalCost: totalCost !== null ? totalCost : null,
-        condition: l.condition || null,
-        batchNumber: l.batchNumber || null,
-        expiryDate: l.expiryDate ? new Date(l.expiryDate) : null,
-        remarks: l.remarks || null,
-        status: 'PENDING',
-      }
-    })
-
-    const disposal = await tx.disposalRequest.create({
-      data: {
-        requestNumber,
-        storeId,
-        requesterId,
-        status: 'DRAFT',
-        disposalMethod: disposalMethod || 'WRITE_OFF',
-        reason,
-        remarks: remarks || null,
-        totalEstimatedValue: computedTotalValue > 0 ? computedTotalValue : null,
-        lines: {
-          create: linesData,
-        },
-      },
-      include: {
-        store: { select: { id: true, name: true, code: true } },
-        requester: { select: { id: true, fullName: true, email: true } },
-        lines: {
-          include: {
-            item: { select: { id: true, name: true, code: true } },
-            location: { select: { id: true, name: true, code: true } },
-          },
-        },
-      },
-    })
-
-    return disposal
-  })
+  return record
 }
 
 /**
  * Get Disposal Request by ID
- * @param {string} id 
+ * @param {string} id
  * @returns {Promise<Object>}
  */
 export async function getDisposalById(id) {
-  const disposal = await prisma.disposalRequest.findUnique({
+  const record = await prisma.disposalRequest.findUnique({
     where: { id },
     include: {
       store: { select: { id: true, name: true, code: true } },
-      requester: { select: { id: true, fullName: true, email: true } },
-      reviewedByUser: { select: { id: true, fullName: true, email: true } },
+      requestedByUser: { select: { id: true, fullName: true, email: true } },
+      evaluatedByUser: { select: { id: true, fullName: true, email: true } },
       approvedByUser: { select: { id: true, fullName: true, email: true } },
       executedByUser: { select: { id: true, fullName: true, email: true } },
       lines: {
         include: {
-          item: { select: { id: true, name: true, code: true, unitCost: true } },
+          item: { select: { id: true, name: true, code: true } },
           location: { select: { id: true, name: true, code: true } },
         },
       },
     },
   })
 
-  if (!disposal) {
-    throw new NotFoundError(`Disposal request with ID '${id}' not found`)
+  if (!record) {
+    throw new NotFoundError(`DisposalRequest with ID '${id}' not found`)
   }
 
-  return disposal
+  return record
 }
 
 /**
  * List Disposal Requests with filters and pagination
- * @param {Object} [filters={}] - { status, storeId, requesterId, disposalMethod, page, limit }
- * @returns {Promise<Object>} { disposalRequests, total, page, totalPages }
+ * @param {Object} [filters={}] - { status, disposalMethod, storeId, search, page, limit }
+ * @returns {Promise<Object>}
  */
 export async function listDisposalRequests(filters = {}) {
-  const { status, storeId, requesterId, disposalMethod, page = 1, limit = 10 } = filters
+  const { status, disposalMethod, storeId, search, page = 1, limit = 10 } = filters
 
   const where = {
     ...(status && { status }),
-    ...(storeId && { storeId }),
-    ...(requesterId && { requesterId }),
     ...(disposalMethod && { disposalMethod }),
+    ...(storeId && { storeId }),
+    ...(search && {
+      OR: [
+        { disposalNumber: { contains: search, mode: 'insensitive' } },
+        { reason: { contains: search, mode: 'insensitive' } },
+      ],
+    }),
   }
 
   const pageNum = parseInt(String(page), 10) || 1
   const limitNum = parseInt(String(limit), 10) || 10
   const skip = (pageNum - 1) * limitNum
 
-  const [disposalRequests, total] = await Promise.all([
+  const [disposals, total] = await Promise.all([
     prisma.disposalRequest.findMany({
       where,
       skip,
       take: limitNum,
       orderBy: { createdAt: 'desc' },
       include: {
-        store: { select: { id: true, name: true, code: true } },
-        requester: { select: { id: true, fullName: true } },
-        approvedByUser: { select: { id: true, fullName: true } },
-        executedByUser: { select: { id: true, fullName: true } },
+        store: { select: { id: true, name: true } },
+        requestedByUser: { select: { id: true, fullName: true } },
         lines: true,
       },
     }),
@@ -187,7 +134,7 @@ export async function listDisposalRequests(filters = {}) {
   ])
 
   return {
-    disposalRequests,
+    disposals,
     total,
     page: pageNum,
     totalPages: Math.ceil(total / limitNum) || 1,
@@ -195,16 +142,43 @@ export async function listDisposalRequests(filters = {}) {
 }
 
 /**
+ * Committee Evaluation of Disposal Request
+ * @param {Object} params - { id, evaluatedBy, notes }
+ * @returns {Promise<Object>}
+ */
+export async function evaluateDisposalRequest({ id, evaluatedBy, notes }) {
+  const record = await getDisposalById(id)
+
+  if (record.status !== 'SUBMITTED' && record.status !== 'DRAFT') {
+    throw new ConflictError(`Cannot evaluate disposal request in state '${record.status}'`)
+  }
+
+  return prisma.disposalRequest.update({
+    where: { id },
+    data: {
+      status: 'UNDER_EVALUATION',
+      evaluatedBy,
+      evaluatedAt: new Date(),
+      ...(notes && { notes }),
+    },
+    include: {
+      requestedByUser: { select: { id: true, fullName: true } },
+      evaluatedByUser: { select: { id: true, fullName: true } },
+    },
+  })
+}
+
+/**
  * Approve Disposal Request (BE-138)
- * @param {Object} params - { id, approverId, approvalNotes, disposalMethod }
+ * @param {Object} params - { id, approvedBy, approvalNotes, disposalMethod }
  * @returns {Promise<Object>} Approved Disposal Request record
  */
-export async function approveDisposalRequest({ id, approverId, approvalNotes, disposalMethod }) {
-  const disposal = await getDisposalById(id)
+export async function approveDisposalRequest({ id, approvedBy, approvalNotes, disposalMethod }) {
+  const record = await getDisposalById(id)
 
-  if (!['DRAFT', 'PENDING_APPROVAL'].includes(disposal.status)) {
+  if (!['DRAFT', 'SUBMITTED', 'UNDER_EVALUATION'].includes(record.status)) {
     throw new ConflictError(
-      `Disposal request cannot be approved from current status '${disposal.status}'. Must be DRAFT or PENDING_APPROVAL.`
+      `Disposal request cannot be approved from current status '${record.status}'.`
     )
   }
 
@@ -212,14 +186,13 @@ export async function approveDisposalRequest({ id, approverId, approvalNotes, di
     where: { id },
     data: {
       status: 'APPROVED',
-      approvedBy: approverId,
+      approvedBy,
       approvedAt: new Date(),
-      approvalNotes: approvalNotes || null,
+      ...(approvalNotes && { notes: approvalNotes }),
       ...(disposalMethod && { disposalMethod }),
     },
     include: {
-      store: { select: { id: true, name: true, code: true } },
-      requester: { select: { id: true, fullName: true } },
+      requestedByUser: { select: { id: true, fullName: true } },
       approvedByUser: { select: { id: true, fullName: true } },
       lines: {
         include: {
@@ -232,50 +205,37 @@ export async function approveDisposalRequest({ id, approverId, approvalNotes, di
 
 /**
  * Reject Disposal Request (BE-138)
- * @param {Object} params - { id, rejectedById, rejectionReason }
+ * @param {Object} params - { id, approvedBy, rejectionReason }
  * @returns {Promise<Object>} Rejected Disposal Request record
  */
-export async function rejectDisposalRequest({ id, rejectedById, rejectionReason }) {
+export async function rejectDisposalRequest({ id, approvedBy, rejectionReason }) {
   if (!rejectionReason) {
     throw new ValidationError('Rejection reason is required')
   }
 
-  const disposal = await getDisposalById(id)
+  const record = await getDisposalById(id)
 
-  if (['EXECUTED', 'CANCELLED'].includes(disposal.status)) {
-    throw new ConflictError(`Disposal request cannot be rejected from status '${disposal.status}'`)
+  if (['EXECUTED', 'CANCELLED'].includes(record.status)) {
+    throw new ConflictError(`Disposal request cannot be rejected from status '${record.status}'`)
   }
 
   return prisma.disposalRequest.update({
     where: { id },
     data: {
       status: 'REJECTED',
-      rejectionReason,
-      approvedBy: rejectedById,
+      approvedBy,
       approvedAt: new Date(),
+      rejectionReason,
     },
     include: {
-      store: { select: { id: true, name: true, code: true } },
-      requester: { select: { id: true, fullName: true } },
+      requestedByUser: { select: { id: true, fullName: true } },
       approvedByUser: { select: { id: true, fullName: true } },
-      lines: true,
     },
   })
 }
 
 /**
- * Execute Disposal & Perform Idempotent Transactional Stock Deduction (BE-139, BE-086)
- * 
- * Enforces:
- * 1. State machine rule: Must be in 'APPROVED' status.
- * 2. Idempotency: Cannot execute already executed request.
- * 3. Stock sufficiency check on stock_cards and bin_cards.
- * 4. Atomic PostgreSQL transaction posting:
- *    - Decrement stock_cards (quantity & availableQty).
- *    - Write immutable stock_card_transactions record (transactionType: 'DISPOSAL').
- *    - Decrement bin_cards & write bin_transactions if location specified.
- *    - Update disposal_requests to 'EXECUTED' with execution metadata.
- * 
+ * Execute Disposal & Perform Idempotent Transactional Stock Deduction (BE-139)
  * @param {Object} params - { id, executedBy, executionNotes, witnessName, certificateNumber, disposalLocation }
  * @returns {Promise<Object>} Executed Disposal Request record
  */
@@ -289,12 +249,10 @@ export async function executeDisposal({
 }) {
   const disposal = await getDisposalById(id)
 
-  // 1. Idempotency Guard (BR-11, BR-18)
   if (disposal.status === 'EXECUTED') {
-    throw new ConflictError('Disposal request has already been executed. Stock has already been deducted.')
+    throw new ConflictError('Disposal request has already been executed.')
   }
 
-  // 2. Status Precondition Guard (SRS §7.1)
   if (disposal.status !== 'APPROVED') {
     throw new ConflictError(
       `Disposal request cannot be executed from status '${disposal.status}'. It must be in 'APPROVED' status.`
@@ -305,10 +263,8 @@ export async function executeDisposal({
     throw new ValidationError('Disposal request has no line items to execute')
   }
 
-  // 3. Execute Transactional Stock Deduction (BE-086, SRS §9.4, BR-18)
   return prisma.$transaction(async (tx) => {
     for (const line of disposal.lines) {
-      // Check stock balance in store
       const stockCard = await tx.stockCard.findUnique({
         where: {
           itemId_storeId: {
@@ -320,26 +276,19 @@ export async function executeDisposal({
 
       if (!stockCard || stockCard.availableQty < line.quantity) {
         throw new ConflictError(
-          `Insufficient stock available for disposal of item '${line.item?.name || line.itemId}'. Available: ${
-            stockCard?.availableQty || 0
-          }, Requested: ${line.quantity}`
+          `Insufficient stock for item '${line.item?.name || line.itemId}'. Available: ${stockCard?.availableQty || 0}`
         )
       }
 
-      const newQuantity = stockCard.quantity - line.quantity
-      const newAvailableQty = stockCard.availableQty - line.quantity
-
-      // Update perpetual Stock Card balance
       await tx.stockCard.update({
         where: { id: stockCard.id },
         data: {
-          quantity: newQuantity,
-          availableQty: newAvailableQty,
+          quantity: stockCard.quantity - line.quantity,
+          availableQty: stockCard.availableQty - line.quantity,
           lastMovementAt: new Date(),
         },
       })
 
-      // Create immutable Stock Card Transaction
       await tx.stockCardTransaction.create({
         data: {
           stockCardId: stockCard.id,
@@ -347,16 +296,12 @@ export async function executeDisposal({
           quantity: -line.quantity,
           referenceType: 'DISPOSAL_REQUEST',
           referenceId: disposal.id,
-          referenceNumber: disposal.requestNumber,
-          notes:
-            executionNotes ||
-            line.remarks ||
-            `Disposal execution under certificate ${certificateNumber || 'N/A'} for request ${disposal.requestNumber}`,
-          createdBy: executedBy || disposal.requesterId,
+          referenceNumber: disposal.disposalNumber,
+          notes: executionNotes || `Disposal execution for request ${disposal.disposalNumber}`,
+          createdBy: executedBy || disposal.requestedBy,
         },
       })
 
-      // If location/bin is specified, decrement bin card balance
       if (line.locationId) {
         const binCard = await tx.binCard.findUnique({
           where: {
@@ -368,11 +313,10 @@ export async function executeDisposal({
         })
 
         if (binCard) {
-          const newBinQuantity = Math.max(0, binCard.quantity - line.quantity)
           await tx.binCard.update({
             where: { id: binCard.id },
             data: {
-              quantity: newBinQuantity,
+              quantity: Math.max(0, binCard.quantity - line.quantity),
               lastMovementAt: new Date(),
             },
           })
@@ -384,38 +328,31 @@ export async function executeDisposal({
               quantity: -line.quantity,
               referenceType: 'DISPOSAL_REQUEST',
               referenceId: disposal.id,
-              referenceNumber: disposal.requestNumber,
-              notes: executionNotes || `Disposal execution for request ${disposal.requestNumber}`,
-              createdBy: executedBy || disposal.requesterId,
+              referenceNumber: disposal.disposalNumber,
+              notes: executionNotes || `Disposal execution for ${disposal.disposalNumber}`,
+              createdBy: executedBy || disposal.requestedBy,
             },
           })
         }
       }
 
-      // Update disposal line item status
       await tx.disposalRequestLine.update({
         where: { id: line.id },
-        data: {
-          status: 'EXECUTED',
-        },
+        data: { status: 'EXECUTED' },
       })
     }
 
-    // Update Disposal Request header to EXECUTED
-    const executedRecord = await tx.disposalRequest.update({
+    return tx.disposalRequest.update({
       where: { id },
       data: {
         status: 'EXECUTED',
         executedBy: executedBy || null,
         executedAt: new Date(),
-        executionNotes: executionNotes || null,
-        witnessName: witnessName || null,
-        certificateNumber: certificateNumber || null,
-        disposalLocation: disposalLocation || null,
+        notes: executionNotes || null,
       },
       include: {
         store: { select: { id: true, name: true, code: true } },
-        requester: { select: { id: true, fullName: true, email: true } },
+        requestedByUser: { select: { id: true, fullName: true, email: true } },
         approvedByUser: { select: { id: true, fullName: true, email: true } },
         executedByUser: { select: { id: true, fullName: true, email: true } },
         lines: {
@@ -426,15 +363,13 @@ export async function executeDisposal({
         },
       },
     })
-
-    return executedRecord
   })
 }
 
 /**
- * Get Disposal Audit Trail & Stock Ledger Integration History (BE-140)
- * @param {string} id - Disposal Request ID
- * @returns {Promise<Object>} Audit history payload
+ * Get Disposal Audit Trail (BE-140)
+ * @param {string} id
+ * @returns {Promise<Object>}
  */
 export async function getDisposalAuditHistory(id) {
   const disposal = await getDisposalById(id)
@@ -443,7 +378,7 @@ export async function getDisposalAuditHistory(id) {
     where: {
       OR: [
         { referenceId: disposal.id },
-        { referenceNumber: disposal.requestNumber },
+        { referenceNumber: disposal.disposalNumber },
       ],
     },
     include: {
@@ -463,10 +398,10 @@ export async function getDisposalAuditHistory(id) {
       eventType: 'DISPOSAL_REQUEST_CREATED',
       status: 'DRAFT',
       timestamp: disposal.createdAt,
-      actor: disposal.requester
-        ? { id: disposal.requester.id, fullName: disposal.requester.fullName }
+      actor: disposal.requestedByUser
+        ? { id: disposal.requestedByUser.id, fullName: disposal.requestedByUser.fullName }
         : null,
-      details: `Disposal request ${disposal.requestNumber} created for store ${disposal.store?.name || 'N/A'}. Method: ${disposal.disposalMethod}. Reason: ${disposal.reason}`,
+      details: `Disposal request ${disposal.disposalNumber} created. Method: ${disposal.disposalMethod}. Reason: ${disposal.reason}`,
     },
   ]
 
@@ -478,7 +413,7 @@ export async function getDisposalAuditHistory(id) {
       actor: disposal.approvedByUser
         ? { id: disposal.approvedByUser.id, fullName: disposal.approvedByUser.fullName }
         : null,
-      details: `Disposal request approved by authorized officer. Notes: ${disposal.approvalNotes || 'None'}`,
+      details: `Disposal request approved.`,
     })
   }
 
@@ -496,31 +431,23 @@ export async function getDisposalAuditHistory(id) {
 
   if (disposal.status === 'EXECUTED') {
     events.push({
-      eventType: 'DISPOSAL_EXECUTED_AND_STOCK_DEDUCTED',
+      eventType: 'DISPOSAL_EXECUTED',
       status: 'EXECUTED',
       timestamp: disposal.executedAt || disposal.updatedAt,
       actor: disposal.executedByUser
         ? { id: disposal.executedByUser.id, fullName: disposal.executedByUser.fullName }
         : null,
-      details: `Disposal executed. Certificate: ${disposal.certificateNumber || 'N/A'}. Witness: ${
-        disposal.witnessName || 'N/A'
-      }. Location: ${disposal.disposalLocation || 'N/A'}. Stock deducted for ${disposal.lines.length} line item(s).`,
+      details: `Disposal executed. Stock deducted for ${disposal.lines?.length || 0} line item(s).`,
     })
   }
 
-  const summary = {
-    disposalId: disposal.id,
-    requestNumber: disposal.requestNumber,
-    currentStatus: disposal.status,
-    disposalMethod: disposal.disposalMethod,
-    totalItemsDisposed: disposal.lines.reduce((acc, l) => acc + l.quantity, 0),
-    totalEstimatedValue: disposal.totalEstimatedValue || null,
-    certificateNumber: disposal.certificateNumber || null,
-    witnessName: disposal.witnessName || null,
-  }
-
   return {
-    summary,
+    summary: {
+      disposalId: disposal.id,
+      disposalNumber: disposal.disposalNumber,
+      currentStatus: disposal.status,
+      disposalMethod: disposal.disposalMethod,
+    },
     events,
     transactions,
     lines: disposal.lines,

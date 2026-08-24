@@ -75,3 +75,6 @@ export const updateAlertDaysSchema = z.object({
     .int('alertDaysBeforeExpiry must be an integer')
     .min(0, 'alertDaysBeforeExpiry cannot be negative'),
 })
+
+// Alias for route compatibility
+export const createBatchSchema = recordBatchSchema

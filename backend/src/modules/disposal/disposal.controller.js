@@ -8,22 +8,23 @@ import {
   createDisposalRequest,
   getDisposalById,
   listDisposalRequests,
+  evaluateDisposalRequest,
   approveDisposalRequest,
   rejectDisposalRequest,
   executeDisposal,
   getDisposalAuditHistory,
 } from './disposal.service.js'
-import { sendCreated, sendSuccess, sendPaginated } from '../../utils/response.js'
+import { sendCreated, sendSuccess } from '../../utils/response.js'
 
 /**
- * Handle POST /api/disposal-requests endpoint (BE-137)
+ * Handle POST /api/disposals endpoint (BE-137)
  */
 export const create = async (req, res, next) => {
   try {
-    const requesterId = req.user?.userId || req.user?.id || 'usr-uuid-requester'
+    const requestedBy = req.user?.userId || req.user?.id
     const disposal = await createDisposalRequest({
       ...req.body,
-      requesterId,
+      requestedBy,
     })
     return sendCreated(res, disposal)
   } catch (err) {
@@ -32,7 +33,7 @@ export const create = async (req, res, next) => {
 }
 
 /**
- * Handle GET /api/disposal-requests/:id endpoint
+ * Handle GET /api/disposals/:id endpoint
  */
 export const getById = async (req, res, next) => {
   try {
@@ -44,33 +45,47 @@ export const getById = async (req, res, next) => {
 }
 
 /**
- * Handle GET /api/disposal-requests endpoint
+ * Handle GET /api/disposals endpoint
  */
 export const list = async (req, res, next) => {
   try {
     const result = await listDisposalRequests(req.query)
-    return sendPaginated(
-      res,
-      result.disposalRequests,
-      result.page,
-      req.query.limit || 10,
-      result.total
-    )
+    return sendSuccess(res, result.disposals, 200, {
+      total: result.total,
+      page: result.page,
+      totalPages: result.totalPages,
+    })
   } catch (err) {
     return next(err)
   }
 }
 
 /**
- * Handle PATCH /api/disposal-requests/:id/approve endpoint (BE-138)
+ * Handle PATCH /api/disposals/:id/evaluate endpoint
+ */
+export const evaluate = async (req, res, next) => {
+  try {
+    const result = await evaluateDisposalRequest({
+      id: req.params.id,
+      evaluatedBy: req.user?.userId || req.user?.id,
+      ...req.body,
+    })
+    return sendSuccess(res, result)
+  } catch (err) {
+    return next(err)
+  }
+}
+
+/**
+ * Handle PATCH /api/disposals/:id/approve endpoint (BE-138)
  */
 export const approve = async (req, res, next) => {
   try {
-    const approverId = req.user?.userId || req.user?.id || 'usr-pao-officer'
+    const approvedBy = req.user?.userId || req.user?.id
     const disposal = await approveDisposalRequest({
       id: req.params.id,
-      approverId,
-      approvalNotes: req.body.approvalNotes,
+      approvedBy,
+      approvalNotes: req.body.notes,
       disposalMethod: req.body.disposalMethod,
     })
     return sendSuccess(res, disposal)
@@ -80,14 +95,14 @@ export const approve = async (req, res, next) => {
 }
 
 /**
- * Handle PATCH /api/disposal-requests/:id/reject endpoint (BE-138)
+ * Handle PATCH /api/disposals/:id/reject endpoint (BE-138)
  */
 export const reject = async (req, res, next) => {
   try {
-    const rejectedById = req.user?.userId || req.user?.id || 'usr-pao-officer'
+    const approvedBy = req.user?.userId || req.user?.id
     const disposal = await rejectDisposalRequest({
       id: req.params.id,
-      rejectedById,
+      approvedBy,
       rejectionReason: req.body.reason,
     })
     return sendSuccess(res, disposal)
@@ -97,11 +112,11 @@ export const reject = async (req, res, next) => {
 }
 
 /**
- * Handle POST /api/disposal-requests/:id/execute endpoint (BE-139)
+ * Handle POST /api/disposals/:id/execute endpoint (BE-139)
  */
 export const execute = async (req, res, next) => {
   try {
-    const executedBy = req.user?.userId || req.user?.id || 'usr-pao-officer'
+    const executedBy = req.user?.userId || req.user?.id
     const disposal = await executeDisposal({
       id: req.params.id,
       executedBy,
@@ -117,7 +132,7 @@ export const execute = async (req, res, next) => {
 }
 
 /**
- * Handle GET /api/disposal-requests/:id/history endpoint (BE-140)
+ * Handle GET /api/disposals/:id/history endpoint (BE-140)
  */
 export const getAuditHistory = async (req, res, next) => {
   try {

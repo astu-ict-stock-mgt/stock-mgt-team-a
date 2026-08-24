@@ -471,3 +471,18 @@ export class ShelfLifeService {
 }
 
 export default ShelfLifeService
+
+// Named exports for controller compatibility (BE-134, BE-135)
+export const createBatchRecord = (data) => ShelfLifeService.recordBatch(data)
+export const getBatchById = (id) => ShelfLifeService.getBatchById(id)
+export const listBatches = (params) => ShelfLifeService.getBatches(params)
+export const getExpiringBatches = (params) => {
+  const storeId = params?.storeId || null
+  const daysThreshold = params?.daysThreshold ? Number(params.daysThreshold) : null
+  return ShelfLifeService.getExpiringBatches(storeId, daysThreshold)
+}
+export const evaluateBatchStatuses = () => ShelfLifeService.refreshBatchStatuses()
+export const detectDisposalCandidates = (params) => {
+  const storeId = params?.storeId || null
+  return ShelfLifeService.getDisposalCandidates(storeId)
+}
