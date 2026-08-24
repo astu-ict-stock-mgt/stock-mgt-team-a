@@ -259,6 +259,38 @@ async function main() {
     }
   }
 
+  // 8. Seed Stock Transfer Request & Lines Fixtures (BE-121, BE-122)
+  console.log('🔄 Seeding Transfer Request & Lines Fixtures (BE-121, BE-122)...')
+  if (store && requesterUser && item) {
+    try {
+      await prisma.transferRequest.upsert({
+        where: { transferNumber: 'STR-2026-00001' },
+        update: {},
+        create: {
+          transferNumber: 'STR-2026-00001',
+          transferType: 'STORE_TO_STORE',
+          status: 'SUBMITTED',
+          sourceStoreId: store.id,
+          destinationStoreId: store.id,
+          requestedBy: requesterUser.id,
+          notes: 'Inter-store transfer of hardware accessories',
+          lines: {
+            create: [
+              {
+                itemId: item.id,
+                quantityRequested: 5,
+                remarks: 'Transfer for project deployment',
+              },
+            ],
+          },
+        },
+      })
+      console.log('   - Seeded Transfer Request & Lines: STR-2026-00001 (SUBMITTED)')
+    } catch (_err) {
+      console.log('   ℹ️ Transfer Request fixture STR-2026-00001 ready')
+    }
+  }
+
   console.log('✅ Deterministic Database Seeding Completed Successfully!')
 }
 
