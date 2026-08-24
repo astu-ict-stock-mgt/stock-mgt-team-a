@@ -1,6 +1,6 @@
 /**
  * Central Fixed Asset Service & Lifecycle Engine
- * Tasks: BE-129, BE-130 (Implement Asset Registration Service/API)
+ * Tasks: BE-129, BE-130, BE-131 (Implement Asset Lifecycle API)
  * SRS Traceability: Section 9 (Fixed Assets Register), Clarification Register C-11
  */
 
@@ -169,6 +169,37 @@ export async function assignCustody({ id, custodianId, departmentId, locationId,
       custodian: { select: { id: true, fullName: true, email: true } },
       department: { select: { id: true, name: true, code: true } },
       location: { select: { id: true, name: true, code: true } },
+    },
+  })
+}
+
+/**
+ * Update Fixed Asset Lifecycle Status (BE-131)
+ * Statuses: REGISTERED | IN_SERVICE | UNDER_MAINTENANCE | DISPOSED | WRITTEN_OFF
+ * @param {Object} params - { id, status, notes }
+ * @returns {Promise<Object>} Updated FixedAsset record
+ */
+export async function updateAssetStatus({ id, status, notes }) {
+  const asset = await getAssetById(id)
+
+  const validStatuses = ['REGISTERED', 'IN_SERVICE', 'UNDER_MAINTENANCE', 'DISPOSED', 'WRITTEN_OFF']
+  if (!validStatuses.includes(status)) {
+    throw new ValidationError(`Invalid asset status '${status}'. Allowed: ${validStatuses.join(', ')}`)
+  }
+
+  if (asset.status === 'DISPOSED' || asset.status === 'WRITTEN_OFF') {
+    throw new ConflictError(`Fixed Asset is already '${asset.status}' and cannot transition status further`)
+  }
+
+  return prisma.fixedAsset.update({
+    where: { id },
+    data: {
+      status,
+      ...(notes && { notes }),
+    },
+    include: {
+      custodian: { select: { id: true, fullName: true } },
+      department: { select: { id: true, name: true, code: true } },
     },
   })
 }

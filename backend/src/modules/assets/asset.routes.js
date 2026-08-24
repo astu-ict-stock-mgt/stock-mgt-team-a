@@ -1,15 +1,15 @@
 /**
  * Fixed Asset Router & OpenAPI Specs
- * Task: BE-130 (Implement Asset Registration Service/API)
+ * Tasks: BE-130, BE-131 (Implement Asset Lifecycle API)
  */
 
 import { Router } from 'express'
-import { create, getById, list, updateCustody } from './asset.controller.js'
+import { create, getById, list, updateCustody, updateStatus } from './asset.controller.js'
 import { validateRequest } from '../../middleware/validate.middleware.js'
 import { authenticate } from '../../middleware/auth.middleware.js'
 import { authorize } from '../../middleware/rbac.middleware.js'
 import { PERMISSIONS } from '../../config/rbac.js'
-import { createAssetSchema, assignCustodySchema } from './dto/asset.dto.js'
+import { createAssetSchema, assignCustodySchema, updateAssetStatusSchema } from './dto/asset.dto.js'
 
 const router = Router()
 
@@ -78,6 +78,47 @@ router.patch(
   authorize(PERMISSIONS.ASSETS_REGISTER),
   validateRequest({ body: assignCustodySchema }),
   updateCustody
+)
+
+/**
+ * @openapi
+ * /assets/{id}/status:
+ *   patch:
+ *     summary: Transition fixed asset lifecycle status (REGISTERED -> IN_SERVICE -> UNDER_MAINTENANCE -> DISPOSED)
+ *     tags:
+ *       - Fixed Assets
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - status
+ *             properties:
+ *               status:
+ *                 type: string
+ *                 enum: [REGISTERED, IN_SERVICE, UNDER_MAINTENANCE, DISPOSED, WRITTEN_OFF]
+ *               notes:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Fixed asset status updated successfully
+ */
+router.patch(
+  '/:id/status',
+  authenticate,
+  authorize(PERMISSIONS.ASSETS_REGISTER),
+  validateRequest({ body: updateAssetStatusSchema }),
+  updateStatus
 )
 
 router.get('/', authenticate, authorize(PERMISSIONS.ASSETS_READ), list)
