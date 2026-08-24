@@ -230,3 +230,57 @@ export async function getValuationReport(filters = {}) {
 
   return { lines, totalValue, valuationMethod: 'AVERAGE_COST_STORED' }
 }
+
+/**
+ * Requisition & issue report — combines requisition status with the SIVs
+ * drawn from them. Queries `sivs` directly (schema confirmed via BE-103)
+ * since no siv.service.js list function has been supplied yet.
+ * @param {Object} filters - { status, storeId, departmentId, dateFrom, dateTo, page, limit }
+ */
+export async function getRequisitionIssueReport(filters = {}) {
+  const { status, storeId, departmentId, dateFrom, dateTo, page = 1, limit = 10 } = filters
+
+  const requisitions = await listRequisitions({ status, storeId, departmentId, page, limit })
+
+  const { pageNum, limitNum, skip } = paginate(page, limit)
+  const sivWhere = {
+    ...(storeId && { storeId }),
+    ...dateRangeWhere(dateFrom, dateTo, 'issueDate'),
+  }
+
+  const [sivs, sivTotal] = await Promise.all([
+    prisma.sIV.findMany({
+      where: sivWhere,
+      skip,
+      take: limitNum,
+      orderBy: { issueDate: 'desc' },
+      include: {
+        requisition: { select: { id: true, requisitionNumber: true } },
+        store: { select: { id: true, name: true, code: true } },
+        lines: { include: { item: { select: { id: true, name: true, code: true } } } },
+      },
+    }),
+    prisma.sIV.count({ where: sivWhere }),
+  ])
+
+  return {
+    requisitions,
+    issues: paginatedResult('sivs', sivs, sivTotal, pageNum, limitNum),
+  }
+}
+
+/**
+ * Returns (SRN) report — delegates to the real return.service.js.
+ * @param {Object} filters - { status, storeId, returnedBy, page, limit }
+ */
+export async function getReturnsReport(filters = {}) {
+  return listReturns(filters)
+}
+
+/**
+ * Transfers report — delegates to the real transfer.service.js.
+ * @param {Object} filters - { status, transferType, sourceStoreId, destinationStoreId, page, limit }
+ */
+export async function getTransfersReport(filters = {}) {
+  return listTransfers(filters)
+}
