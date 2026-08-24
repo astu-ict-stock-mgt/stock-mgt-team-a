@@ -1,6 +1,6 @@
 /**
  * Disposal Request Controller
- * Task: BE-137 (Implement Disposal Request API)
+ * Tasks: BE-137, BE-138, BE-140 (Implement Disposal Evidence/Completion API)
  * SRS Traceability: Section 11 (Disposal Module)
  */
 
@@ -10,6 +10,7 @@ import {
   listDisposalRequests,
   evaluateDisposalRequest,
   approveDisposalRequest,
+  completeDisposalRequest,
 } from './disposal.service.js'
 import { sendCreated, sendSuccess } from '../../utils/response.js'
 
@@ -80,6 +81,22 @@ export const approve = async (req, res, next) => {
     const result = await approveDisposalRequest({
       id: req.params.id,
       approvedBy: req.user.id || req.user.userId,
+      ...req.body,
+    })
+    sendSuccess(res, result)
+  } catch (err) {
+    next(err)
+  }
+}
+
+/**
+ * Handle PATCH /api/disposals/:id/complete endpoint (BE-140)
+ */
+export const complete = async (req, res, next) => {
+  try {
+    const result = await completeDisposalRequest({
+      id: req.params.id,
+      executedBy: req.user.id || req.user.userId,
       ...req.body,
     })
     sendSuccess(res, result)
