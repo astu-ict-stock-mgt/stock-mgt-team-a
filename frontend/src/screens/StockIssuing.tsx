@@ -28,14 +28,6 @@ const createId = () => {
   return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 };
 
-const createId = () => {
-  if (typeof crypto !== "undefined" && crypto.randomUUID) {
-    return crypto.randomUUID();
-  }
-
-  return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-};
-
 interface IssueLine {
   id: string;
   itemName: string;
@@ -119,6 +111,7 @@ export default function StockIssuing() {
   };
 
   const handleNext = () => {
+    if (isSubmitting) return;
     let errs: Record<string, string> = {};
 
     if (step === 0) {
@@ -287,8 +280,8 @@ export default function StockIssuing() {
                     </tr>
                   </thead>
                   <tbody>
-                    {lines.map((l, i) => (
-                      <tr key={i} className="border-b border-[#F8FAFC]">
+                    {lines.map((l) => (
+                      <tr key={l.id} className="border-b border-[#F8FAFC]">
                         <td className="py-2 px-2 font-medium text-[#1E293B]">
                           {l.itemName}
                         </td>
