@@ -170,3 +170,117 @@ export async function generateExpiryNotifications(daysUntilExpiry = 30) {
   const result = await createBulkNotifications(notifications)
   return { created: result.count, itemsExpiring: cards.length, usersNotified: userIds.length }
 }
+
+/**
+ * Auto-generate low-stock notifications for items below reorder point
+ * Task: BE-150
+ * @returns {Promise<Object>} { created, itemsBelowReorder, usersNotified }
+ */
+export async function generateLowStockNotifications() {
+  // Find items where total stock across all cards is below reorder point
+  const items = await prisma.item.findMany({
+    where: {
+      reorderPoint: { not: null, gt: 0 },
+      isActive: true,
+    },
+    select: {
+      id: true,
+      name: true,
+      code: true,
+      reorderPoint: true,
+      stockCards: {
+        where: { quantity: { gt: 0 } },
+        select: { quantity: true },
+      },
+    },
+  })
+
+  // Filter to items actually below reorder point
+  const lowStockItems = items.filter((item) => {
+    const totalQty = item.stockCards.reduce((sum, sc) => sum + (sc.quantity || 0), 0)
+    return totalQty <= item.reorderPoint
+  })
+
+  if (lowStockItems.length === 0) return { created: 0, itemsBelowReorder: 0, usersNotified: 0 }
+
+  // Notify storekeepers and PAO
+  const targetUsers = await prisma.userRole.findMany({
+    where: {
+      role: { code: { in: ['STOREKEEPER', 'PAO'] } },
+    },
+    select: { userId: true },
+  })
+  const userIds = [...new Set(targetUsers.map((r) => r.userId))]
+
+  if (userIds.length === 0) return { created: 0, itemsBelowReorder: lowStockItems.length, usersNotified: 0 }
+
+  const notifications = []
+  for (const item of lowStockItems) {
+    const totalQty = item.stockCards.reduce((sum, sc) => sum + (sc.quantity || 0), 0)
+    for (const userId of userIds) {
+      notifications.push({
+        userId,
+        title: `Low Stock Alert: ${item.name}`,
+        message: `${item.name} (${item.code}) stock is at ${totalQty} units, below reorder point of ${item.reorderPoint}. Reorder recommended.`,
+        type: 'LOW_STOCK',
+        referenceId: item.id,
+        referenceType: 'ITEM',
+      })
+    }
+  }
+
+  const result = await createBulkNotifications(notifications)
+  return { created: result.count, itemsBelowReorder: lowStockItems.length, usersNotified: userIds.length }
+}
+
+/**
+ * Auto-generate disposal candidate notifications for expired items
+ * Task: BE-150
+ * @returns {Promise<Object>} { created, expiredItems, usersNotified }
+ */
+export async function generateDisposalCandidateNotifications() {
+  // Find stock cards with past expiry dates that still have quantity
+  const expiredCards = await prisma.stockCard.findMany({
+    where: {
+      quantity: { gt: 0 },
+      expiryDate: { not: null, lt: new Date() },
+    },
+    include: {
+      item: { select: { id: true, name: true, code: true } },
+      store: { select: { id: true, name: true } },
+    },
+  })
+
+  if (expiredCards.length === 0) return { created: 0, expiredItems: 0, usersNotified: 0 }
+
+  // Notify PAO and TEC
+  const targetUsers = await prisma.userRole.findMany({
+    where: {
+      role: { code: { in: ['PAO', 'TEC'] } },
+    },
+    select: { userId: true },
+  })
+  const userIds = [...new Set(targetUsers.map((r) => r.userId))]
+
+  if (userIds.length === 0) return { created: 0, expiredItems: expiredCards.length, usersNotified: 0 }
+
+  const notifications = []
+  for (const card of expiredCards) {
+    const daysPastExpiry = Math.ceil(
+      (Date.now() - new Date(card.expiryDate).getTime()) / (1000 * 60 * 60 * 24)
+    )
+    for (const userId of userIds) {
+      notifications.push({
+        userId,
+        title: `Disposal Candidate: ${card.item?.name || 'Unknown'}`,
+        message: `${card.item?.name} (batch: ${card.batchNumber || 'N/A'}) at ${card.store?.name} expired ${daysPastExpiry} day(s) ago. Qty: ${card.quantity}. Consider disposal.`,
+        type: 'DISPOSAL_CANDIDATE',
+        referenceId: card.itemId,
+        referenceType: 'ITEM',
+      })
+    }
+  }
+
+  const result = await createBulkNotifications(notifications)
+  return { created: result.count, expiredItems: expiredCards.length, usersNotified: userIds.length }
+}
