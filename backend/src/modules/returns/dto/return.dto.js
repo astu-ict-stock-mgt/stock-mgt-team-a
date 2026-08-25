@@ -18,7 +18,6 @@ export const returnLineSchema = z.object({
     .int('quantityReturned must be an integer')
     .positive('quantityReturned must be greater than zero'),
 
-  condition: z.string().optional(),
   remarks: z.string().optional(),
 })
 
@@ -27,7 +26,9 @@ export const createReturnSchema = z.object({
     required_error: 'storeId is required',
   }).min(1, 'storeId cannot be empty'),
 
-  requisitionId: z.string().optional(),
+  sivId: z.string({
+    required_error: 'sivId is required',
+  }).min(1, 'sivId cannot be empty'),
 
   reason: z
     .enum(['UNUSED', 'DEFECTIVE', 'EXPIRED', 'EXCESS', 'WRONG_SPECIFICATION'], {

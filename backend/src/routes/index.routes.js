@@ -7,6 +7,11 @@ import { Router } from 'express'
 import healthRoutes from './health.routes.js'
 import rbacRoutes from './rbac.routes.js'
 import authRoutes from '../modules/auth/auth.routes.js'
+import userRoutes from '../modules/users/user.routes.js'
+import accountActivationRoutes from '../modules/users/account-activation.routes.js'
+import roleRoutes from '../modules/roles/role.routes.js'
+import permissionRoutes from '../modules/permissions/permission.routes.js'
+import auditRoutes from '../modules/audit/audit.routes.js'
 import { storeRoutes } from '../modules/stores/index.js'
 import { departmentRoutes } from '../modules/departments/index.js'
 import { categoryRoutes } from '../modules/categories/index.js'
@@ -25,12 +30,19 @@ import assetRoutes from '../modules/assets/asset.routes.js'
 import shelflifeRoutes from '../modules/shelflife/shelflife.routes.js'
 import disposalRoutes from '../modules/disposals/disposal.routes.js'
 import reconciliationRoutes from '../modules/reconciliation/reconciliation.routes.js'
+import stockTakingRoutes from '../modules/stock-taking/stock-taking.routes.js'
+import notificationsRoutes from '../modules/notifications/notifications.routes.js'
 
 const router = Router()
 
 router.use('/', healthRoutes)
 router.use('/', rbacRoutes)
 router.use('/auth', authRoutes)
+router.use('/users', userRoutes)
+router.use('/users', accountActivationRoutes)
+router.use('/roles', roleRoutes)
+router.use('/permissions', permissionRoutes)
+router.use('/audit', auditRoutes)
 router.use('/stores', storeRoutes)
 router.use('/departments', departmentRoutes)
 router.use('/categories', categoryRoutes)
@@ -52,5 +64,7 @@ router.use('/assets', assetRoutes)
 router.use('/shelflife', shelflifeRoutes)
 router.use('/disposals', disposalRoutes)
 router.use('/reconciliations', reconciliationRoutes)
+router.use('/stocktakes', stockTakingRoutes)
+router.use('/notifications', notificationsRoutes)
 
 export default router
