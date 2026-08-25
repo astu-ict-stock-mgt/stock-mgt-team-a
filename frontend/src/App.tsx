@@ -7,6 +7,8 @@ import AuditLog from "./screens/AuditLog";
 import Notifications from "./screens/Notifications";
 import StockTransfer from "./screens/StockTransfer";
 import StockTracking from "./screens/StockTracking";
+import Users from "./screens/Users";
+import RolesPermissions from "./screens/RolesPermissions";
 
 type Screen =
   | "dashboard"
@@ -519,12 +521,8 @@ export default function App() {
             {screen === "stock-taking" && (
               <PlaceholderScreen title="Stock Taking" />
             )}
-            {screen === "users" && (
-              <PlaceholderScreen title="User Management" />
-            )}
-            {screen === "roles" && (
-              <PlaceholderScreen title="Roles & Permissions" />
-            )}
+            {screen === "users" && <Users />}
+            {screen === "roles" && <RolesPermissions />}
             {screen === "reports" && <Reports />}
             {screen === "audit" && <AuditLog />}
             {screen === "notifications" && <Notifications />}
