@@ -5,6 +5,7 @@ import swaggerUi from 'swagger-ui-express'
 import swaggerSpec from './config/swagger.js'
 import { getCorsOptions, getHelmetOptions, apiRateLimiter } from './config/security.js'
 import { ROLES, PERMISSIONS, ROLE_PERMISSIONS_MATRIX, getPermissionsForRole } from './config/rbac.js'
+import masterRouter from './routes/index.routes.js'
 
 const app = express()
 const PORT = process.env.PORT || 3001
@@ -79,6 +80,9 @@ app.get('/api/rbac/roles/:roleCode', (req, res) => {
     }
   })
 })
+
+// Mount all API routes via master router
+app.use('/api', masterRouter)
 
 // 404 handler
 app.use((req, res) => {

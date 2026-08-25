@@ -42,7 +42,7 @@ export const getAllUsers = async ({ page = 1, limit = 10, search = '', status = 
         status: true,
         createdAt: true,
         updatedAt: true,
-        userRoles: {
+        roles: {
           select: {
             role: {
               select: {
@@ -60,8 +60,8 @@ export const getAllUsers = async ({ page = 1, limit = 10, search = '', status = 
 
   const formattedUsers = users.map((user) => ({
     ...user,
-    roles: user.userRoles.map((ur) => ur.role),
-    userRoles: undefined,
+    roles: user.roles.map((ur) => ur.role),
+    roles: undefined,
   }))
 
   return {
@@ -90,7 +90,7 @@ export const getUserById = async (userId) => {
       status: true,
       createdAt: true,
       updatedAt: true,
-      userRoles: {
+      roles: {
         select: {
           role: {
             select: {
@@ -110,8 +110,8 @@ export const getUserById = async (userId) => {
 
   return {
     ...user,
-    roles: user.userRoles.map((ur) => ur.role),
-    userRoles: undefined,
+    roles: user.roles.map((ur) => ur.role),
+    roles: undefined,
   }
 }
 
@@ -150,7 +150,7 @@ export const createUser = async ({ email, fullName, password, roleIds = [] }) =>
       fullName: fullName.trim(),
       passwordHash,
       status: 'ACTIVE',
-      userRoles: roleIds.length > 0
+      roles: roleIds.length > 0
         ? {
             create: roleIds.map((roleId) => ({ roleId })),
           }
@@ -162,7 +162,7 @@ export const createUser = async ({ email, fullName, password, roleIds = [] }) =>
       fullName: true,
       status: true,
       createdAt: true,
-      userRoles: {
+      roles: {
         select: {
           role: {
             select: {
@@ -178,8 +178,8 @@ export const createUser = async ({ email, fullName, password, roleIds = [] }) =>
 
   return {
     ...user,
-    roles: user.userRoles.map((ur) => ur.role),
-    userRoles: undefined,
+    roles: user.roles.map((ur) => ur.role),
+    roles: undefined,
   }
 }
 
@@ -218,7 +218,7 @@ export const updateUser = async (userId, { fullName, email }) => {
       status: true,
       createdAt: true,
       updatedAt: true,
-      userRoles: {
+      roles: {
         select: {
           role: {
             select: {
@@ -234,8 +234,8 @@ export const updateUser = async (userId, { fullName, email }) => {
 
   return {
     ...updatedUser,
-    roles: updatedUser.userRoles.map((ur) => ur.role),
-    userRoles: undefined,
+    roles: updatedUser.roles.map((ur) => ur.role),
+    roles: undefined,
   }
 }
 

@@ -94,11 +94,19 @@ export const authenticateUser = async ({ email, password }) => {
     throw new UnauthorizedError('Invalid email or password')
   }
 
+  // Fetch user roles for JWT
+  const userRoles = await prisma.userRole.findMany({
+    where: { userId: user.id },
+    include: { role: true },
+  })
+  const roleCodes = userRoles.map(ur => ur.role.code)
+
   const tokenPayload = {
     userId: user.id,
     email: user.email,
     fullName: user.fullName,
     status: user.status,
+    roles: roleCodes,
   }
 
   const token = issueAuthToken(tokenPayload)

@@ -23,7 +23,7 @@ export const getAllRoles = async () => {
       updatedAt: true,
       _count: {
         select: {
-          userRoles: true,
+          users: true,
         },
       },
     },
@@ -31,7 +31,7 @@ export const getAllRoles = async () => {
 
   return roles.map((role) => ({
     ...role,
-    userCount: role._count.userRoles,
+    userCount: role._count.users,
     _count: undefined,
   }))
 }
@@ -65,7 +65,7 @@ export const getRoleById = async (roleId) => {
       },
       _count: {
         select: {
-          userRoles: true,
+          users: true,
         },
       },
     },
@@ -79,7 +79,7 @@ export const getRoleById = async (roleId) => {
     ...role,
     permissions: role.rolePermissions.map((rp) => rp.permission),
     rolePermissions: undefined,
-    userCount: role._count.userRoles,
+    userCount: role._count.users,
     _count: undefined,
   }
 }
@@ -255,14 +255,14 @@ export const removePermissionsFromRole = async (roleId, permissionIds) => {
 export const deleteRole = async (roleId) => {
   const role = await prisma.role.findUnique({
     where: { id: roleId },
-    include: { userRoles: true },
+    include: { users: true },
   })
 
   if (!role) {
     throw new NotFoundError(`Role with ID '${roleId}' not found`)
   }
 
-  if (role.userRoles.length > 0) {
+  if (role.users.length > 0) {
     throw new ConflictError('Cannot delete role with assigned users')
   }
 

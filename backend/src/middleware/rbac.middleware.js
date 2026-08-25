@@ -23,20 +23,32 @@ export const authorize = (requiredPermissions) => {
       }
 
       // 2. Extract user role (Default to REQUESTER if unassigned)
-      const userRole = req.user.role || req.user.roleCode || 'REQUESTER'
+      // Supports: req.user.roles (array from JWT), req.user.roleCode, or single req.user.role
+      const userRoles = req.user.roles || (req.user.role ? [req.user.role] : (req.user.roleCode ? [req.user.roleCode] : ['REQUESTER']))
 
       // 3. Normalize required permissions to string keys
       const rawList = Array.isArray(requiredPermissions)
         ? requiredPermissions
         : [requiredPermissions]
 
-      const permissionsArray = rawList.map((p) => (typeof p === 'object' && p?.key ? p.key : String(p)))
+      const permissionsArray = rawList.map((p) => {
+        const key = (typeof p === 'object' && p?.key ? p.key : String(p))
+        // Normalize: convert dot-separated to colon-separated (items.read -> items:read)
+        return key.includes('.') && !key.includes(':') ? key.replace(/\./g, ':') : key
+      })
 
       // 4. Verify user role possesses all required permissions
-      const isAuthorized = permissionsArray.every((permKey) => hasPermission(userRole, permKey))
+      // If user has manage permission, they implicitly have read/create/update/delete
+      const isAuthorized = permissionsArray.every((permKey) => {
+        if (hasPermission(userRoles, permKey)) return true
+        // Check if a parent manage permission covers this
+        const [module, action] = permKey.split(':')
+        if (action !== 'manage' && hasPermission(userRoles, `${module}:manage`)) return true
+        return false
+      })
 
       if (!isAuthorized) {
-        throw new ForbiddenError(`Access denied: role '${userRole}' lacks required permissions`)
+        throw new ForbiddenError(`Access denied: roles '${userRoles.join(',')}' lack required permissions`)
       }
 
       next()
