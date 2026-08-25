@@ -5,6 +5,7 @@ import Dashboard from "./screens/Dashboard";
 import Reports from "./screens/Reports";
 import AuditLog from "./screens/AuditLog";
 import Notifications from "./screens/Notifications";
+import StockTransfer from "./screens/StockTransfer";
 
 type Screen =
   | "dashboard"
@@ -512,9 +513,7 @@ export default function App() {
             {screen === "stock-issuing" && (
               <PlaceholderScreen title="Stock Issuing" />
             )}
-            {screen === "stock-transfer" && (
-              <PlaceholderScreen title="Stock Transfer" />
-            )}
+            {screen === "stock-transfer" && <StockTransfer />}
             {screen === "stock-tracking" && (
               <PlaceholderScreen title="Stock Tracking" />
             )}
