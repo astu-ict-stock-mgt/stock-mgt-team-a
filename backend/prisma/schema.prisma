@@ -113,6 +113,9 @@ model User {
   // BE-150: notifications for this user
   notifications Notification[]
 
+  // BE-150: audit events for this user
+  auditEvents AuditEvent[]
+
   @@map("users")
 }
 
@@ -1535,4 +1538,31 @@ model Notification {
   @@index([type])
   @@index([createdAt])
   @@map("notifications")
+}
+
+// ────────────────────────────────────────────────────────────────
+// Audit Event Model (BE-039 / BE-150)
+//
+// Design notes:
+// - Captures security and domain-level audit events.
+// - Auth events: login, logout, password change, account lock.
+// - Domain events: approval, rejection, disposal, transfer, stock adjustment.
+// - SRS §12.3: actor/user ID, timestamp, action, module, entity, result.
+// ────────────────────────────────────────────────────────────────
+model AuditEvent {
+  id        String   @id @default(uuid())
+  eventType String   @map("event_type")
+  userId    String?  @map("user_id")
+  details   String?
+  ipAddress String?  @map("ip_address")
+  userAgent String?  @map("user_agent")
+  timestamp DateTime @default(now())
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([eventType])
+  @@index([userId])
+  @@index([timestamp])
+  @@map("audit_events")
 }

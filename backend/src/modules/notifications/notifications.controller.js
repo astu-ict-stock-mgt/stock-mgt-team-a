@@ -69,3 +69,21 @@ export const triggerExpiryCheck = async (req, res, next) => {
     return next(err)
   }
 }
+
+export const triggerLowStockCheck = async (req, res, next) => {
+  try {
+    const result = await notificationsService.generateLowStockNotifications()
+    return sendSuccess(res, result)
+  } catch (err) {
+    return next(err)
+  }
+}
+
+export const triggerDisposalCheck = async (req, res, next) => {
+  try {
+    const result = await notificationsService.generateDisposalCandidateNotifications()
+    return sendSuccess(res, result)
+  } catch (err) {
+    return next(err)
+  }
+}
