@@ -117,106 +117,104 @@ function PlaceholderScreen({ title }: { title: string }) {
   );
 }
 
-// Login screen
-function LoginScreen({ onLogin }: { onLogin: () => void }) {
+function LoginScreen({ onLogin }: { onLogin: (email: string, password: string) => Promise<void> }) {
+  const [email, setEmail] = useState("admin@stockmgt.gov.et");
+  const [password, setPassword] = useState("password");
+  const [loading, setLoading] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      await onLogin(email, password);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-[#F8FAFC]">
       <div className="w-full max-w-md p-8 bg-white rounded-2xl shadow-lg">
         <div className="text-center mb-8">
           <div className="w-12 h-12 mx-auto rounded-xl bg-gradient-to-br from-[#4F46E5] to-[#7C3AED] flex items-center justify-center mb-4">
-            <svg
-              width="24"
-              height="24"
-              viewBox="0 0 24 24"
-              fill="none"
-              className="text-white"
-            >
-              <rect
-                x="3"
-                y="3"
-                width="7"
-                height="7"
-                rx="1.5"
-                fill="currentColor"
-                fillOpacity="0.9"
-              />
-              <rect
-                x="14"
-                y="3"
-                width="7"
-                height="7"
-                rx="1.5"
-                fill="currentColor"
-                fillOpacity="0.6"
-              />
-              <rect
-                x="14"
-                y="14"
-                width="7"
-                height="7"
-                rx="1.5"
-                fill="currentColor"
-                fillOpacity="0.9"
-              />
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" className="text-white">
+              <rect x="3" y="3" width="7" height="7" rx="1.5" fill="currentColor" fillOpacity="0.9" />
+              <rect x="14" y="3" width="7" height="7" rx="1.5" fill="currentColor" fillOpacity="0.6" />
+              <rect x="14" y="14" width="7" height="7" rx="1.5" fill="currentColor" fillOpacity="0.9" />
             </svg>
           </div>
           <h1 className="text-2xl font-bold text-[#0F172A]">StockManager</h1>
           <p className="text-sm text-[#64748B] mt-1">Sign in to your account</p>
         </div>
-        <div className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="text-sm font-medium text-[#334155]">Email</label>
             <input
               type="email"
-              placeholder="admin@stockmanager.io"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="admin@stockmgt.gov.et"
               className="w-full h-10 mt-1.5 px-3 rounded-lg border border-[#E2E8F0] text-sm focus:border-[#4F46E5] focus:ring-2 focus:ring-[#C7D2FE] outline-none"
             />
           </div>
           <div>
-            <label className="text-sm font-medium text-[#334155]">
-              Password
-            </label>
+            <label className="text-sm font-medium text-[#334155]">Password</label>
             <input
               type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
               placeholder="Enter your password"
               className="w-full h-10 mt-1.5 px-3 rounded-lg border border-[#E2E8F0] text-sm focus:border-[#4F46E5] focus:ring-2 focus:ring-[#C7D2FE] outline-none"
             />
           </div>
           <button
-            onClick={onLogin}
-            className="w-full h-10 bg-[#4F46E5] text-white font-medium rounded-lg hover:bg-[#4338CA] transition-colors"
+            type="submit"
+            disabled={loading}
+            className="w-full h-10 bg-[#4F46E5] text-white font-medium rounded-lg hover:bg-[#4338CA] transition-colors disabled:opacity-50"
           >
-            Sign In
+            {loading ? "Signing in..." : "Sign In"}
           </button>
-        </div>
+          <p className="text-xs text-[#94A3B8] text-center mt-2">
+            Demo: admin@stockmgt.gov.et / password
+          </p>
+        </form>
       </div>
     </div>
   );
 }
 
 export default function App() {
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [screen, setScreen] = useState<Screen>("dashboard");
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [globalSearch, setGlobalSearch] = useState("");
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const { toasts, toast, remove } = useToast();
 
-  const { notifications, inventoryItems } = useApp();
-  const unreadNotifications = notifications.filter((n) => !n.read).length;
-  const lowStockCount = inventoryItems.filter(
-    (i) => i.status === "low-stock" || i.qty <= i.minQty,
-  ).length;
+  const { notifications, inventoryItems, stockCards, isAuthenticated, currentUser, login, logout, isLoading, apiStatus } = useApp();
+  const unreadNotifications = notifications.filter((n) => !n.isRead).length;
+  const lowStockCount = inventoryItems.filter(i => stockCards.some(sc => sc.itemId === i.id && sc.availableQty <= i.minimumStock)).length;
 
-  if (!isLoggedIn) {
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#F8FAFC]">
+        <div className="text-center">
+          <div className="w-12 h-12 mx-auto rounded-xl bg-gradient-to-br from-[#4F46E5] to-[#7C3AED] flex items-center justify-center mb-4 animate-pulse">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" className="text-white">
+              <rect x="3" y="3" width="7" height="7" rx="1.5" fill="currentColor" />
+              <rect x="14" y="3" width="7" height="7" rx="1.5" fill="currentColor" fillOpacity="0.6" />
+              <rect x="14" y="14" width="7" height="7" rx="1.5" fill="currentColor" />
+            </svg>
+          </div>
+          <p className="text-sm text-[#64748B]">Loading StockManager...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
     return (
       <>
-        <LoginScreen
-          onLogin={() => {
-            setIsLoggedIn(true);
-            toast.success("Welcome back, Marcus!");
-          }}
-        />
+        <LoginScreen onLogin={login} />
         <ToastContainer toasts={toasts} onRemove={remove} />
       </>
     );
@@ -395,6 +393,10 @@ export default function App() {
 
           {/* Quick stats */}
           <div className="hidden lg:flex items-center gap-4 text-xs text-[#94A3B8] border-r border-[#E2E8F0] pr-4 mr-1">
+            <span className="flex items-center gap-1.5">
+              <span className={`w-2 h-2 rounded-full ${apiStatus === 'connected' ? 'bg-[#16A34A]' : apiStatus === 'disconnected' ? 'bg-[#DC2626]' : 'bg-[#D97706] animate-pulse'}`} />
+              {apiStatus === 'connected' ? 'API Connected' : apiStatus === 'disconnected' ? 'Demo Mode' : 'Connecting...'}
+            </span>
             <span>
               <span className="text-[#D97706] font-semibold">
                 {lowStockCount}
@@ -426,14 +428,14 @@ export default function App() {
               className="flex items-center gap-2.5 pl-2 pr-3 py-1.5 rounded-lg hover:bg-[#F1F5F9] transition-colors"
             >
               <div className="w-7 h-7 rounded-full bg-[#EEF2FF] text-[#4F46E5] text-xs font-semibold flex items-center justify-center">
-                MT
+                {currentUser?.fullName?.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2) || "U"}
               </div>
               <div className="hidden sm:block text-left">
                 <p className="text-xs font-semibold text-[#1E293B] leading-none">
-                  Marcus Thompson
+                  {currentUser?.fullName || "User"}
                 </p>
                 <p className="text-[10px] text-[#94A3B8] mt-0.5">
-                  Administrator
+                  {currentUser?.status || "User"}
                 </p>
               </div>
               <svg
@@ -450,10 +452,10 @@ export default function App() {
               <div className="absolute right-0 top-full mt-1.5 w-52 bg-white rounded-xl border border-[#E2E8F0] shadow-lg z-30 py-1 overflow-hidden">
                 <div className="px-3 py-2.5 border-b border-[#F1F5F9]">
                   <p className="text-xs font-semibold text-[#1E293B]">
-                    Marcus Thompson
+                    {currentUser?.fullName || "User"}
                   </p>
                   <p className="text-[11px] text-[#94A3B8]">
-                    mthompson@stockmanager.io
+                    {currentUser?.email || "user@stockmanager.io"}
                   </p>
                 </div>
                 {[
@@ -484,7 +486,10 @@ export default function App() {
                 ))}
                 <div className="h-px bg-[#F1F5F9] my-1" />
                 <button
-                  onClick={() => setIsLoggedIn(false)}
+                  onClick={() => {
+                    logout();
+                    toast.success("Signed out successfully");
+                  }}
                   className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-[#DC2626] hover:bg-[#FEF2F2] transition-colors"
                 >
                   <svg

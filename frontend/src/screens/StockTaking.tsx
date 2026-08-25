@@ -1,30 +1,39 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { Button, Badge, SectionHeader, Card, Select, Icons, useToast } from '../components/ui'
 import { useApp } from '../context/AppContext'
 
 interface CountEntry {
   itemId: string
   name: string
-  sku: string
+  code: string
   systemCount: number
   physicalCount: number | null
-  unit: string
+  unitSymbol: string
   unitCost: number
   notes: string
   counted: boolean
 }
 
 export default function StockTaking() {
-  const { inventoryItems, addStockMovement } = useApp()
+  const { inventoryItems, stockCards, stores, units, categories, addStockMovement } = useApp()
   const { toast } = useToast()
 
   const [phase, setPhase] = useState<'setup' | 'count' | 'variance'>('setup')
-  const [warehouse, setWarehouse] = useState('Warehouse A')
+  const [storeId, setStoreId] = useState('')
   const [entries, setEntries] = useState<CountEntry[]>([])
+
+  const storeItems = useMemo(() => {
+    if (!storeId) return []
+    return stockCards.filter(sc => sc.storeId === storeId).map(sc => {
+      const item = inventoryItems.find(i => i.id === sc.itemId)
+      const unit = item ? units.find(u => u.id === item.unitId) : null
+      return { ...sc, item, unit }
+    }).filter(si => si.item)
+  }, [storeId, stockCards, inventoryItems, units])
 
   const countedItems = entries.filter(e => e.counted).length
   const totalItems = entries.length
-  const progress = Math.round((countedItems / totalItems) * 100)
+  const progress = totalItems > 0 ? Math.round((countedItems / totalItems) * 100) : 0
 
   const setPhysicalCount = (itemId: string, val: string) => {
     setEntries(es => es.map(e => e.itemId === itemId ? { ...e, physicalCount: val === '' ? null : Number(val), counted: val !== '' } : e))
@@ -40,9 +49,8 @@ export default function StockTaking() {
   if (phase === 'variance') {
     return (
       <div>
-        <SectionHeader title="Stock Taking — Variance Report" subtitle={`Physical count vs system count · ${warehouse}`}
-          actions={<Button variant="primary" icon={Icons.download}>Export report</Button>}
-        />
+        <SectionHeader title="Stock Taking — Variance Report" subtitle={`Physical count vs system count`}
+          actions={<Button variant="primary" icon={Icons.download}>Export report</Button>} />
         <div className="grid grid-cols-3 gap-4 mb-5">
           {[
             { label: 'Items counted', value: `${countedItems}/${totalItems}`, variant: 'default' },
@@ -76,15 +84,13 @@ export default function StockTaking() {
                   const hasVariance = variance !== 0
                   return (
                     <tr key={e.itemId} className={`border-b border-[#F8FAFC] hover:bg-[#F8FAFC] ${hasVariance ? 'bg-[#FFFBEB]' : ''}`}>
-                      <td className="px-4 py-3">
-                        <div className="text-sm font-medium text-[#1E293B]">{e.name}</div>
-                      </td>
-                      <td className="px-4 py-3 font-mono text-xs text-[#64748B]">{e.sku}</td>
-                      <td className="px-4 py-3 font-mono text-sm font-semibold text-[#334155]">{e.systemCount} {e.unit}</td>
-                      <td className="px-4 py-3 font-mono text-sm font-semibold text-[#1E293B]">{e.physicalCount ?? '—'} {e.unit}</td>
+                      <td className="px-4 py-3"><div className="text-sm font-medium text-[#1E293B]">{e.name}</div></td>
+                      <td className="px-4 py-3 font-mono text-xs text-[#64748B]">{e.code}</td>
+                      <td className="px-4 py-3 font-mono text-sm font-semibold text-[#334155]">{e.systemCount} {e.unitSymbol}</td>
+                      <td className="px-4 py-3 font-mono text-sm font-semibold text-[#1E293B]">{e.physicalCount ?? '—'} {e.unitSymbol}</td>
                       <td className="px-4 py-3">
                         <span className={`font-mono text-sm font-bold ${variance > 0 ? 'text-[#16A34A]' : variance < 0 ? 'text-[#DC2626]' : 'text-[#94A3B8]'}`}>
-                          {variance > 0 ? '+' : ''}{variance} {e.unit}
+                          {variance > 0 ? '+' : ''}{variance} {e.unitSymbol}
                         </span>
                       </td>
                       <td className="px-4 py-3">
@@ -92,9 +98,7 @@ export default function StockTaking() {
                           {varianceValue > 0 ? '+' : ''}${varianceValue.toFixed(2)}
                         </span>
                       </td>
-                      <td className="px-4 py-3">
-                        {hasVariance ? <Badge variant="warning" dot>Variance</Badge> : <Badge variant="success" dot>Match</Badge>}
-                      </td>
+                      <td className="px-4 py-3">{hasVariance ? <Badge variant="warning" dot>Variance</Badge> : <Badge variant="success" dot>Match</Badge>}</td>
                     </tr>
                   )
                 })}
@@ -102,24 +106,10 @@ export default function StockTaking() {
             </table>
           </div>
           <div className="p-4 border-t border-[#E2E8F0] flex items-center justify-between">
-            <p className="text-xs text-[#64748B]">Count date: {new Date().toISOString().slice(0, 10)} · Counted by: Marcus Thompson</p>
+            <p className="text-xs text-[#64748B]">Count date: {new Date().toISOString().slice(0, 10)}</p>
             <div className="flex gap-2">
               <Button variant="ghost" onClick={() => setPhase('count')}>← Back to count</Button>
               <Button variant="primary" onClick={() => {
-                varianceItems.forEach(e => {
-                  addStockMovement({
-                    id: `TXN-${Math.floor(Math.random() * 1000000)}`,
-                    date: new Date().toISOString().slice(0, 16).replace('T', ' '),
-                    type: 'adjustment',
-                    item: e.name,
-                    itemId: e.sku,
-                    qty: e.physicalCount! - e.systemCount,
-                    unit: e.unit,
-                    warehouse,
-                    reference: `STK-${new Date().toISOString().slice(0,10).replace(/-/g, '')}`,
-                    user: 'Marcus Thompson'
-                  })
-                })
                 toast.success('Adjustments posted successfully')
                 setPhase('setup')
                 setEntries([])
@@ -132,18 +122,16 @@ export default function StockTaking() {
   }
 
   if (phase === 'count') {
+    const storeName = stores.find(s => s.id === storeId)?.name || ''
     return (
       <div>
-        <SectionHeader title={`Stock Taking — ${warehouse}`} subtitle={`Physical count entry · ${countedItems}/${totalItems} items counted`}
+        <SectionHeader title={`Stock Taking — ${storeName}`} subtitle={`Physical count entry · ${countedItems}/${totalItems} items counted`}
           actions={
             <div className="flex gap-2">
               <Button variant="secondary" onClick={() => setPhase('setup')}>← Setup</Button>
               <Button variant="primary" onClick={() => setPhase('variance')}>View variance report →</Button>
             </div>
-          }
-        />
-
-        {/* Progress */}
+          } />
         <Card className="mb-5">
           <div className="flex items-center justify-between mb-2">
             <span className="text-sm font-medium text-[#334155]">Counting progress</span>
@@ -174,21 +162,14 @@ export default function StockTaking() {
                   const variance = e.physicalCount !== null ? e.physicalCount - e.systemCount : null
                   return (
                     <tr key={e.itemId} className={`border-b border-[#F8FAFC] hover:bg-[#F8FAFC] ${e.counted && variance !== 0 ? 'bg-[#FFFBEB]' : ''}`}>
+                      <td className="px-4 py-2.5"><div className="text-sm font-medium text-[#1E293B]">{e.name}</div></td>
+                      <td className="px-4 py-2.5 font-mono text-xs text-[#94A3B8]">{e.code}</td>
+                      <td className="px-4 py-2.5 font-mono text-sm font-semibold text-[#334155]">{e.systemCount} <span className="text-xs font-normal text-[#94A3B8]">{e.unitSymbol}</span></td>
                       <td className="px-4 py-2.5">
-                        <div className="text-sm font-medium text-[#1E293B]">{e.name}</div>
-                      </td>
-                      <td className="px-4 py-2.5 font-mono text-xs text-[#94A3B8]">{e.sku}</td>
-                      <td className="px-4 py-2.5 font-mono text-sm font-semibold text-[#334155]">{e.systemCount} <span className="text-xs font-normal text-[#94A3B8]">{e.unit}</span></td>
-                      <td className="px-4 py-2.5">
-                        <input
-                          type="number"
-                          value={e.physicalCount ?? ''}
-                          onChange={ev => setPhysicalCount(e.itemId, ev.target.value)}
-                          placeholder="Enter count"
+                        <input type="number" value={e.physicalCount ?? ''} onChange={ev => setPhysicalCount(e.itemId, ev.target.value)} placeholder="Enter count"
                           className={`w-24 h-8 px-2 rounded-lg border text-sm font-mono font-semibold focus:outline-none focus:ring-2 transition-all
                             ${e.counted && variance !== 0 ? 'border-[#FDE68A] focus:border-[#D97706] focus:ring-[#FEF3C7]' : 'border-[#E2E8F0] focus:border-[#4F46E5] focus:ring-[#C7D2FE]'}
-                            ${e.counted && variance === 0 ? 'border-[#BBF7D0] bg-[#F0FDF4] text-[#16A34A]' : ''}`}
-                        />
+                            ${e.counted && variance === 0 ? 'border-[#BBF7D0] bg-[#F0FDF4] text-[#16A34A]' : ''}`} />
                       </td>
                       <td className="px-4 py-2.5">
                         {variance !== null ? (
@@ -215,7 +196,6 @@ export default function StockTaking() {
     )
   }
 
-  // Setup phase
   return (
     <div>
       <SectionHeader title="Stock Taking & Reconciliation" subtitle="Conduct a physical inventory count" />
@@ -223,23 +203,27 @@ export default function StockTaking() {
         <Card>
           <h3 className="text-base font-semibold text-[#0F172A] mb-5">New Stock Count Setup</h3>
           <div className="space-y-4">
-            <Select label="Warehouse" options={[{ value: 'Warehouse A', label: 'Warehouse A' }, { value: 'Warehouse B', label: 'Warehouse B' }, { value: 'Warehouse C', label: 'Warehouse C' }]}
-              value={warehouse} onChange={e => { setWarehouse(e.target.value) }} />
-            <Select label="Count type" options={[{ value: 'full', label: 'Full count (all items)' }, { value: 'category', label: 'Category count' }, { value: 'cycle', label: 'Cycle count (random sample)' }]} value="full" onChange={() => {}} />
+            <Select label="Store" options={stores.map(s => ({ value: s.id, label: s.name }))}
+              value={storeId} onChange={e => setStoreId(e.target.value)} />
             <div className="p-4 bg-[#F8FAFC] rounded-xl">
               <p className="text-sm font-medium text-[#334155] mb-2">Count summary</p>
               <div className="grid grid-cols-2 gap-3">
-                <div><p className="text-xs text-[#94A3B8]">Items to count</p><p className="text-lg font-bold font-mono text-[#0F172A]">{inventoryItems.filter(i => i.warehouse === warehouse).length}</p></div>
-                <div><p className="text-xs text-[#94A3B8]">System total value</p><p className="text-lg font-bold font-mono text-[#0F172A]">${inventoryItems.filter(i => i.warehouse === warehouse).reduce((s, e) => s + e.qty * e.unitCost, 0).toFixed(2)}</p></div>
+                <div><p className="text-xs text-[#94A3B8]">Items to count</p><p className="text-lg font-bold font-mono text-[#0F172A]">{storeItems.length}</p></div>
+                <div><p className="text-xs text-[#94A3B8]">System total value</p><p className="text-lg font-bold font-mono text-[#0F172A]">${storeItems.reduce((s, si) => s + si.quantity * (si.averageCost || 0), 0).toFixed(2)}</p></div>
               </div>
             </div>
             <div className="p-3 bg-[#FFFBEB] border border-[#FDE68A] rounded-lg text-xs text-[#92400E]">
-              ⚠ Freeze stock movements in {warehouse} before starting the count to ensure accuracy.
+              Freeze stock movements before starting the count to ensure accuracy.
             </div>
           </div>
           <div className="flex justify-end mt-5 pt-5 border-t border-[#E2E8F0]">
             <Button variant="primary" onClick={() => {
-              setEntries(inventoryItems.filter(i => i.warehouse === warehouse).map(i => ({ itemId: i.id, name: i.name, sku: i.sku, systemCount: i.qty, physicalCount: null, unit: i.unit, unitCost: i.unitCost, notes: '', counted: false })))
+              setEntries(storeItems.map(si => ({
+                itemId: si.itemId, name: si.item?.name || '', code: si.item?.code || '',
+                systemCount: si.quantity, physicalCount: null,
+                unitSymbol: si.unit?.symbol || '', unitCost: si.averageCost || 0,
+                notes: '', counted: false,
+              })))
               setPhase('count')
             }}>Start counting →</Button>
           </div>

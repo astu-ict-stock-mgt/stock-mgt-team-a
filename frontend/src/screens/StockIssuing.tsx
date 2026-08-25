@@ -46,7 +46,7 @@ export default function StockIssuing() {
     requestedBy: "",
     purpose: "",
     urgency: "normal",
-    warehouse: "",
+    storeId: "",
   });
   const [lines, setLines] = useState<IssueLine[]>([
     {
@@ -58,7 +58,7 @@ export default function StockIssuing() {
       unit: "kg",
     },
   ]);
-  const { addStockMovement } = useApp();
+  const { addStockMovement, stores } = useApp();
   const { toast } = useToast();
 
   const [approvalStatus, setApprovalStatus] = useState<
@@ -76,7 +76,7 @@ export default function StockIssuing() {
     if (!form.department) e.department = "Department is required";
     if (!form.requestedBy.trim()) e.requestedBy = "Requestor name is required";
     if (!form.purpose.trim()) e.purpose = "Purpose is required";
-    if (!form.warehouse) e.warehouse = "Select a warehouse";
+    if (!form.storeId) e.storeId = "Select a warehouse";
 
     return e;
   };
@@ -158,17 +158,17 @@ export default function StockIssuing() {
 
         lines.forEach((line) => {
           addStockMovement({
-            id: `TXN-${createId()}`,
-            date: transactionDate,
-            type: "issued",
-            item: line.itemName.trim(),
-            itemId: line.sku,
-            qty: Number(line.requestedQty),
-            unit: line.unit,
-            warehouse: form.warehouse,
-            reference: issueRef,
-            user: "James Okafor",
-            dept: form.department.trim(),
+            id: crypto.randomUUID(),
+            stockCardId: '',
+            transactionType: 'ISSUE',
+            quantity: Number(line.requestedQty),
+            balanceAfter: 0,
+            referenceType: 'SIV',
+            referenceId: null,
+            referenceNumber: issueRef,
+            notes: `Issued to ${form.department}`,
+            createdBy: '',
+            createdAt: new Date().toISOString(),
           });
         });
 
@@ -374,15 +374,13 @@ export default function StockIssuing() {
                     label="Issuing Warehouse *"
                     options={[
                       { value: "", label: "Select..." },
-                      { value: "Warehouse A", label: "Warehouse A" },
-                      { value: "Warehouse B", label: "Warehouse B" },
-                      { value: "Warehouse C", label: "Warehouse C" },
+                      ...stores.map(s => ({ value: s.id, label: s.name })),
                     ]}
-                    value={form.warehouse}
-                    onChange={(e) =>
-                      setForm((f) => ({ ...f, warehouse: e.target.value }))
+                    value={form.storeId}
+                                        onChange={(e) =>
+                      setForm((f) => ({ ...f, storeId: e.target.value }))
                     }
-                    error={errors.warehouse}
+                    error={errors.storeId}
                   />
                   <Select
                     label="Urgency"
@@ -620,7 +618,7 @@ export default function StockIssuing() {
                     ["Department", form.department || "Maintenance"],
                     ["Requested by", form.requestedBy || "K. Adebayo"],
                     ["Purpose", form.purpose || "Equipment maintenance"],
-                    ["Warehouse", form.warehouse || "Warehouse B"],
+                    ["Warehouse", stores.find(s => s.id === form.storeId)?.name || 'N/A'],
                   ].map(([l, v]) => (
                     <div key={l}>
                       <p className="text-xs font-medium text-[#94A3B8] uppercase tracking-wide mb-0.5">

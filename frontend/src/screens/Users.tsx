@@ -2,38 +2,23 @@ import { useState } from 'react'
 import { Button, Badge, SectionHeader, Card, Input, Select, Modal, FormGroup, Icons, useToast } from '../components/ui'
 import { useApp } from '../context/AppContext'
 
-interface UserRecord {
-  id: string
-  name: string
-  email: string
-  role: string
-  department: string
-  status: 'active' | 'inactive'
-  lastLogin: string
-  avatar: string
-}
-
-const departments = ['Management', 'Warehouse A', 'Warehouse B', 'Warehouse C', 'Finance', 'Operations', 'Maintenance']
-const roleOptions = ['Administrator', 'Property Administration Officer', 'Storekeeper', 'Accountant', 'Department Head', 'Security Officer']
-
 export default function Users() {
-  const { users, addUser, updateUser, deleteUser } = useApp()
+  const { users, roles, addUser, updateUser, deleteUser } = useApp()
   const { toast } = useToast()
 
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [showModal, setShowModal] = useState(false)
-  const [editingUser, setEditingUser] = useState<UserRecord | null>(null)
+  const [editingUser, setEditingUser] = useState<typeof users[0] | null>(null)
   const [formData, setFormData] = useState({
-    name: '',
+    fullName: '',
     email: '',
-    role: roleOptions[0],
-    department: departments[0],
-    status: 'active' as 'active' | 'inactive',
+    roleId: roles[0]?.id || '',
+    status: 'ACTIVE' as 'ACTIVE' | 'INACTIVE',
   })
 
   const filteredUsers = users.filter(u => {
-    const matchesSearch = u.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    const matchesSearch = u.fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       u.email.toLowerCase().includes(searchTerm.toLowerCase())
     const matchesStatus = statusFilter === 'all' || u.status === statusFilter
     return matchesSearch && matchesStatus
@@ -41,54 +26,51 @@ export default function Users() {
 
   const stats = {
     total: users.length,
-    active: users.filter(u => u.status === 'active').length,
-    inactive: users.filter(u => u.status === 'inactive').length,
+    active: users.filter(u => u.status === 'ACTIVE').length,
+    inactive: users.filter(u => u.status === 'INACTIVE').length,
   }
 
   const openCreateModal = () => {
     setEditingUser(null)
-    setFormData({ name: '', email: '', role: roleOptions[0], department: departments[0], status: 'active' })
+    setFormData({ fullName: '', email: '', roleId: roles[0]?.id || '', status: 'ACTIVE' })
     setShowModal(true)
   }
 
-  const openEditModal = (user: UserRecord) => {
+  const openEditModal = (user: typeof users[0]) => {
     setEditingUser(user)
     setFormData({
-      name: user.name,
+      fullName: user.fullName,
       email: user.email,
-      role: user.role,
-      department: user.department,
+      roleId: user.roles?.[0]?.id || '',
       status: user.status,
     })
     setShowModal(true)
   }
 
   const saveUser = () => {
-    if (!formData.name || !formData.email) {
+    if (!formData.fullName || !formData.email) {
       toast.error('Name and email are required')
       return
     }
 
     if (editingUser) {
-      updateUser(editingUser.id, formData)
-      toast.success(`User ${formData.name} updated`)
+      updateUser(editingUser.id, { fullName: formData.fullName, email: formData.email, status: formData.status })
+      toast.success(`User ${formData.fullName} updated`)
     } else {
-      const newUser: UserRecord = {
-        id: `USR${String(users.length + 1).padStart(3, '0')}`,
-        ...formData,
-        lastLogin: 'Never',
-        avatar: formData.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2),
-      }
-      addUser(newUser)
-      toast.success(`User ${formData.name} created`)
+      addUser({
+        id: crypto.randomUUID(), fullName: formData.fullName, email: formData.email,
+        status: formData.status, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
+        roles: [],
+      })
+      toast.success(`User ${formData.fullName} created`)
     }
     setShowModal(false)
   }
 
-  const handleDelete = (user: UserRecord) => {
-    if (confirm(`Delete user ${user.name}?`)) {
+  const handleDelete = (user: typeof users[0]) => {
+    if (confirm(`Delete user ${user.fullName}?`)) {
       deleteUser(user.id)
-      toast.success(`User ${user.name} deleted`)
+      toast.success(`User ${user.fullName} deleted`)
     }
   }
 
@@ -98,9 +80,9 @@ export default function Users() {
         title="User Management"
         subtitle="Manage system users and their access"
         actions={
-          <Button variant="primary" icon={Icons.plus} onClick={openCreateModal}>
-            Add User
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button variant="primary" size="md" icon={Icons.plus} onClick={openCreateModal}>Add user</Button>
+          </div>
         }
       />
 
@@ -115,74 +97,47 @@ export default function Users() {
         </Card>
         <Card>
           <p className="text-xs font-medium text-[#94A3B8] uppercase tracking-wide mb-1">Inactive</p>
-          <p className="text-2xl font-bold font-mono text-[#94A3B8]">{stats.inactive}</p>
+          <p className="text-2xl font-bold font-mono text-[#DC2626]">{stats.inactive}</p>
         </Card>
       </div>
 
       <Card padding={false}>
-        <div className="p-4 border-b border-[#E2E8F0] flex items-center justify-between">
-          <div className="flex gap-2">
-            <Input
-              placeholder="Search users..."
-              value={searchTerm}
-              onChange={e => setSearchTerm(e.target.value)}
-              className="w-64"
-            />
-            <select
-              value={statusFilter}
-              onChange={e => setStatusFilter(e.target.value)}
-              className="h-9 px-3 rounded-lg border border-[#E2E8F0] text-sm text-[#1E293B] bg-white outline-none"
-            >
-              <option value="all">All Status</option>
-              <option value="active">Active</option>
-              <option value="inactive">Inactive</option>
-            </select>
-          </div>
+        <div className="p-4 border-b border-[#E2E8F0] flex items-center gap-3">
+          <Input placeholder="Search users..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="w-64" />
+          <Select options={[{ value: 'all', label: 'All statuses' }, { value: 'ACTIVE', label: 'Active' }, { value: 'INACTIVE', label: 'Inactive' }]}
+            value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className="w-36 h-8 text-xs" />
         </div>
 
         <div className="overflow-x-auto">
           <table className="w-full text-sm border-collapse">
             <thead>
               <tr className="border-b border-[#E2E8F0]">
-                {['User', 'Email', 'Role', 'Department', 'Status', 'Last Login', 'Actions'].map(h => (
+                {['User', 'Email', 'Role', 'Status', 'Actions'].map(h => (
                   <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-[#64748B] uppercase tracking-wide">{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {filteredUsers.length === 0 ? (
-                <tr>
-                  <td colSpan={7} className="px-4 py-16 text-center text-sm text-[#94A3B8]">
-                    No users found.
-                  </td>
-                </tr>
+                <tr><td colSpan={5} className="px-4 py-16 text-center text-sm text-[#94A3B8]">No users found.</td></tr>
               ) : (
-                filteredUsers.map(user => (
-                  <tr key={user.id} className="border-b border-[#F8FAFC] hover:bg-[#F8FAFC]">
+                filteredUsers.map(u => (
+                  <tr key={u.id} className="border-b border-[#F8FAFC] hover:bg-[#F8FAFC]">
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-3">
                         <div className="w-8 h-8 rounded-full bg-[#EEF2FF] text-[#4F46E5] text-xs font-semibold flex items-center justify-center">
-                          {user.avatar}
+                          {u.fullName.split(' ').map(n => n[0]).join('').slice(0, 2)}
                         </div>
-                        <div>
-                          <div className="text-sm font-medium text-[#1E293B]">{user.name}</div>
-                          <div className="text-xs text-[#64748B]">{user.id}</div>
-                        </div>
+                        <span className="text-sm font-medium text-[#1E293B]">{u.fullName}</span>
                       </div>
                     </td>
-                    <td className="px-4 py-3 text-sm text-[#334155]">{user.email}</td>
-                    <td className="px-4 py-3 text-xs text-[#64748B]">{user.role}</td>
-                    <td className="px-4 py-3 text-xs text-[#64748B]">{user.department}</td>
-                    <td className="px-4 py-3">
-                      <Badge variant={user.status === 'active' ? 'success' : 'default'} dot>
-                        {user.status === 'active' ? 'Active' : 'Inactive'}
-                      </Badge>
-                    </td>
-                    <td className="px-4 py-3 text-xs text-[#64748B]">{user.lastLogin}</td>
+                    <td className="px-4 py-3 text-xs text-[#64748B]">{u.email}</td>
+                    <td className="px-4 py-3"><Badge variant="default">{u.roles?.[0]?.name || 'No role'}</Badge></td>
+                    <td className="px-4 py-3"><Badge variant={u.status === 'ACTIVE' ? 'success' : 'danger'} dot>{u.status === 'ACTIVE' ? 'Active' : 'Inactive'}</Badge></td>
                     <td className="px-4 py-3">
                       <div className="flex gap-1">
-                        <Button variant="ghost" size="sm" icon={Icons.edit} onClick={() => openEditModal(user)} />
-                        <Button variant="ghost" size="sm" icon={Icons.trash} onClick={() => handleDelete(user)} />
+                        <Button variant="ghost" size="sm" icon={Icons.edit} onClick={() => openEditModal(u)}>Edit</Button>
+                        <Button variant="ghost" size="sm" icon={Icons.trash} onClick={() => handleDelete(u)}>Delete</Button>
                       </div>
                     </td>
                   </tr>
@@ -193,53 +148,16 @@ export default function Users() {
         </div>
       </Card>
 
-      <Modal
-        open={showModal}
-        onClose={() => setShowModal(false)}
-        title={editingUser ? 'Edit User' : 'Add User'}
-        footer={
-          <>
-            <Button variant="secondary" onClick={() => setShowModal(false)}>Cancel</Button>
-            <Button variant="primary" onClick={saveUser}>{editingUser ? 'Update' : 'Create'}</Button>
-          </>
-        }
-      >
+      <Modal open={showModal} onClose={() => setShowModal(false)} title={editingUser ? 'Edit User' : 'Add User'} width="max-w-lg"
+        footer={<>
+          <Button variant="ghost" onClick={() => setShowModal(false)}>Cancel</Button>
+          <Button variant="primary" onClick={saveUser}>{editingUser ? 'Update' : 'Create'} User</Button>
+        </>}>
         <div className="space-y-4">
-          <FormGroup columns={2}>
-            <Input
-              label="Full Name"
-              placeholder="John Doe"
-              value={formData.name}
-              onChange={e => setFormData(prev => ({ ...prev, name: e.target.value }))}
-            />
-            <Input
-              label="Email"
-              type="email"
-              placeholder="john@stockmanager.io"
-              value={formData.email}
-              onChange={e => setFormData(prev => ({ ...prev, email: e.target.value }))}
-            />
-          </FormGroup>
-          <FormGroup columns={2}>
-            <Select
-              label="Role"
-              options={roleOptions.map(r => ({ value: r, label: r }))}
-              value={formData.role}
-              onChange={e => setFormData(prev => ({ ...prev, role: e.target.value }))}
-            />
-            <Select
-              label="Department"
-              options={departments.map(d => ({ value: d, label: d }))}
-              value={formData.department}
-              onChange={e => setFormData(prev => ({ ...prev, department: e.target.value }))}
-            />
-          </FormGroup>
-          <Select
-            label="Status"
-            options={[{ value: 'active', label: 'Active' }, { value: 'inactive', label: 'Inactive' }]}
-            value={formData.status}
-            onChange={e => setFormData(prev => ({ ...prev, status: e.target.value as 'active' | 'inactive' }))}
-          />
+          <Input label="Full name" placeholder="e.g. John Smith" value={formData.fullName} onChange={e => setFormData(f => ({ ...f, fullName: e.target.value }))} />
+          <Input label="Email" type="email" placeholder="john@example.com" value={formData.email} onChange={e => setFormData(f => ({ ...f, email: e.target.value }))} />
+          <Select label="Role" options={roles.map(r => ({ value: r.id, label: r.name }))} value={formData.roleId} onChange={e => setFormData(f => ({ ...f, roleId: e.target.value }))} />
+          <Select label="Status" options={[{ value: 'ACTIVE', label: 'Active' }, { value: 'INACTIVE', label: 'Inactive' }]} value={formData.status} onChange={e => setFormData(f => ({ ...f, status: e.target.value as 'ACTIVE' | 'INACTIVE' }))} />
         </div>
       </Modal>
     </div>

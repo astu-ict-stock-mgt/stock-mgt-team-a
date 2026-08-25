@@ -27,12 +27,12 @@ const defaultLine = (): LineItem => ({
 })
 
 export default function StockReceiving() {
-  const { addStockMovement } = useApp()
+  const { addStockMovement, stores, suppliers } = useApp()
   const { toast } = useToast()
   
   const [step, setStep] = useState(0)
   const [submitted, setSubmitted] = useState(false)
-  const [form, setForm] = useState({ supplier: '', poReference: '', warehouse: '', deliveryDate: '', deliveryNote: '', carrier: '' })
+  const [form, setForm] = useState({ supplier: '', poReference: '', storeId: '', deliveryDate: '', deliveryNote: '', carrier: '' })
   const [lines, setLines] = useState<LineItem[]>([
     { id: '1', itemName: 'Bearing 6205-2RS', sku: 'BRG-6205-2RS', orderedQty: '50', receivedQty: '50', unit: 'pcs', unitCost: '7.25', condition: 'good' },
     { id: '2', itemName: 'Stainless Steel Bolts M8×40', sku: 'SSB-M8-40', orderedQty: '1000', receivedQty: '980', unit: 'pcs', unitCost: '0.45', condition: 'good' },
@@ -43,7 +43,7 @@ export default function StockReceiving() {
   const validateStep0 = () => {
     const e: Record<string, string> = {}
     if (!form.supplier) e.supplier = 'Select a supplier'
-    if (!form.warehouse) e.warehouse = 'Select a warehouse'
+    if (!form.storeId) e.storeId = 'Select a warehouse'
     if (!form.deliveryDate) e.deliveryDate = 'Delivery date is required'
     return e
   }
@@ -75,17 +75,17 @@ export default function StockReceiving() {
     else {
       lines.forEach(line => {
         addStockMovement({
-          id: `TXN-${Math.floor(Math.random() * 1000000)}`,
-          date: new Date().toISOString().slice(0, 16).replace('T', ' '),
-          type: 'received',
-          item: line.itemName,
-          itemId: line.sku,
-          qty: Number(line.receivedQty),
-          unit: line.unit,
-          warehouse: form.warehouse,
-          reference: grnRef,
-          user: 'Marcus Thompson',
-          supplier: form.supplier
+          id: crypto.randomUUID(),
+          stockCardId: '',
+          transactionType: 'RECEIPT',
+          quantity: Number(line.receivedQty),
+          balanceAfter: 0,
+          referenceType: 'GOODS_RECEIPT',
+          referenceId: null,
+          referenceNumber: grnRef,
+          notes: `Received from ${form.supplier}`,
+          createdBy: '',
+          createdAt: new Date().toISOString(),
         })
       })
       toast.success('Stock received successfully')
@@ -136,7 +136,7 @@ export default function StockReceiving() {
                 </div>
                 <div>
                   <p className="text-xs font-medium text-[#94A3B8] uppercase tracking-wide mb-1">Warehouse</p>
-                  <p className="text-sm font-medium text-[#1E293B]">{form.warehouse || 'Warehouse B'}</p>
+                  <p className="text-sm font-medium text-[#1E293B]">{stores.find(s => s.id === form.storeId)?.name || 'N/A'}</p>
                 </div>
               </div>
 
@@ -203,8 +203,8 @@ export default function StockReceiving() {
                 <Input label="PO Reference" placeholder="e.g. PO-20250807-001" value={form.poReference} onChange={e => setForm(f => ({ ...f, poReference: e.target.value }))} />
               </div>
               <div className="grid grid-cols-2 gap-4">
-                <Select label="Receiving Warehouse *" options={[{ value: '', label: 'Select warehouse...' }, { value: 'Warehouse A', label: 'Warehouse A' }, { value: 'Warehouse B', label: 'Warehouse B' }, { value: 'Warehouse C', label: 'Warehouse C' }]}
-                  value={form.warehouse} onChange={e => setForm(f => ({ ...f, warehouse: e.target.value }))} error={errors.warehouse} />
+                <Select label="Receiving Warehouse *" options={[{ value: '', label: 'Select warehouse...' }, ...stores.map(s => ({ value: s.id, label: s.name }))]}
+                  value={form.storeId} onChange={e => setForm(f => ({ ...f, storeId: e.target.value }))} error={errors.storeId} />
                 <Input label="Delivery Date *" type="date" value={form.deliveryDate} onChange={e => setForm(f => ({ ...f, deliveryDate: e.target.value }))} error={errors.deliveryDate} />
               </div>
               <div className="grid grid-cols-2 gap-4">
@@ -298,7 +298,7 @@ export default function StockReceiving() {
               <div className="grid grid-cols-2 gap-4 mb-5">
                 {[
                   { label: 'Supplier', value: form.supplier || 'McMaster-Carr Supply Co.' },
-                  { label: 'Warehouse', value: form.warehouse || 'Warehouse B' },
+                  { label: 'Warehouse', value: stores.find(s => s.id === form.storeId)?.name || 'N/A' },
                   { label: 'Delivery date', value: form.deliveryDate || new Date().toISOString().slice(0, 10) },
                   { label: 'PO Reference', value: form.poReference || '—' },
                 ].map(({ label, value }) => (

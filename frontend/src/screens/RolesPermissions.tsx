@@ -27,9 +27,9 @@ export default function RolesPermissions() {
   const { roles, addRole, updateRole, deleteRole } = useApp()
   const { toast } = useToast()
 
-  const [selectedRole, setSelectedRole] = useState<RoleRecord | null>(roles[0] || null)
+  const [selectedRole, setSelectedRole] = useState<typeof roles[0] | null>(roles[0] || null)
   const [showModal, setShowModal] = useState(false)
-  const [editingRole, setEditingRole] = useState<RoleRecord | null>(null)
+  const [editingRole, setEditingRole] = useState<typeof roles[0] | null>(null)
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -44,12 +44,12 @@ export default function RolesPermissions() {
     setShowModal(true)
   }
 
-  const openEditModal = (role: RoleRecord) => {
+  const openEditModal = (role: typeof roles[0]) => {
     setEditingRole(role)
     setFormData({
       name: role.name,
-      description: role.description,
-      permissions: { ...role.permissions },
+      description: role.description || '',
+      permissions: {},
     })
     setShowModal(true)
   }
@@ -61,24 +61,28 @@ export default function RolesPermissions() {
     }
 
     if (editingRole) {
-      updateRole(editingRole.id, formData)
+      updateRole(editingRole.id, { name: formData.name, description: formData.description })
       toast.success(`Role ${formData.name} updated`)
-      setSelectedRole({ ...editingRole, ...formData })
+      setSelectedRole({ ...editingRole, name: formData.name, description: formData.description })
     } else {
-      const newRole: RoleRecord = {
+      const newRole = {
         id: `rol_${formData.name.toLowerCase().replace(/\s+/g, '_')}`,
-        ...formData,
+        code: formData.name.toUpperCase().replace(/\s+/g, '_'),
+        name: formData.name,
+        description: formData.description,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
         userCount: 0,
       }
-      addRole(newRole)
+      addRole(newRole as any)
       toast.success(`Role ${formData.name} created`)
     }
     setShowModal(false)
   }
 
-  const handleDelete = (role: RoleRecord) => {
-    if (role.userCount > 0) {
-      toast.error(`Cannot delete role with ${role.userCount} assigned users`)
+  const handleDelete = (role: typeof roles[0]) => {
+    if ((role.userCount || 0) > 0) {
+      toast.error(`Cannot delete role with ${role.userCount || 0} assigned users`)
       return
     }
     if (confirm(`Delete role ${role.name}?`)) {
@@ -118,7 +122,7 @@ export default function RolesPermissions() {
         </Card>
         <Card>
           <p className="text-xs font-medium text-[#94A3B8] uppercase tracking-wide mb-1">Total Users</p>
-          <p className="text-2xl font-bold font-mono text-[#4F46E5]">{roles.reduce((s, r) => s + r.userCount, 0)}</p>
+          <p className="text-2xl font-bold font-mono text-[#4F46E5]">{roles.reduce((s, r) => s + (r.userCount || 0), 0)}</p>
         </Card>
         <Card>
           <p className="text-xs font-medium text-[#94A3B8] uppercase tracking-wide mb-1">Modules</p>
@@ -145,7 +149,7 @@ export default function RolesPermissions() {
                 >
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-medium text-[#1E293B]">{role.name}</span>
-                    <Badge variant="default">{role.userCount}</Badge>
+                    <Badge variant="default">{role.userCount || 0}</Badge>
                   </div>
                   <p className="text-xs text-[#64748B] mt-0.5 truncate">{role.description}</p>
                 </button>
@@ -187,7 +191,7 @@ export default function RolesPermissions() {
                       <tr key={module} className="border-b border-[#F8FAFC] hover:bg-[#F8FAFC]">
                         <td className="px-4 py-3 text-sm font-medium text-[#1E293B]">{moduleLabels[module]}</td>
                         {allActions.map(action => {
-                          const hasPermission = (selectedRole.permissions[module] || []).includes(action)
+                          const hasPermission = ((selectedRole.permissions as any)?.[module] || []).includes(action)
                           return (
                             <td key={action} className="px-4 py-3 text-center">
                               {hasPermission ? (
