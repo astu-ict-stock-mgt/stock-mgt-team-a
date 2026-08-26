@@ -301,7 +301,12 @@ export const deleteUser = async (userId) => {
     throw new NotFoundError(`User with ID '${userId}' not found`)
   }
 
-  // Delete user roles first
+  // Soft delete: deactivate instead of hard delete (preserves FK integrity)
+  await prisma.user.update({
+    where: { id: userId },
+    data: { status: 'INACTIVE' },
+  })
+
+  // Remove user roles
   await prisma.userRole.deleteMany({ where: { userId } })
-  await prisma.user.delete({ where: { id: userId } })
 }
