@@ -5,7 +5,7 @@ import { useApp } from '../context/AppContext'
 type View = 'list' | 'detail' | 'add'
 
 export default function Stores() {
-  const { stores, addStore, updateStore, deleteStore } = useApp()
+  const { stores, addStore, updateStore, deleteStore, users } = useApp()
   const { toast } = useToast()
 
   const [view, setView] = useState<View>('list')
@@ -17,8 +17,9 @@ export default function Stores() {
   const [showEditModal, setShowEditModal] = useState(false)
   const [errors, setErrors] = useState<Record<string, string>>({})
   type StoreType = 'MAIN_STORE' | 'DEPARTMENT_STORE' | 'WAREHOUSE' | 'TRANSIT_STORE' | 'QUARANTINE_STORE'
-  const [form, setForm] = useState({ name: '', code: '', type: 'MAIN_STORE' as StoreType, description: '' })
-  const [editForm, setEditForm] = useState({ name: '', code: '', type: 'MAIN_STORE' as StoreType, description: '' })
+  type StoreStatus = 'ACTIVE' | 'INACTIVE'
+  const [form, setForm] = useState({ name: '', code: '', type: 'MAIN_STORE' as StoreType, status: 'ACTIVE' as StoreStatus, description: '', address: '', responsibleOfficerId: '' })
+  const [editForm, setEditForm] = useState({ name: '', code: '', type: 'MAIN_STORE' as StoreType, status: 'ACTIVE' as StoreStatus, description: '', address: '', responsibleOfficerId: '' })
 
   const storeTypes = [
     { value: 'MAIN_STORE', label: 'Main Store' },
@@ -27,6 +28,15 @@ export default function Stores() {
     { value: 'TRANSIT_STORE', label: 'Transit Store' },
     { value: 'QUARANTINE_STORE', label: 'Quarantine Store' },
   ]
+
+  const storeStatuses = [
+    { value: 'ACTIVE', label: 'Active' },
+    { value: 'INACTIVE', label: 'Inactive' },
+  ]
+
+  const responsibleOfficers = users
+    .filter(u => u.status === 'ACTIVE')
+    .map(u => ({ value: u.id, label: u.fullName }))
 
   const filtered = stores.filter(s =>
     (activeTab === 'all' || s.status === activeTab) &&
@@ -38,6 +48,7 @@ export default function Stores() {
     if (!form.name.trim()) e.name = 'Store name is required'
     if (!form.code.trim()) e.code = 'Code is required'
     else if (stores.some(s => s.code === form.code.trim())) e.code = 'Code already exists'
+    if (!form.status) e.status = 'Status is required'
     return e
   }
 
@@ -46,6 +57,7 @@ export default function Stores() {
     if (!editForm.name.trim()) e.name = 'Store name is required'
     if (!editForm.code.trim()) e.code = 'Code is required'
     else if (selected && stores.some(s => s.code === editForm.code.trim() && s.id !== selected.id)) e.code = 'Code already exists'
+    if (!editForm.status) e.status = 'Status is required'
     return e
   }
 
@@ -107,8 +119,8 @@ export default function Stores() {
                   <div>{typeBadge(s.type)}</div>
                 </div>
                 <div>
-                  <p className="text-xs font-medium text-[#94A3B8] uppercase tracking-wide mb-1">Description</p>
-                  <p className="text-sm text-[#1E293B]">{s.description || 'No description'}</p>
+                  <p className="text-xs font-medium text-[#94A3B8] uppercase tracking-wide mb-1">Status</p>
+                  <Badge variant={s.status === 'ACTIVE' ? 'success' : 'default'} dot>{s.status === 'ACTIVE' ? 'Active' : 'Inactive'}</Badge>
                 </div>
                 <div>
                   <p className="text-xs font-medium text-[#94A3B8] uppercase tracking-wide mb-1">Address</p>
@@ -118,6 +130,10 @@ export default function Stores() {
                   <p className="text-xs font-medium text-[#94A3B8] uppercase tracking-wide mb-1">Responsible Officer</p>
                   <p className="text-sm text-[#1E293B]">{s.responsibleOfficer?.fullName || 'Not assigned'}</p>
                 </div>
+                <div className="col-span-2">
+                  <p className="text-xs font-medium text-[#94A3B8] uppercase tracking-wide mb-1">Description</p>
+                  <p className="text-sm text-[#1E293B]">{s.description || 'No description'}</p>
+                </div>
               </div>
             </Card>
           </div>
@@ -126,7 +142,11 @@ export default function Stores() {
               <h3 className="text-xs font-semibold text-[#94A3B8] uppercase tracking-wide mb-4">Quick Actions</h3>
               <div className="flex flex-col gap-2">
                 <Button variant="primary" className="w-full" icon={Icons.edit} onClick={() => {
-                  setEditForm({ name: s.name, code: s.code, type: s.type, description: s.description || '' })
+                  setEditForm({
+                    name: s.name, code: s.code, type: s.type, status: s.status,
+                    description: s.description || '', address: s.address || '',
+                    responsibleOfficerId: s.responsibleOfficerId || ''
+                  })
                   setShowEditModal(true)
                 }}>Edit Store</Button>
                 <Button variant="ghost" className="w-full text-[#DC2626] hover:bg-[#FEF2F2]" onClick={() => {
@@ -147,17 +167,39 @@ export default function Stores() {
             <Button variant="ghost" onClick={() => setShowEditModal(false)}>Cancel</Button>
             <Button variant="primary" onClick={() => {
               const e = validateEdit(); if (Object.keys(e).length > 0) { setErrors(e); return }
-              updateStore(selected.id, { name: editForm.name.trim(), code: editForm.code.trim().toUpperCase(), type: editForm.type, description: editForm.description.trim() || null })
+              updateStore(selected.id, {
+                name: editForm.name.trim(), code: editForm.code.trim().toUpperCase(),
+                type: editForm.type, status: editForm.status,
+                description: editForm.description.trim() || null,
+                address: editForm.address.trim() || null,
+                responsibleOfficerId: editForm.responsibleOfficerId || null
+              })
               toast.success('Store updated')
               setShowEditModal(false)
-              setSelected({ ...selected, name: editForm.name.trim(), code: editForm.code.trim().toUpperCase(), type: editForm.type as typeof selected.type, description: editForm.description.trim() || null })
+              setSelected({
+                ...selected, name: editForm.name.trim(), code: editForm.code.trim().toUpperCase(),
+                type: editForm.type, status: editForm.status,
+                description: editForm.description.trim() || null,
+                address: editForm.address.trim() || null,
+                responsibleOfficerId: editForm.responsibleOfficerId || null
+              })
             }}>Save Changes</Button>
           </>}>
           <div className="space-y-4">
-            <Input label="Store name" placeholder="e.g. Main Warehouse" value={editForm.name} onChange={e => setEditForm(f => ({ ...f, name: e.target.value }))} error={errors.name} />
-            <Input label="Code" placeholder="e.g. WH-MAIN-01" value={editForm.code} onChange={e => setEditForm(f => ({ ...f, code: e.target.value.toUpperCase() }))} error={errors.code} />
-            <Select label="Type" options={storeTypes} value={editForm.type} onChange={e => setEditForm(f => ({ ...f, type: e.target.value as StoreType }))} />
-            <Input label="Description" placeholder="Optional description" value={editForm.description} onChange={e => setEditForm(f => ({ ...f, description: e.target.value }))} />
+            <div className="grid grid-cols-2 gap-4">
+              <Input label="Store name *" placeholder="e.g. Main Warehouse" value={editForm.name} onChange={e => setEditForm(f => ({ ...f, name: e.target.value }))} error={errors.name} />
+              <Input label="Code *" placeholder="e.g. WH-MAIN-01" value={editForm.code} onChange={e => setEditForm(f => ({ ...f, code: e.target.value.toUpperCase() }))} error={errors.code} />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <Select label="Type *" options={storeTypes} value={editForm.type} onChange={e => setEditForm(f => ({ ...f, type: e.target.value as StoreType }))} />
+              <Select label="Status *" options={storeStatuses} value={editForm.status} onChange={e => setEditForm(f => ({ ...f, status: e.target.value as StoreStatus }))} />
+            </div>
+            <Input label="Address" placeholder="e.g. Bole Road, Addis Ababa" value={editForm.address} onChange={e => setEditForm(f => ({ ...f, address: e.target.value }))} />
+            <Select label="Responsible Officer" options={responsibleOfficers} value={editForm.responsibleOfficerId} onChange={e => setEditForm(f => ({ ...f, responsibleOfficerId: e.target.value }))} />
+            <div>
+              <label className="block text-sm font-medium text-[#334155] mb-1">Description</label>
+              <textarea className="w-full px-3 py-2 border border-[#E2E8F0] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#4F46E5] focus:border-transparent resize-none" rows={3} placeholder="Optional description of the store" value={editForm.description} onChange={e => setEditForm(f => ({ ...f, description: e.target.value }))} />
+            </div>
           </div>
         </Modal>
       </div>
@@ -202,21 +244,32 @@ export default function Stores() {
             const e = validate(); if (Object.keys(e).length > 0) { setErrors(e); return }
             addStore({
               id: crypto.randomUUID(), code: form.code.trim().toUpperCase(), name: form.name.trim(),
-              type: form.type, status: 'ACTIVE',
-              description: form.description.trim() || null, address: null,
-              responsibleOfficerId: null,
+              type: form.type, status: form.status,
+              description: form.description.trim() || null,
+              address: form.address.trim() || null,
+              responsibleOfficerId: form.responsibleOfficerId || null,
               createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
             })
             toast.success('Store created successfully')
             setShowModal(false)
-            setForm({ name: '', code: '', type: 'MAIN_STORE', description: '' })
+            setForm({ name: '', code: '', type: 'MAIN_STORE', status: 'ACTIVE', description: '', address: '', responsibleOfficerId: '' })
           }}>Create Store</Button>
         </>}>
         <div className="space-y-4">
-          <Input label="Store name" placeholder="e.g. Main Warehouse" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} error={errors.name} />
-          <Input label="Code" placeholder="e.g. WH-MAIN-01" value={form.code} onChange={e => setForm(f => ({ ...f, code: e.target.value.toUpperCase() }))} error={errors.code} />
-          <Select label="Type" options={storeTypes} value={form.type} onChange={e => setForm(f => ({ ...f, type: e.target.value as StoreType }))} />
-          <Input label="Description" placeholder="Optional description" value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} />
+          <div className="grid grid-cols-2 gap-4">
+            <Input label="Store name *" placeholder="e.g. Main Warehouse" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} error={errors.name} />
+            <Input label="Code *" placeholder="e.g. WH-MAIN-01" value={form.code} onChange={e => setForm(f => ({ ...f, code: e.target.value.toUpperCase() }))} error={errors.code} />
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <Select label="Type *" options={storeTypes} value={form.type} onChange={e => setForm(f => ({ ...f, type: e.target.value as StoreType }))} />
+            <Select label="Status *" options={storeStatuses} value={form.status} onChange={e => setForm(f => ({ ...f, status: e.target.value as StoreStatus }))} />
+          </div>
+          <Input label="Address" placeholder="e.g. Bole Road, Addis Ababa" value={form.address} onChange={e => setForm(f => ({ ...f, address: e.target.value }))} />
+          <Select label="Responsible Officer" options={responsibleOfficers} value={form.responsibleOfficerId} onChange={e => setForm(f => ({ ...f, responsibleOfficerId: e.target.value }))} />
+          <div>
+            <label className="block text-sm font-medium text-[#334155] mb-1">Description</label>
+            <textarea className="w-full px-3 py-2 border border-[#E2E8F0] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#4F46E5] focus:border-transparent resize-none" rows={3} placeholder="Optional description of the store" value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} />
+          </div>
         </div>
       </Modal>
     </div>
