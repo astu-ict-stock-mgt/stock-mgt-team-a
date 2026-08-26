@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Button, Badge, SectionHeader, Card, Input, Select, Modal, FormGroup, Icons, useToast } from '../components/ui'
 import { useApp } from '../context/AppContext'
+import { usersApi } from '../services/api'
 
 export default function Users() {
   const { users, roles, addUser, updateUser, deleteUser } = useApp()
@@ -13,9 +14,11 @@ export default function Users() {
   const [formData, setFormData] = useState({
     fullName: '',
     email: '',
+    password: '',
     roleId: roles[0]?.id || '',
     status: 'ACTIVE' as 'ACTIVE' | 'INACTIVE',
   })
+  const [saving, setSaving] = useState(false)
 
   const filteredUsers = users.filter(u => {
     const matchesSearch = u.fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -32,7 +35,7 @@ export default function Users() {
 
   const openCreateModal = () => {
     setEditingUser(null)
-    setFormData({ fullName: '', email: '', roleId: roles[0]?.id || '', status: 'ACTIVE' })
+    setFormData({ fullName: '', email: '', password: '', roleId: roles[0]?.id || '', status: 'ACTIVE' })
     setShowModal(true)
   }
 
@@ -41,30 +44,58 @@ export default function Users() {
     setFormData({
       fullName: user.fullName,
       email: user.email,
+      password: '',
       roleId: user.roles?.[0]?.id || '',
       status: user.status,
     })
     setShowModal(true)
   }
 
-  const saveUser = () => {
+  const saveUser = async () => {
     if (!formData.fullName || !formData.email) {
       toast.error('Name and email are required')
       return
     }
 
-    if (editingUser) {
-      updateUser(editingUser.id, { fullName: formData.fullName, email: formData.email, status: formData.status })
-      toast.success(`User ${formData.fullName} updated`)
-    } else {
-      addUser({
-        id: crypto.randomUUID(), fullName: formData.fullName, email: formData.email,
-        status: formData.status, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
-        roles: [],
-      })
-      toast.success(`User ${formData.fullName} created`)
+    if (!editingUser && !formData.password) {
+      toast.error('Password is required for new users')
+      return
     }
-    setShowModal(false)
+
+    if (!editingUser && formData.password.length < 8) {
+      toast.error('Password must be at least 8 characters')
+      return
+    }
+
+    setSaving(true)
+    try {
+      if (editingUser) {
+        const res = await usersApi.update(editingUser.id, {
+          fullName: formData.fullName,
+          email: formData.email,
+        })
+        // Update local state
+        updateUser(editingUser.id, { fullName: formData.fullName, email: formData.email, status: formData.status })
+        toast.success(`User ${formData.fullName} updated`)
+      } else {
+        const res = await usersApi.create({
+          fullName: formData.fullName,
+          email: formData.email,
+          password: formData.password,
+          roleIds: formData.roleId ? [formData.roleId] : [],
+        })
+        // Add to local state
+        if (res.data) {
+          addUser(res.data as any)
+        }
+        toast.success(`User ${formData.fullName} created — they can now login with the password you set`)
+      }
+      setShowModal(false)
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to save user')
+    } finally {
+      setSaving(false)
+    }
   }
 
   const handleDelete = (user: typeof users[0]) => {
@@ -151,11 +182,14 @@ export default function Users() {
       <Modal open={showModal} onClose={() => setShowModal(false)} title={editingUser ? 'Edit User' : 'Add User'} width="max-w-lg"
         footer={<>
           <Button variant="ghost" onClick={() => setShowModal(false)}>Cancel</Button>
-          <Button variant="primary" onClick={saveUser}>{editingUser ? 'Update' : 'Create'} User</Button>
+          <Button variant="primary" loading={saving} onClick={saveUser}>{editingUser ? 'Update' : 'Create'} User</Button>
         </>}>
         <div className="space-y-4">
           <Input label="Full name" placeholder="e.g. John Smith" value={formData.fullName} onChange={e => setFormData(f => ({ ...f, fullName: e.target.value }))} />
           <Input label="Email" type="email" placeholder="john@example.com" value={formData.email} onChange={e => setFormData(f => ({ ...f, email: e.target.value }))} />
+          {!editingUser && (
+            <Input label="Password" type="password" placeholder="Min 8 characters" value={formData.password} onChange={e => setFormData(f => ({ ...f, password: e.target.value }))} />
+          )}
           <Select label="Role" options={roles.map(r => ({ value: r.id, label: r.name }))} value={formData.roleId} onChange={e => setFormData(f => ({ ...f, roleId: e.target.value }))} />
           <Select label="Status" options={[{ value: 'ACTIVE', label: 'Active' }, { value: 'INACTIVE', label: 'Inactive' }]} value={formData.status} onChange={e => setFormData(f => ({ ...f, status: e.target.value as 'ACTIVE' | 'INACTIVE' }))} />
         </div>

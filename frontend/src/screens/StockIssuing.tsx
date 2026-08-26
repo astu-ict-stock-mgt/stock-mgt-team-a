@@ -1,267 +1,533 @@
-import { useState, useMemo } from 'react'
-import { Button, Input, Select, Stepper, SectionHeader, Card, Badge, Divider, Textarea, useToast } from '../components/ui'
+import { useState, useEffect, useCallback } from 'react'
+import { Button, Input, Select, SectionHeader, Card, Badge, Tabs, Modal, Textarea, useToast } from '../components/ui'
 import { useApp } from '../context/AppContext'
-import { requisitionsApi } from '../services/api'
+import { requisitionsApi, sivApi, storesApi, itemsApi } from '../services/api'
+import { hasPermission, PERMISSIONS } from '../lib/permissions'
+import type { Requisition, SIV, Store, Item } from '../types'
 
-const steps = ['Request Details', 'Item Selection', 'Approval', 'Issue Voucher']
+const statusColors: Record<string, 'warning' | 'success' | 'danger' | 'default' | 'primary'> = {
+  SUBMITTED: 'warning',
+  DEPARTMENT_APPROVED: 'primary',
+  PAO_APPROVED: 'success',
+  COMPLETED: 'success',
+  PARTIALLY_ISSUED: 'primary',
+  DEPARTMENT_REJECTED: 'danger',
+  PAO_REJECTED: 'danger',
+  CANCELLED: 'default',
+  DRAFT: 'default',
+  PREPARED: 'warning',
+  APPROVED: 'primary',
+  FINALIZED: 'success',
+}
+
+const statusLabels: Record<string, string> = {
+  SUBMITTED: 'Submitted',
+  DEPARTMENT_APPROVED: 'Dept Approved',
+  PAO_APPROVED: 'PAO Approved',
+  COMPLETED: 'Completed',
+  PARTIALLY_ISSUED: 'Partial',
+  DEPARTMENT_REJECTED: 'Dept Rejected',
+  PAO_REJECTED: 'PAO Rejected',
+  CANCELLED: 'Cancelled',
+  DRAFT: 'Draft',
+  PREPARED: 'Prepared',
+  APPROVED: 'Approved',
+  FINALIZED: 'Finalized',
+}
 
 export default function StockIssuing() {
-  const { inventoryItems, stockCards, stores, categories } = useApp()
+  const { currentUser, userRoles } = useApp()
   const { toast } = useToast()
 
-  const [step, setStep] = useState(0)
-  const [submitted, setSubmitted] = useState(false)
-  const [isSubmitting, setIsSubmitting] = useState(false)
-  const [form, setForm] = useState({ departmentId: '', purpose: '', urgency: 'normal', storeId: '' })
-  const [lines, setLines] = useState<{ id: string; itemId: string; requestedQty: string }[]>([])
-  const [approvalStatus, setApprovalStatus] = useState<'pending' | 'approved' | 'rejected'>('pending')
-  const [errors, setErrors] = useState<Record<string, string>>({})
-  const [sivRef, setSivRef] = useState('')
+  const canCreateRequisition = hasPermission(userRoles, PERMISSIONS.REQUISITIONS_CREATE)
+  const canApproveRequisition = hasPermission(userRoles, PERMISSIONS.REQUISITIONS_APPROVE)
+  const canPrepareSiv = hasPermission(userRoles, PERMISSIONS.SIV_PREPARE)
+  const canApproveSiv = hasPermission(userRoles, PERMISSIONS.SIV_APPROVE)
+  const canFinalizeSiv = hasPermission(userRoles, PERMISSIONS.SIV_FINALIZE)
 
-  const storeItems = useMemo(() => {
-    if (!form.storeId) return []
-    return stockCards.filter(sc => sc.storeId === form.storeId && sc.availableQty > 0).map(sc => {
-      const item = inventoryItems.find(i => i.id === sc.itemId)
-      const cat = item ? categories.find(c => c.id === item.categoryId) : null
-      return { ...sc, item, catName: cat?.name || '' }
-    }).filter(si => si.item)
-  }, [form.storeId, stockCards, inventoryItems, categories])
+  const [activeTab, setActiveTab] = useState('requisitions')
 
-  const validateStep0 = () => {
-    const e: Record<string, string> = {}
-    if (!form.storeId) e.storeId = 'Select a warehouse'
-    if (!form.purpose.trim()) e.purpose = 'Purpose is required'
-    return e
-  }
+  const [allStores, setAllStores] = useState<Store[]>([])
+  const [allItems, setAllItems] = useState<Item[]>([])
 
-  const validateStep1 = () => {
-    const e: Record<string, string> = {}
-    if (lines.length === 0) { e.lines = 'Add at least one item'; return e }
-    lines.forEach((line, index) => {
-      if (!line.itemId) e[`item-${index}`] = 'Select an item'
-      const qty = Number(line.requestedQty)
-      if (!line.requestedQty || !Number.isFinite(qty) || qty <= 0) e[`qty-${index}`] = 'Valid quantity required'
-      const stock = stockCards.find(sc => sc.itemId === line.itemId && sc.storeId === form.storeId)
-      if (stock && qty > stock.availableQty) e[`qty-${index}`] = 'Cannot exceed available stock'
-    })
-    return e
-  }
+  const [requisitions, setRequisitions] = useState<Requisition[]>([])
+  const [loadingReqs, setLoadingReqs] = useState(false)
+  const [sivs, setSivs] = useState<SIV[]>([])
+  const [loadingSivs, setLoadingSivs] = useState(false)
 
-  const handleNext = async () => {
-    let errs: Record<string, string> = {}
-    if (step === 0) errs = validateStep0()
-    if (step === 1) errs = validateStep1()
-    if (Object.keys(errs).length > 0) { setErrors(errs); return }
-    setErrors({})
+  const [showCreateReq, setShowCreateReq] = useState(false)
+  const [reqForm, setReqForm] = useState({ storeId: '', purpose: '', departmentId: '00000000-0000-0000-0000-000000000000' })
+  const [reqLines, setReqLines] = useState<{ id: string; itemId: string; qty: string }[]>([])
+  const [submittingReq, setSubmittingReq] = useState(false)
 
-    if (step < 3) {
-      setStep(s => s + 1)
-    } else {
-      if (approvalStatus !== 'approved') {
-        toast.error('Stock cannot be issued without approval')
+  const [showCreateSiv, setShowCreateSiv] = useState(false)
+  const [selectedReq, setSelectedReq] = useState<Requisition | null>(null)
+  const [sivForm, setSivForm] = useState({ issuedToUserId: '', notes: '' })
+  const [sivLines, setSivLines] = useState<{ id: string; itemId: string; qty: string }[]>([])
+  const [submittingSiv, setSubmittingSiv] = useState(false)
+
+  const [showDetail, setShowDetail] = useState<Requisition | SIV | null>(null)
+  const [detailType, setDetailType] = useState<'req' | 'siv'>('req')
+
+  const [processingId, setProcessingId] = useState<string | null>(null)
+
+  const loadStores = useCallback(async () => {
+    try {
+      const res = await storesApi.getAll()
+      setAllStores(res.data || [])
+    } catch { /* ignore */ }
+  }, [])
+
+  const loadItems = useCallback(async () => {
+    try {
+      const res = await itemsApi.getAll()
+      setAllItems(res.data || [])
+    } catch { /* ignore */ }
+  }, [])
+
+  const loadRequisitions = useCallback(async () => {
+    setLoadingReqs(true)
+    try {
+      const res = await requisitionsApi.getAll({ page: 1, limit: 50 })
+      setRequisitions(Array.isArray(res.data) ? res.data : (res.data as any)?.requisitions || [])
+    } catch (err: any) {
+      toast.error('Failed to load requisitions')
+    } finally {
+      setLoadingReqs(false)
+    }
+  }, [])
+
+  const loadSivs = useCallback(async () => {
+    setLoadingSivs(true)
+    try {
+      const res = await sivApi.getAll({ page: 1, limit: 50 })
+      setSivs(Array.isArray(res.data) ? res.data : (res.data as any)?.sivs || [])
+    } catch (err: any) {
+      toast.error('Failed to load SIVs')
+    } finally {
+      setLoadingSivs(false)
+    }
+  }, [])
+
+  useEffect(() => { loadStores(); loadItems() }, [loadStores, loadItems])
+  useEffect(() => {
+    if (activeTab === 'requisitions') loadRequisitions()
+    else if (activeTab === 'sivs') loadSivs()
+  }, [activeTab])
+
+  const handleCreateRequisition = async () => {
+    if (!reqForm.storeId || !reqForm.purpose.trim()) {
+      toast.error('Warehouse and purpose are required')
+      return
+    }
+    if (reqLines.length === 0) {
+      toast.error('Add at least one item')
+      return
+    }
+    for (const line of reqLines) {
+      if (!line.itemId || !line.qty || Number(line.qty) <= 0) {
+        toast.error('Each line requires a valid item and quantity')
         return
       }
-      setIsSubmitting(true)
-      try {
-        const ref = 'SIV-' + new Date().toISOString().slice(0, 10).replace(/-/g, '') + '-' + Date.now().toString().slice(-4)
-        await requisitionsApi.create({
-          departmentId: form.departmentId || '00000000-0000-0000-0000-000000000000',
-          storeId: form.storeId,
-          purpose: form.purpose,
-          lines: lines.map(l => ({ itemId: l.itemId, requestedQuantity: Number(l.requestedQty) })),
-        })
-        setSivRef(ref)
-        toast.success('Stock issued successfully')
-        setSubmitted(true)
-      } catch (error: any) {
-        toast.error(error.message || 'Failed to issue stock')
-      } finally {
-        setIsSubmitting(false)
-      }
+    }
+
+    setSubmittingReq(true)
+    try {
+      await requisitionsApi.create({
+        departmentId: reqForm.departmentId,
+        storeId: reqForm.storeId,
+        purpose: reqForm.purpose,
+        lines: reqLines.map(l => ({ itemId: l.itemId, requestedQuantity: Number(l.qty) })),
+      })
+      toast.success('Requisition submitted for approval')
+      setShowCreateReq(false)
+      setReqForm({ storeId: '', purpose: '', departmentId: '00000000-0000-0000-0000-000000000000' })
+      setReqLines([])
+      loadRequisitions()
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to create requisition')
+    } finally {
+      setSubmittingReq(false)
     }
   }
 
-  const getItemName = (itemId: string) => inventoryItems.find(i => i.id === itemId)?.name || ''
-  const getItemCode = (itemId: string) => inventoryItems.find(i => i.id === itemId)?.code || ''
-  const getAvailableQty = (itemId: string) => stockCards.find(sc => sc.itemId === itemId && sc.storeId === form.storeId)?.availableQty || 0
+  const handleApproveRequisition = async (id: string, action: 'dept' | 'pao') => {
+    setProcessingId(id)
+    try {
+      if (action === 'dept') {
+        await requisitionsApi.approveDepartment(id)
+        toast.success('Requisition approved by Department Head')
+      } else {
+        await requisitionsApi.approvePAO(id)
+        toast.success('Requisition approved by PAO')
+      }
+      loadRequisitions()
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to approve requisition')
+    } finally {
+      setProcessingId(null)
+    }
+  }
 
-  if (submitted) {
-    return (
-      <div>
-        <SectionHeader title="Stock Issuing" subtitle="Process outgoing stock requests" />
-        <div className="max-w-2xl mx-auto">
-          <Card>
-            <div className="text-center py-6">
-              <div className="w-14 h-14 rounded-full bg-[#F0FDF4] flex items-center justify-center mx-auto mb-4">
-                <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#16A34A" strokeWidth="2.5"><path d="M20 6 9 17l-5-5" /></svg>
-              </div>
-              <h2 className="text-xl font-semibold text-[#0F172A]">Stock Issued Successfully</h2>
-              <p className="text-sm text-[#64748B] mt-1">Voucher: <span className="font-mono font-semibold text-[#4F46E5]">{sivRef}</span></p>
+  const handleRejectRequisition = async (id: string) => {
+    const reason = prompt('Rejection reason:')
+    if (!reason) return
+    setProcessingId(id)
+    try {
+      await requisitionsApi.reject(id, reason)
+      toast.success('Requisition rejected')
+      loadRequisitions()
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to reject requisition')
+    } finally {
+      setProcessingId(null)
+    }
+  }
+
+  const openCreateSiv = (req: Requisition) => {
+    setSelectedReq(req)
+    setSivForm({ issuedToUserId: currentUser?.userId || '', notes: '' })
+    setSivLines(
+      (req.lines || []).map(l => ({
+        id: l.id,
+        itemId: l.itemId,
+        qty: String(l.approvedQuantity || l.requestedQuantity),
+      }))
+    )
+    setShowCreateSiv(true)
+  }
+
+  const handleCreateSiv = async () => {
+    if (!selectedReq) return
+    if (!sivForm.issuedToUserId) {
+      toast.error('Recipient is required')
+      return
+    }
+    for (const line of sivLines) {
+      if (!line.itemId || !line.qty || Number(line.qty) <= 0) {
+        toast.error('Each line requires a valid quantity')
+        return
+      }
+    }
+
+    setSubmittingSiv(true)
+    try {
+      await sivApi.create({
+        requisitionId: selectedReq.id,
+        storeId: selectedReq.storeId,
+        issuedToUserId: sivForm.issuedToUserId,
+        notes: sivForm.notes,
+        lines: sivLines.map(l => ({ itemId: l.itemId, quantityIssued: Number(l.qty) })),
+      })
+      toast.success('SIV prepared and submitted for approval')
+      setShowCreateSiv(false)
+      setSelectedReq(null)
+      loadSivs()
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to create SIV')
+    } finally {
+      setSubmittingSiv(false)
+    }
+  }
+
+  const handleApproveSiv = async (id: string) => {
+    setProcessingId(id)
+    try {
+      await sivApi.approve(id)
+      toast.success('SIV approved')
+      loadSivs()
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to approve SIV')
+    } finally {
+      setProcessingId(null)
+    }
+  }
+
+  const handleFinalizeSiv = async (id: string) => {
+    if (!confirm('Finalize this SIV? Stock will be deducted from inventory.')) return
+    setProcessingId(id)
+    try {
+      await sivApi.finalize(id)
+      toast.success('SIV finalized — stock deducted from inventory')
+      loadSivs()
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to finalize SIV')
+    } finally {
+      setProcessingId(null)
+    }
+  }
+
+  const getItemName = (itemId: string) => allItems.find(i => i.id === itemId)?.name || itemId.slice(0, 8)
+  const getItemCode = (itemId: string) => allItems.find(i => i.id === itemId)?.code || ''
+  const getUserName = (id: string) => id === currentUser?.userId ? 'You' : id.slice(0, 8)
+
+  const tabItems = [
+    { id: 'requisitions', label: `Requisitions (${requisitions.length})` },
+    { id: 'sivs', label: `SIVs (${sivs.length})` },
+  ]
+
+  return (
+    <div>
+      <SectionHeader title="Stock Issuing" subtitle="Manage requisitions and store issue vouchers (SIV)" />
+
+      <div className="mb-6">
+        <Tabs tabs={tabItems} active={activeTab} onChange={setActiveTab} />
+      </div>
+
+      {activeTab === 'requisitions' && (
+        <div>
+          <div className="flex justify-between items-center mb-4">
+            <p className="text-sm text-[#64748B]">{requisitions.length} requisition(s)</p>
+            {canCreateRequisition && (
+              <Button variant="primary" onClick={() => setShowCreateReq(true)}>+ New Requisition</Button>
+            )}
+          </div>
+
+          {loadingReqs ? (
+            <Card><p className="text-center py-8 text-[#64748B]">Loading...</p></Card>
+          ) : requisitions.length === 0 ? (
+            <Card><p className="text-center py-8 text-[#64748B]">No requisitions found</p></Card>
+          ) : (
+            <div className="space-y-3">
+              {requisitions.map(req => (
+                <Card key={req.id}>
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="font-mono text-sm font-semibold text-[#4F46E5]">{req.requisitionNumber}</span>
+                        <Badge variant={statusColors[req.status] || 'default'} dot>{statusLabels[req.status] || req.status}</Badge>
+                      </div>
+                      <p className="text-sm text-[#1E293B]">{req.purpose}</p>
+                      <div className="flex gap-4 mt-1 text-xs text-[#94A3B8]">
+                        <span>By: {req.requester?.fullName || getUserName(req.requesterId)}</span>
+                        <span>Store: {allStores.find(s => s.id === req.storeId)?.name || req.storeId}</span>
+                        <span>{new Date(req.createdAt).toLocaleDateString()}</span>
+                      </div>
+                      {req.lines && req.lines.length > 0 && (
+                        <div className="mt-2 flex flex-wrap gap-1">
+                          {req.lines.map(l => (
+                            <span key={l.id} className="text-xs bg-[#F1F5F9] px-2 py-0.5 rounded">
+                              {getItemName(l.itemId)} × {l.requestedQuantity}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex gap-2 ml-4">
+                      {req.status === 'SUBMITTED' && canApproveRequisition && (
+                        <>
+                          <Button variant="primary" size="sm" loading={processingId === req.id} onClick={() => handleApproveRequisition(req.id, 'pao')}>Approve (PAO)</Button>
+                          <Button variant="destructive" size="sm" loading={processingId === req.id} onClick={() => handleRejectRequisition(req.id)}>Reject</Button>
+                        </>
+                      )}
+                      {req.status === 'DEPARTMENT_APPROVED' && canApproveRequisition && (
+                        <>
+                          <Button variant="primary" size="sm" loading={processingId === req.id} onClick={() => handleApproveRequisition(req.id, 'pao')}>Approve (PAO)</Button>
+                          <Button variant="destructive" size="sm" loading={processingId === req.id} onClick={() => handleRejectRequisition(req.id)}>Reject</Button>
+                        </>
+                      )}
+                      {req.status === 'PAO_APPROVED' && canPrepareSiv && (
+                        <Button variant="primary" size="sm" onClick={() => openCreateSiv(req)}>Create SIV</Button>
+                      )}
+                      <Button variant="ghost" size="sm" onClick={() => { setDetailType('req'); setShowDetail(req) }}>View</Button>
+                    </div>
+                  </div>
+                </Card>
+              ))}
             </div>
-            <Divider label="Issue Voucher" />
-            <div className="border border-[#E2E8F0] rounded-xl p-5">
-              <div className="flex items-start justify-between mb-4">
-                <div>
-                  <p className="font-semibold text-[#0F172A]">StockManager</p>
-                  <p className="text-xs text-[#64748B]">Stock Issue Voucher</p>
-                </div>
-                <div className="text-right">
-                  <p className="text-sm font-semibold font-mono text-[#4F46E5]">{sivRef}</p>
-                  <p className="text-xs text-[#94A3B8]">{new Date().toISOString().slice(0, 10)}</p>
-                </div>
+          )}
+        </div>
+      )}
+
+      {activeTab === 'sivs' && (
+        <div>
+          <div className="flex justify-between items-center mb-4">
+            <p className="text-sm text-[#64748B]">{sivs.length} SIV(s)</p>
+          </div>
+
+          {loadingSivs ? (
+            <Card><p className="text-center py-8 text-[#64748B]">Loading...</p></Card>
+          ) : sivs.length === 0 ? (
+            <Card><p className="text-center py-8 text-[#64748B]">No SIVs found. Create one from an approved requisition.</p></Card>
+          ) : (
+            <div className="space-y-3">
+              {sivs.map(siv => (
+                <Card key={siv.id}>
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="font-mono text-sm font-semibold text-[#4F46E5]">{siv.sivNumber}</span>
+                        <Badge variant={statusColors[siv.status] || 'default'} dot>{statusLabels[siv.status] || siv.status}</Badge>
+                      </div>
+                      <p className="text-sm text-[#1E293B]">
+                        Requisition: {siv.requisition?.requisitionNumber || siv.requisitionId}
+                      </p>
+                      <div className="flex gap-4 mt-1 text-xs text-[#94A3B8]">
+                        <span>Store: {allStores.find(s => s.id === siv.storeId)?.name || siv.storeId}</span>
+                        <span>To: {siv.issuedToUser?.fullName || getUserName(siv.issuedToUserId)}</span>
+                        <span>By: {siv.preparedByUser?.fullName || getUserName(siv.preparedBy)}</span>
+                        <span>{new Date(siv.createdAt).toLocaleDateString()}</span>
+                      </div>
+                      {siv.lines && siv.lines.length > 0 && (
+                        <div className="mt-2 flex flex-wrap gap-1">
+                          {siv.lines.map(l => (
+                            <span key={l.id} className="text-xs bg-[#F1F5F9] px-2 py-0.5 rounded">
+                              {getItemName(l.itemId)} × {l.quantityIssued}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex gap-2 ml-4">
+                      {siv.status === 'PREPARED' && canApproveSiv && (
+                        <Button variant="primary" size="sm" loading={processingId === siv.id} onClick={() => handleApproveSiv(siv.id)}>Approve</Button>
+                      )}
+                      {siv.status === 'APPROVED' && canFinalizeSiv && (
+                        <Button variant="primary" size="sm" loading={processingId === siv.id} onClick={() => handleFinalizeSiv(siv.id)}>Finalize (Deduct Stock)</Button>
+                      )}
+                      <Button variant="ghost" size="sm" onClick={() => { setDetailType('siv'); setShowDetail(siv) }}>View</Button>
+                    </div>
+                  </div>
+                </Card>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Create Requisition Modal */}
+      <Modal open={showCreateReq} onClose={() => setShowCreateReq(false)} title="New Requisition" width="max-w-2xl">
+        <div className="space-y-4">
+          <Select label="Warehouse *" options={[{ value: '', label: 'Select warehouse...' }, ...allStores.map(s => ({ value: s.id, label: s.name }))]}
+            value={reqForm.storeId} onChange={e => setReqForm(f => ({ ...f, storeId: e.target.value }))} />
+          <Textarea label="Purpose / Justification *" placeholder="Why is this stock needed?" value={reqForm.purpose}
+            onChange={e => setReqForm(f => ({ ...f, purpose: e.target.value }))} />
+
+          <div>
+            <p className="text-sm font-medium text-[#1E293B] mb-2">Items *</p>
+            {reqLines.map((line, idx) => (
+              <div key={idx} className="flex gap-2 mb-2">
+                <Select options={[{ value: '', label: 'Select item...' }, ...allItems.map(i => ({ value: i.id, label: `${i.name} (${i.code})` }))]}
+                  value={line.itemId} onChange={e => setReqLines(ls => ls.map((l, i) => i === idx ? { ...l, itemId: e.target.value } : l))} className="flex-1" />
+                <Input type="number" min="1" placeholder="Qty" value={line.qty}
+                  onChange={e => setReqLines(ls => ls.map((l, i) => i === idx ? { ...l, qty: e.target.value } : l))} className="w-24" />
+                <button onClick={() => setReqLines(ls => ls.filter((_, i) => i !== idx))} className="px-2 text-[#94A3B8] hover:text-[#DC2626]">✕</button>
               </div>
-              <div className="grid grid-cols-2 gap-3 mb-4">
-                <div>
-                  <p className="text-xs font-medium text-[#94A3B8] uppercase tracking-wide mb-0.5">Warehouse</p>
-                  <p className="text-sm text-[#1E293B]">{stores.find(s => s.id === form.storeId)?.name || 'N/A'}</p>
-                </div>
-                <div>
-                  <p className="text-xs font-medium text-[#94A3B8] uppercase tracking-wide mb-0.5">Purpose</p>
-                  <p className="text-sm text-[#1E293B]">{form.purpose}</p>
-                </div>
+            ))}
+            <button onClick={() => setReqLines(ls => [...ls, { id: Date.now().toString(), itemId: '', qty: '' }])}
+              className="w-full py-2 border-2 border-dashed border-[#E2E8F0] rounded-lg text-sm text-[#64748B] hover:border-[#4F46E5] hover:text-[#4F46E5] transition-all">+ Add item</button>
+          </div>
+        </div>
+        <div slot="footer">
+          <Button variant="ghost" onClick={() => setShowCreateReq(false)}>Cancel</Button>
+          <Button variant="primary" loading={submittingReq} onClick={handleCreateRequisition}>Submit Requisition</Button>
+        </div>
+      </Modal>
+
+      {/* Create SIV Modal */}
+      <Modal open={showCreateSiv} onClose={() => setShowCreateSiv(false)} title={`Create SIV for ${selectedReq?.requisitionNumber || ''}`} width="max-w-2xl">
+        <div className="space-y-4">
+          <Input label="Recipient (Issued To) *" value={sivForm.issuedToUserId}
+            onChange={e => setSivForm(f => ({ ...f, issuedToUserId: e.target.value }))} placeholder="User ID" />
+          <Textarea label="Notes" value={sivForm.notes} placeholder="Optional notes"
+            onChange={e => setSivForm(f => ({ ...f, notes: e.target.value }))} />
+
+          <div>
+            <p className="text-sm font-medium text-[#1E293B] mb-2">Issue Quantities *</p>
+            {sivLines.map((line, idx) => (
+              <div key={idx} className="flex gap-2 mb-2 items-center">
+                <span className="flex-1 text-sm text-[#1E293B]">{getItemName(line.itemId)}</span>
+                <Input type="number" min="1" value={line.qty}
+                  onChange={e => setSivLines(ls => ls.map((l, i) => i === idx ? { ...l, qty: e.target.value } : l))} className="w-24" />
               </div>
-              <table className="w-full text-xs border-collapse">
-                <thead>
-                  <tr className="border-b border-[#E2E8F0]">
-                    {['Item', 'SKU', 'Qty', 'Available'].map(h => (
-                      <th key={h} className="py-2 px-2 text-left font-semibold text-[#64748B] uppercase tracking-wide">{h}</th>
-                    ))}
-                  </tr>
-                </thead>
+            ))}
+          </div>
+        </div>
+        <div slot="footer">
+          <Button variant="ghost" onClick={() => setShowCreateSiv(false)}>Cancel</Button>
+          <Button variant="primary" loading={submittingSiv} onClick={handleCreateSiv}>Prepare SIV</Button>
+        </div>
+      </Modal>
+
+      {/* Detail View Modal */}
+      <Modal open={!!showDetail} onClose={() => setShowDetail(null)} title={detailType === 'req' ? (showDetail as Requisition)?.requisitionNumber || 'Requisition' : (showDetail as SIV)?.sivNumber || 'SIV'} width="max-w-xl">
+        {showDetail && detailType === 'req' && (
+          <div>
+            <div className="grid grid-cols-2 gap-4 mb-4">
+              <div>
+                <p className="text-xs text-[#94A3B8] uppercase">Status</p>
+                <Badge variant={statusColors[(showDetail as Requisition).status] || 'default'}>{statusLabels[(showDetail as Requisition).status] || (showDetail as Requisition).status}</Badge>
+              </div>
+              <div>
+                <p className="text-xs text-[#94A3B8] uppercase">Store</p>
+                <p className="text-sm">{allStores.find(s => s.id === (showDetail as Requisition).storeId)?.name}</p>
+              </div>
+              <div>
+                <p className="text-xs text-[#94A3B8] uppercase">Requester</p>
+                <p className="text-sm">{(showDetail as Requisition).requester?.fullName || (showDetail as Requisition).requesterId}</p>
+              </div>
+              <div>
+                <p className="text-xs text-[#94A3B8] uppercase">Purpose</p>
+                <p className="text-sm">{(showDetail as Requisition).purpose}</p>
+              </div>
+            </div>
+            {(showDetail as Requisition).lines && (
+              <table className="w-full text-xs">
+                <thead><tr className="border-b border-[#E2E8F0]">
+                  <th className="py-2 text-left">Item</th><th className="py-2 text-right">Requested</th><th className="py-2 text-right">Approved</th><th className="py-2 text-right">Issued</th>
+                </tr></thead>
                 <tbody>
-                  {lines.map((l, i) => (
-                    <tr key={i} className="border-b border-[#F8FAFC]">
-                      <td className="py-2 px-2 font-medium text-[#1E293B]">{getItemName(l.itemId)}</td>
-                      <td className="py-2 px-2 font-mono text-[#64748B]">{getItemCode(l.itemId)}</td>
-                      <td className="py-2 px-2 font-semibold text-[#4F46E5]">{l.requestedQty}</td>
-                      <td className="py-2 px-2 text-[#64748B]">{getAvailableQty(l.itemId)}</td>
+                  {(showDetail as Requisition).lines!.map(l => (
+                    <tr key={l.id} className="border-b border-[#F8FAFC]">
+                      <td className="py-2">{getItemName(l.itemId)}</td>
+                      <td className="py-2 text-right">{l.requestedQuantity}</td>
+                      <td className="py-2 text-right">{l.approvedQuantity ?? '—'}</td>
+                      <td className="py-2 text-right">{l.issuedQuantity ?? '—'}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
-              <div className="mt-4 pt-3 border-t border-[#E2E8F0] flex justify-between text-xs text-[#94A3B8]">
-                <span>Status: <span className="text-[#16A34A] font-medium">Issued</span></span>
-              </div>
-            </div>
-            <div className="flex gap-2 mt-5">
-              <Button variant="primary" className="flex-1" onClick={() => { setSubmitted(false); setStep(0); setLines([]); setForm({ departmentId: '', purpose: '', urgency: 'normal', storeId: '' }); setApprovalStatus('pending') }}>New request</Button>
-            </div>
-          </Card>
-        </div>
-      </div>
-    )
-  }
-
-  return (
-    <div>
-      <SectionHeader title="Stock Issuing" subtitle="Process outgoing stock requests with approval workflow" />
-      <div className="max-w-3xl mx-auto">
-        <div className="mb-8">
-          <Stepper steps={steps} current={step} />
-        </div>
-        <Card>
-          {step === 0 && (
-            <div className="space-y-4">
-              <h3 className="text-base font-semibold text-[#0F172A] mb-4">Request Details</h3>
-              <div className="grid grid-cols-2 gap-4">
-                <Select label="Issuing Warehouse *" options={[{ value: '', label: 'Select warehouse...' }, ...stores.map(s => ({ value: s.id, label: s.name }))]}
-                  value={form.storeId} onChange={e => setForm(f => ({ ...f, storeId: e.target.value }))} error={errors.storeId} />
-                <Select label="Urgency" options={[{ value: 'normal', label: 'Normal' }, { value: 'urgent', label: 'Urgent' }, { value: 'critical', label: 'Critical' }]}
-                  value={form.urgency} onChange={e => setForm(f => ({ ...f, urgency: e.target.value }))} />
-              </div>
-              <Textarea label="Purpose / Justification *" placeholder="Describe why this stock is needed..." value={form.purpose}
-                onChange={e => setForm(f => ({ ...f, purpose: e.target.value }))} error={errors.purpose} />
-            </div>
-          )}
-
-          {step === 1 && (
-            <div>
-              <h3 className="text-base font-semibold text-[#0F172A] mb-4">Select Items to Issue</h3>
-              {errors.lines && <div className="mb-3 p-3 bg-[#FEF2F2] border border-[#FECACA] rounded-lg text-sm text-[#DC2626]">{errors.lines}</div>}
-              <div className="space-y-3">
-                {lines.map((line, idx) => (
-                  <div key={idx} className="p-4 border border-[#E2E8F0] rounded-xl">
-                    <div className="grid grid-cols-4 gap-3 items-end">
-                      <div className="col-span-2">
-                        <Select label="Item *" options={[{ value: '', label: 'Select item...' }, ...storeItems.map(si => ({ value: si.itemId, label: `${si.item?.name} (${si.item?.code}) — ${si.availableQty} available` }))]}
-                          value={line.itemId}
-                          onChange={e => setLines(ls => ls.map((l, i) => i === idx ? { ...l, itemId: e.target.value } : l))}
-                          error={errors[`item-${idx}`]} />
-                      </div>
-                      <Input label="Qty *" type="number" min="1" value={line.requestedQty}
-                        onChange={e => setLines(ls => ls.map((l, i) => i === idx ? { ...l, requestedQty: e.target.value } : l))}
-                        error={errors[`qty-${idx}`]} />
-                      {lines.length > 1 && (
-                        <button onClick={() => setLines(ls => ls.filter((_, i) => i !== idx))}
-                          className="h-9 px-3 border border-[#E2E8F0] rounded-lg text-[#94A3B8] hover:text-[#DC2626] hover:bg-[#FEF2F2] transition-all text-sm">✕</button>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-              <button onClick={() => setLines(ls => [...ls, { id: Date.now().toString(), itemId: '', requestedQty: '' }])}
-                className="mt-3 w-full py-2.5 border-2 border-dashed border-[#E2E8F0] rounded-xl text-sm text-[#64748B] hover:border-[#4F46E5] hover:text-[#4F46E5] transition-all">+ Add item</button>
-            </div>
-          )}
-
-          {step === 2 && (
-            <div>
-              <h3 className="text-base font-semibold text-[#0F172A] mb-1">Approval Step</h3>
-              <p className="text-sm text-[#64748B] mb-5">This request requires authorization before issuing stock.</p>
-              <div className="p-4 border border-[#E2E8F0] rounded-xl mb-4">
-                <div className="flex items-center justify-between">
-                  <p className="text-sm font-medium text-[#1E293B]">Approval status</p>
-                  <Badge variant={approvalStatus === 'approved' ? 'success' : approvalStatus === 'rejected' ? 'danger' : 'warning'} dot>
-                    {approvalStatus === 'approved' ? 'Approved' : approvalStatus === 'rejected' ? 'Rejected' : 'Awaiting approval'}
-                  </Badge>
-                </div>
-              </div>
-              <div className="p-3 bg-[#F1F5F9] rounded-xl">
-                <p className="text-xs font-medium text-[#64748B] mb-2">Demo: Simulate approval decision</p>
-                <div className="flex gap-2">
-                  <button onClick={() => setApprovalStatus('approved')} className="px-3 py-1.5 rounded-lg text-xs font-medium bg-[#F0FDF4] text-[#16A34A] border border-[#BBF7D0] hover:bg-[#DCFCE7]">Approve</button>
-                  <button onClick={() => setApprovalStatus('rejected')} className="px-3 py-1.5 rounded-lg text-xs font-medium bg-[#FEF2F2] text-[#DC2626] border border-[#FECACA] hover:bg-[#FEE2E2]">Reject</button>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {step === 3 && (
-            <div>
-              <h3 className="text-base font-semibold text-[#0F172A] mb-4">Review & Issue</h3>
-              <div className="grid grid-cols-2 gap-4 mb-4">
-                <div>
-                  <p className="text-xs font-medium text-[#94A3B8] uppercase tracking-wide mb-0.5">Warehouse</p>
-                  <p className="text-sm text-[#1E293B]">{stores.find(s => s.id === form.storeId)?.name || 'N/A'}</p>
-                </div>
-                <div>
-                  <p className="text-xs font-medium text-[#94A3B8] uppercase tracking-wide mb-0.5">Purpose</p>
-                  <p className="text-sm text-[#1E293B]">{form.purpose}</p>
-                </div>
-              </div>
-              <Divider label="Items" />
-              <div className="space-y-2">
-                {lines.map((l, i) => (
-                  <div key={i} className="flex items-center justify-between p-3 bg-[#F8FAFC] rounded-lg">
-                    <div>
-                      <p className="text-sm font-medium text-[#1E293B]">{getItemName(l.itemId)}</p>
-                      <p className="text-xs text-[#94A3B8]">Available: {getAvailableQty(l.itemId)}</p>
-                    </div>
-                    <span className="text-sm font-semibold font-mono text-[#4F46E5]">{l.requestedQty}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          <div className="flex items-center justify-between mt-6 pt-5 border-t border-[#E2E8F0]">
-            <Button variant="ghost" onClick={() => setStep(s => Math.max(0, s - 1))} disabled={step === 0}>← Back</Button>
-            <Button variant="primary" onClick={handleNext} disabled={isSubmitting || (step === 2 && approvalStatus !== 'approved')}>
-              {isSubmitting ? 'Issuing...' : step === 3 ? 'Confirm Issue' : 'Continue →'}
-            </Button>
+            )}
           </div>
-        </Card>
-      </div>
+        )}
+        {showDetail && detailType === 'siv' && (
+          <div>
+            <div className="grid grid-cols-2 gap-4 mb-4">
+              <div>
+                <p className="text-xs text-[#94A3B8] uppercase">Status</p>
+                <Badge variant={statusColors[(showDetail as SIV).status] || 'default'}>{statusLabels[(showDetail as SIV).status] || (showDetail as SIV).status}</Badge>
+              </div>
+              <div>
+                <p className="text-xs text-[#94A3B8] uppercase">Requisition</p>
+                <p className="text-sm">{(showDetail as SIV).requisition?.requisitionNumber || (showDetail as SIV).requisitionId}</p>
+              </div>
+              <div>
+                <p className="text-xs text-[#94A3B8] uppercase">Issued To</p>
+                <p className="text-sm">{(showDetail as SIV).issuedToUser?.fullName || (showDetail as SIV).issuedToUserId}</p>
+              </div>
+              <div>
+                <p className="text-xs text-[#94A3B8] uppercase">Prepared By</p>
+                <p className="text-sm">{(showDetail as SIV).preparedByUser?.fullName || (showDetail as SIV).preparedBy}</p>
+              </div>
+            </div>
+            {(showDetail as SIV).lines && (
+              <table className="w-full text-xs">
+                <thead><tr className="border-b border-[#E2E8F0]">
+                  <th className="py-2 text-left">Item</th><th className="py-2 text-right">Qty Issued</th>
+                </tr></thead>
+                <tbody>
+                  {(showDetail as SIV).lines!.map(l => (
+                    <tr key={l.id} className="border-b border-[#F8FAFC]">
+                      <td className="py-2">{getItemName(l.itemId)}</td>
+                      <td className="py-2 text-right">{l.quantityIssued}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        )}
+      </Modal>
     </div>
   )
 }

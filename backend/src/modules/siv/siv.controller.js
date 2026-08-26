@@ -13,6 +13,7 @@ import {
   amendSIV,
   verifyDispatchSIV,
   getSivAuditHistory,
+  directIssue,
 } from './siv.service.js'
 import { sendCreated, sendSuccess } from '../../utils/response.js'
 
@@ -131,6 +132,25 @@ export const getAudit = async (req, res, next) => {
   try {
     const auditHistory = await getSivAuditHistory(req.params.id)
     sendSuccess(res, auditHistory)
+  } catch (err) {
+    next(err)
+  }
+}
+
+/**
+ * Handle POST /api/sivs/direct-issue endpoint
+ * One-shot: create requisition + SIV + finalize (posts stock deduction)
+ */
+export const directIssueController = async (req, res, next) => {
+  try {
+    const userId = req.user?.userId || req.user?.id
+    const result = await directIssue({
+      storeId: req.body.storeId,
+      purpose: req.body.purpose,
+      userId,
+      lines: req.body.lines,
+    })
+    sendCreated(res, result)
   } catch (err) {
     next(err)
   }

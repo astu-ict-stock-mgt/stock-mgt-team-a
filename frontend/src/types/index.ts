@@ -262,19 +262,21 @@ export interface Requisition {
   requisitionNumber: string
   departmentId: string
   storeId: string
-  requestedBy: string
+  requesterId: string
   purpose: string
-  status: 'SUBMITTED' | 'DEPARTMENT_APPROVED' | 'APPROVED' | 'PARTIALLY_ISSUED' | 'FULLY_ISSUED' | 'REJECTED'
-  departmentApprovalAt: string | null
+  status: 'SUBMITTED' | 'DEPARTMENT_APPROVED' | 'PAO_APPROVED' | 'PARTIALLY_ISSUED' | 'COMPLETED' | 'DEPARTMENT_REJECTED' | 'PAO_REJECTED' | 'CANCELLED'
+  departmentApprovedAt: string | null
   departmentApprovedBy: string | null
-  paoApprovalAt: string | null
+  paoApprovedAt: string | null
   paoApprovedBy: string | null
   rejectionReason: string | null
   createdAt: string
   updatedAt: string
   department?: Department
   store?: Store
-  requestedByUser?: { id: string; fullName: string; email: string }
+  requester?: { id: string; fullName: string; email: string }
+  departmentApprovedByUser?: { id: string; fullName: string }
+  paoApprovedByUser?: { id: string; fullName: string }
   lines?: RequisitionLine[]
   _count?: { lines: number }
 }
@@ -284,6 +286,7 @@ export interface RequisitionLine {
   requisitionId: string
   itemId: string
   requestedQuantity: number
+  approvedQuantity: number | null
   issuedQuantity: number | null
   item?: Item
 }
@@ -293,15 +296,18 @@ export interface SIV {
   sivNumber: string
   requisitionId: string | null
   storeId: string
-  issuedTo: string
-  purpose: string
-  status: 'DRAFT' | 'PENDING' | 'APPROVED' | 'ISSUED' | 'CANCELLED'
-  issuedAt: string | null
-  issuedBy: string | null
+  issuedToUserId: string
+  preparedBy: string
+  status: 'DRAFT' | 'PREPARED' | 'APPROVED' | 'FINALIZED' | 'CANCELLED'
+  approvedBy: string | null
+  notes: string | null
   createdAt: string
   updatedAt: string
   store?: Store
-  issuedByUser?: { id: string; fullName: string }
+  requisition?: Requisition
+  issuedToUser?: { id: string; fullName: string }
+  preparedByUser?: { id: string; fullName: string }
+  approvedByUser?: { id: string; fullName: string }
   lines?: SIVLine[]
 }
 
@@ -309,8 +315,9 @@ export interface SIVLine {
   id: string
   sivId: string
   itemId: string
-  quantityRequested: number
-  quantityIssued: number | null
+  quantityIssued: number
+  unitCost: number | null
+  totalCost: number | null
   item?: Item
 }
 

@@ -39,7 +39,8 @@ interface AppContextType {
   requisitions: Requisition[]
 
   isAuthenticated: boolean
-  currentUser: { userId: string; email: string; fullName: string; status: string } | null
+  currentUser: { userId: string; email: string; fullName: string; status: string; roles: string[] } | null
+  userRoles: string[]
   login: (email: string, password: string) => Promise<void>
   logout: () => void
 
@@ -89,10 +90,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
   const [apiStatus, setApiStatus] = useState<'connected' | 'disconnected' | 'checking'>('checking');
   const [isAuthenticated, setIsAuthenticated] = useState(() => localStorage.getItem('sms_token') !== null);
-  const [currentUser, setCurrentUser] = useState<{ userId: string; email: string; fullName: string; status: string } | null>(() => {
+  const [currentUser, setCurrentUser] = useState<{ userId: string; email: string; fullName: string; status: string; roles: string[] } | null>(() => {
     const saved = localStorage.getItem('sms_user');
     return saved ? JSON.parse(saved) : null;
   });
+
+  const userRoles = currentUser?.roles || []
 
   const [inventoryItems, setInventoryItems] = useState<Item[]>([]);
   const [stockCards, setStockCards] = useState<StockCard[]>([]);
@@ -176,9 +179,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const response = await authApi.login(email, password);
     if (response.success && response.data) {
       api.setToken(response.data.token);
-      const profileRes = await authApi.me();
-      setCurrentUser(profileRes.data);
-      localStorage.setItem('sms_user', JSON.stringify(profileRes.data));
+      // Decode JWT to get roles
+      const payload = JSON.parse(atob(response.data.token.split('.')[1]));
+      const userData = {
+        userId: payload.userId,
+        email: payload.email,
+        fullName: payload.fullName,
+        status: payload.status,
+        roles: payload.roles || [],
+      };
+      setCurrentUser(userData);
+      localStorage.setItem('sms_user', JSON.stringify(userData));
       setIsAuthenticated(true);
       await loadAllData();
     } else {
@@ -313,7 +324,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     <AppContext.Provider value={{
       inventoryItems, stockCards, suppliers, stockMovements, users, roles,
       stores, categories, units, auditLogs, notifications, transfers, stockTakes, requisitions,
-      isAuthenticated, currentUser, login, logout,
+      isAuthenticated, currentUser, userRoles, login, logout,
       addInventoryItem, updateInventoryItem, deleteInventoryItem,
       addSupplier, updateSupplier, deleteSupplier,
       addCategory, updateCategory, deleteCategory,

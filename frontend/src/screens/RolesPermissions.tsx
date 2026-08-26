@@ -1,106 +1,157 @@
-import { useState } from 'react'
-import { Button, Badge, SectionHeader, Card, Input, Modal, FormGroup, Icons, useToast } from '../components/ui'
+import { useState, useEffect, useCallback } from 'react'
+import { Button, Badge, SectionHeader, Card, Input, Modal, useToast } from '../components/ui'
 import { useApp } from '../context/AppContext'
+import { rolesApi } from '../services/api'
+import type { Role } from '../types'
 
-interface RoleRecord {
+interface Permission {
   id: string
+  code: string
   name: string
-  description: string
-  userCount: number
-  permissions: Record<string, string[]>
+  description: string | null
 }
 
-const allModules = ['inventory', 'stockOps', 'suppliers', 'users', 'reports', 'audit', 'settings']
-const allActions = ['view', 'create', 'edit', 'delete', 'approve', 'export']
+const PERMISSION_MODULES = [
+  { key: 'users', label: 'User Management', perms: ['users:manage', 'users:create', 'users:read', 'users:update', 'users:deactivate'] },
+  { key: 'stores', label: 'Stores & Master Data', perms: ['stores:manage', 'categories:manage', 'items:manage', 'units:manage', 'suppliers:manage', 'locations:manage'] },
+  { key: 'receiving', label: 'Goods Receiving', perms: ['receipts:create', 'receipts:read', 'grn:generate', 'grn:read', 'goods-receipt:create', 'goods-receipt:read', 'goods-receipt:update'] },
+  { key: 'ledger', label: 'Stock & Bin Cards', perms: ['stock_cards:read', 'bin_cards:read', 'bins:transfer'] },
+  { key: 'requisition', label: 'Requisitions', perms: ['requisitions:create', 'requisitions:read', 'requisitions:approve'] },
+  { key: 'siv', label: 'Store Issue Voucher', perms: ['siv:prepare', 'siv:amend', 'siv:approve', 'siv:finalize'] },
+  { key: 'assets', label: 'Fixed Assets', perms: ['assets:register', 'assets:read'] },
+  { key: 'returns', label: 'Material Returns', perms: ['returns:create', 'returns:evaluate', 'returns:approve'] },
+  { key: 'transfers', label: 'Transfers', perms: ['transfers:create', 'transfers:approve', 'transfers:execute'] },
+  { key: 'disposal', label: 'Disposal', perms: ['shelflife:read', 'disposal:request', 'disposal:approve', 'disposal:execute'] },
+  { key: 'reconciliation', label: 'Stock Taking', perms: ['reconciliation:create', 'reconciliation:read', 'reconciliation:approve', 'reconciliation:post'] },
+  { key: 'gate', label: 'Gate Control', perms: ['dispatch:verify'] },
+  { key: 'reports', label: 'Reports & Audit', perms: ['reports:view', 'audit:read'] },
+]
 
-const moduleLabels: Record<string, string> = {
-  inventory: 'Inventory',
-  stockOps: 'Stock Operations',
-  suppliers: 'Suppliers',
-  users: 'Users',
-  reports: 'Reports',
-  audit: 'Audit Log',
-  settings: 'Settings',
+const permLabels: Record<string, string> = {
+  'users:manage': 'Manage Users (Full)', 'users:create': 'Create Users', 'users:read': 'View Users', 'users:update': 'Update Users', 'users:deactivate': 'Deactivate Users',
+  'stores:manage': 'Manage Stores', 'categories:manage': 'Manage Categories', 'items:manage': 'Manage Items', 'units:manage': 'Manage Units', 'suppliers:manage': 'Manage Suppliers', 'locations:manage': 'Manage Locations',
+  'receipts:create': 'Create Receipts', 'receipts:read': 'View Receipts', 'grn:generate': 'Generate GRN', 'grn:read': 'View GRN', 'goods-receipt:create': 'Create Goods Receipt', 'goods-receipt:read': 'View Goods Receipt', 'goods-receipt:update': 'Update Goods Receipt',
+  'stock_cards:read': 'View Stock Cards', 'bin_cards:read': 'View Bin Cards', 'bins:transfer': 'Transfer Bins',
+  'requisitions:create': 'Create Requisitions', 'requisitions:read': 'View Requisitions', 'requisitions:approve': 'Approve Requisitions',
+  'siv:prepare': 'Prepare SIV', 'siv:amend': 'Amend SIV', 'siv:approve': 'Approve SIV', 'siv:finalize': 'Finalize SIV',
+  'assets:register': 'Register Assets', 'assets:read': 'View Assets',
+  'returns:create': 'Create Returns', 'returns:evaluate': 'Evaluate Returns', 'returns:approve': 'Approve Returns',
+  'transfers:create': 'Create Transfers', 'transfers:approve': 'Approve Transfers', 'transfers:execute': 'Execute Transfers',
+  'shelflife:read': 'View Shelf Life', 'disposal:request': 'Request Disposal', 'disposal:approve': 'Approve Disposal', 'disposal:execute': 'Execute Disposal',
+  'reconciliation:create': 'Create Reconciliation', 'reconciliation:read': 'View Reconciliation', 'reconciliation:approve': 'Approve Reconciliation', 'reconciliation:post': 'Post Reconciliation',
+  'dispatch:verify': 'Verify Dispatch',
+  'reports:view': 'View Reports', 'audit:read': 'View Audit Log',
 }
 
 export default function RolesPermissions() {
-  const { roles, addRole, updateRole, deleteRole } = useApp()
+  const { roles } = useApp()
   const { toast } = useToast()
 
-  const [selectedRole, setSelectedRole] = useState<typeof roles[0] | null>(roles[0] || null)
+  const [selectedRole, setSelectedRole] = useState<Role | null>(roles[0] || null)
+  const [selectedRolePerms, setSelectedRolePerms] = useState<Permission[]>([])
+  const [loadingPerms, setLoadingPerms] = useState(false)
+  const [editingPerms, setEditingPerms] = useState<Set<string> | null>(null)
+  const [savingPerms, setSavingPerms] = useState(false)
   const [showModal, setShowModal] = useState(false)
-  const [editingRole, setEditingRole] = useState<typeof roles[0] | null>(null)
-  const [formData, setFormData] = useState({
-    name: '',
-    description: '',
-    permissions: {} as Record<string, string[]>,
-  })
+  const [editingRole, setEditingRole] = useState<Role | null>(null)
+  const [saving, setSaving] = useState(false)
+  const [formData, setFormData] = useState({ code: '', name: '', description: '' })
+
+  const loadRolePermissions = useCallback(async (roleId: string) => {
+    setLoadingPerms(true)
+    try {
+      const res = await rolesApi.getById(roleId)
+      const perms = (res.data as any)?.permissions || []
+      setSelectedRolePerms(perms)
+      setEditingPerms(new Set(perms.map((p: Permission) => p.code)))
+    } catch {
+      setSelectedRolePerms([])
+      setEditingPerms(new Set())
+    } finally {
+      setLoadingPerms(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (selectedRole) loadRolePermissions(selectedRole.id)
+    else { setEditingPerms(null); setSelectedRolePerms([]) }
+  }, [selectedRole, loadRolePermissions])
+
+  const togglePerm = (permCode: string) => {
+    if (!editingPerms) return
+    const next = new Set(editingPerms)
+    if (next.has(permCode)) next.delete(permCode)
+    else next.add(permCode)
+    setEditingPerms(next)
+  }
+
+  const savePerms = async () => {
+    if (!selectedRole || !editingPerms) return
+    setSavingPerms(true)
+    try {
+      const original = new Set(selectedRolePerms.map(p => p.code))
+      const toAdd = [...editingPerms].filter(p => !original.has(p))
+      const toRemove = [...original].filter(p => !editingPerms.has(p))
+      if (toAdd.length) await rolesApi.assignPermissions(selectedRole.id, toAdd)
+      if (toRemove.length) await rolesApi.removePermissions(selectedRole.id, toRemove)
+      toast.success('Permissions saved')
+      await loadRolePermissions(selectedRole.id)
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to save permissions')
+    } finally {
+      setSavingPerms(false)
+    }
+  }
 
   const openCreateModal = () => {
     setEditingRole(null)
-    const defaultPerms: Record<string, string[]> = {}
-    allModules.forEach(m => { defaultPerms[m] = [] })
-    setFormData({ name: '', description: '', permissions: defaultPerms })
+    setFormData({ code: '', name: '', description: '' })
     setShowModal(true)
   }
 
-  const openEditModal = (role: typeof roles[0]) => {
+  const openEditModal = (role: Role) => {
     setEditingRole(role)
-    setFormData({
-      name: role.name,
-      description: role.description || '',
-      permissions: {},
-    })
+    setFormData({ code: role.code, name: role.name, description: role.description || '' })
     setShowModal(true)
   }
 
-  const saveRole = () => {
-    if (!formData.name) {
-      toast.error('Role name is required')
+  const saveRole = async () => {
+    if (!formData.name || !formData.code) {
+      toast.error('Name and code are required')
       return
     }
-
-    if (editingRole) {
-      updateRole(editingRole.id, { name: formData.name, description: formData.description })
-      toast.success(`Role ${formData.name} updated`)
-      setSelectedRole({ ...editingRole, name: formData.name, description: formData.description })
-    } else {
-      const newRole = {
-        id: `rol_${formData.name.toLowerCase().replace(/\s+/g, '_')}`,
-        code: formData.name.toUpperCase().replace(/\s+/g, '_'),
-        name: formData.name,
-        description: formData.description,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        userCount: 0,
+    setSaving(true)
+    try {
+      if (editingRole) {
+        await rolesApi.update(editingRole.id, { name: formData.name, description: formData.description })
+        toast.success(`Role ${formData.name} updated`)
+      } else {
+        await rolesApi.create({ code: formData.code, name: formData.name, description: formData.description })
+        toast.success(`Role ${formData.name} created`)
       }
-      addRole(newRole as any)
-      toast.success(`Role ${formData.name} created`)
+      setShowModal(false)
+      window.location.reload()
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to save role')
+    } finally {
+      setSaving(false)
     }
-    setShowModal(false)
   }
 
-  const handleDelete = (role: typeof roles[0]) => {
+  const handleDelete = async (role: Role) => {
     if ((role.userCount || 0) > 0) {
-      toast.error(`Cannot delete role with ${role.userCount || 0} assigned users`)
+      toast.error(`Cannot delete role with ${role.userCount} assigned users`)
       return
     }
-    if (confirm(`Delete role ${role.name}?`)) {
-      deleteRole(role.id)
+    if (!confirm(`Delete role ${role.name}?`)) return
+    try {
+      await rolesApi.delete(role.id)
       toast.success(`Role ${role.name} deleted`)
       if (selectedRole?.id === role.id) setSelectedRole(roles[0] || null)
+      window.location.reload()
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to delete role')
     }
-  }
-
-  const togglePermission = (module: string, action: string) => {
-    if (!editingRole) return
-    setFormData(prev => {
-      const current = prev.permissions[module] || []
-      const updated = current.includes(action)
-        ? current.filter(a => a !== action)
-        : [...current, action]
-      return { ...prev, permissions: { ...prev.permissions, [module]: updated } }
-    })
   }
 
   return (
@@ -108,11 +159,7 @@ export default function RolesPermissions() {
       <SectionHeader
         title="Roles & Permissions"
         subtitle="Manage roles and access control"
-        actions={
-          <Button variant="primary" icon={Icons.plus} onClick={openCreateModal}>
-            Add Role
-          </Button>
-        }
+        actions={<Button variant="primary" onClick={openCreateModal}>+ Add Role</Button>}
       />
 
       <div className="grid grid-cols-4 gap-4 mb-5">
@@ -125,8 +172,8 @@ export default function RolesPermissions() {
           <p className="text-2xl font-bold font-mono text-[#4F46E5]">{roles.reduce((s, r) => s + (r.userCount || 0), 0)}</p>
         </Card>
         <Card>
-          <p className="text-xs font-medium text-[#94A3B8] uppercase tracking-wide mb-1">Modules</p>
-          <p className="text-2xl font-bold font-mono text-[#0F172A]">{allModules.length}</p>
+          <p className="text-xs font-medium text-[#94A3B8] uppercase tracking-wide mb-1">Permission Modules</p>
+          <p className="text-2xl font-bold font-mono text-[#0F172A]">{PERMISSION_MODULES.length}</p>
         </Card>
         <Card>
           <p className="text-xs font-medium text-[#94A3B8] uppercase tracking-wide mb-1">Selected Role</p>
@@ -140,7 +187,7 @@ export default function RolesPermissions() {
             <div className="p-4 border-b border-[#E2E8F0]">
               <h3 className="text-sm font-semibold text-[#0F172A]">Roles</h3>
             </div>
-            <div className="divide-y divide-[#F1F5F9]">
+            <div className="divide-y divide-[#F1F5F9] max-h-[500px] overflow-y-auto">
               {roles.map(role => (
                 <button
                   key={role.id}
@@ -151,7 +198,7 @@ export default function RolesPermissions() {
                     <span className="text-sm font-medium text-[#1E293B]">{role.name}</span>
                     <Badge variant="default">{role.userCount || 0}</Badge>
                   </div>
-                  <p className="text-xs text-[#64748B] mt-0.5 truncate">{role.description}</p>
+                  <p className="text-xs text-[#64748B] mt-0.5 truncate">{role.description || role.code}</p>
                 </button>
               ))}
             </div>
@@ -164,57 +211,90 @@ export default function RolesPermissions() {
               <div className="flex items-center justify-between mb-5">
                 <div>
                   <h3 className="text-base font-semibold text-[#0F172A]">{selectedRole.name}</h3>
-                  <p className="text-sm text-[#64748B]">{selectedRole.description}</p>
+                  <p className="text-sm text-[#64748B]">{selectedRole.description || selectedRole.code}</p>
                 </div>
-                <div className="flex gap-2">
-                  <Button variant="secondary" size="sm" icon={Icons.edit} onClick={() => openEditModal(selectedRole)}>
-                    Edit
-                  </Button>
-                  <Button variant="destructive" size="sm" icon={Icons.trash} onClick={() => handleDelete(selectedRole)}>
-                    Delete
-                  </Button>
+                <div className="flex gap-2 items-center">
+                  {editingPerms && (
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      onClick={savePerms}
+                      disabled={savingPerms}
+                    >
+                      {savingPerms ? 'Saving...' : 'Save Permissions'}
+                    </Button>
+                  )}
+                  <Button variant="secondary" size="sm" onClick={() => openEditModal(selectedRole)}>Edit</Button>
+                  <Button variant="destructive" size="sm" onClick={() => handleDelete(selectedRole)}>Delete</Button>
                 </div>
               </div>
 
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm border-collapse">
-                  <thead>
-                    <tr className="border-b border-[#E2E8F0]">
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-[#64748B] uppercase tracking-wide">Module</th>
-                      {allActions.map(a => (
-                        <th key={a} className="px-4 py-3 text-center text-xs font-semibold text-[#64748B] uppercase tracking-wide">{a}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {allModules.map(module => (
-                      <tr key={module} className="border-b border-[#F8FAFC] hover:bg-[#F8FAFC]">
-                        <td className="px-4 py-3 text-sm font-medium text-[#1E293B]">{moduleLabels[module]}</td>
-                        {allActions.map(action => {
-                          const hasPermission = ((selectedRole.permissions as any)?.[module] || []).includes(action)
-                          return (
-                            <td key={action} className="px-4 py-3 text-center">
-                              {hasPermission ? (
-                                <span className="inline-flex w-5 h-5 rounded-full bg-[#16A34A] text-white items-center justify-center text-xs">
-                                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M20 6 9 17l-5-5" /></svg>
-                                </span>
-                              ) : (
-                                <span className="inline-flex w-5 h-5 rounded-full bg-[#F1F5F9] text-[#CBD5E1] items-center justify-center text-xs">—</span>
-                              )}
-                            </td>
-                          )
-                        })}
+              {loadingPerms ? (
+                <p className="text-center py-8 text-[#64748B]">Loading permissions...</p>
+              ) : editingPerms ? (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm border-collapse">
+                    <thead>
+                      <tr className="border-b border-[#E2E8F0]">
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-[#64748B] uppercase tracking-wide">Module</th>
+                        <th className="px-4 py-3 text-center text-xs font-semibold text-[#64748B] uppercase tracking-wide">Create</th>
+                        <th className="px-4 py-3 text-center text-xs font-semibold text-[#64748B] uppercase tracking-wide">Read</th>
+                        <th className="px-4 py-3 text-center text-xs font-semibold text-[#64748B] uppercase tracking-wide">Update</th>
+                        <th className="px-4 py-3 text-center text-xs font-semibold text-[#64748B] uppercase tracking-wide">Delete</th>
+                        <th className="px-4 py-3 text-center text-xs font-semibold text-[#64748B] uppercase tracking-wide">Approve</th>
+                        <th className="px-4 py-3 text-center text-xs font-semibold text-[#64748B] uppercase tracking-wide">Execute</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                    </thead>
+                    <tbody>
+                      {PERMISSION_MODULES.map(mod => {
+                        const perms = mod.perms.map(p => editingPerms.has(p))
+                        const activeCount = perms.filter(Boolean).length
+                        return (
+                          <tr key={mod.key} className="border-b border-[#F8FAFC] hover:bg-[#F8FAFC]">
+                            <td className="px-4 py-3">
+                              <div>
+                                <span className="text-sm font-medium text-[#1E293B]">{mod.label}</span>
+                                <span className="ml-2 text-xs text-[#94A3B8]">({activeCount}/{mod.perms.length})</span>
+                              </div>
+                            </td>
+                            {['create', 'read', 'update', 'delete', 'approve', 'execute'].map(action => {
+                              const permForAction = mod.perms.find(p => p.endsWith(`:${action}`))
+                              const hasPerm = permForAction ? editingPerms.has(permForAction) : false
+                              return (
+                                <td key={action} className="px-4 py-3 text-center">
+                                  {permForAction ? (
+                                    <button
+                                      onClick={() => togglePerm(permForAction)}
+                                      className={`inline-flex w-6 h-6 rounded-full items-center justify-center transition-colors ${
+                                        hasPerm
+                                          ? 'bg-[#16A34A] text-white hover:bg-[#DC2626]'
+                                          : 'bg-[#F1F5F9] text-[#CBD5E1] hover:bg-[#16A34A] hover:text-white'
+                                      }`}
+                                      title={`${hasPerm ? 'Revoke' : 'Grant'} ${permLabels[permForAction] || permForAction}`}
+                                    >
+                                      {hasPerm ? (
+                                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M20 6 9 17l-5-5" /></svg>
+                                      ) : (
+                                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 5v14M5 12h14" /></svg>
+                                      )}
+                                    </button>
+                                  ) : (
+                                    <span className="inline-flex w-6 h-6 rounded-full bg-[#F8FAFC] text-[#E2E8F0] items-center justify-center text-xs">—</span>
+                                  )}
+                                </td>
+                              )
+                            })}
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              ) : null}
             </Card>
           ) : (
             <Card>
-              <div className="text-center py-12 text-sm text-[#94A3B8]">
-                Select a role to view permissions
-              </div>
+              <div className="text-center py-12 text-sm text-[#94A3B8]">Select a role to view permissions</div>
             </Card>
           )}
         </div>
@@ -224,65 +304,21 @@ export default function RolesPermissions() {
         open={showModal}
         onClose={() => setShowModal(false)}
         title={editingRole ? 'Edit Role' : 'Add Role'}
-        width="max-w-2xl"
-        footer={
-          <>
-            <Button variant="secondary" onClick={() => setShowModal(false)}>Cancel</Button>
-            <Button variant="primary" onClick={saveRole}>{editingRole ? 'Update' : 'Create'}</Button>
-          </>
-        }
+        width="max-w-lg"
+        footer={<>
+          <Button variant="secondary" onClick={() => setShowModal(false)}>Cancel</Button>
+          <Button variant="primary" loading={saving} onClick={saveRole}>{editingRole ? 'Update' : 'Create'}</Button>
+        </>}
       >
         <div className="space-y-4">
-          <FormGroup columns={2}>
-            <Input
-              label="Role Name"
-              placeholder="e.g. Warehouse Manager"
-              value={formData.name}
-              onChange={e => setFormData(prev => ({ ...prev, name: e.target.value }))}
-            />
-            <Input
-              label="Description"
-              placeholder="Brief description of this role"
-              value={formData.description}
-              onChange={e => setFormData(prev => ({ ...prev, description: e.target.value }))}
-            />
-          </FormGroup>
-
-          <div>
-            <p className="text-sm font-medium text-[#334155] mb-3">Permissions</p>
-            <div className="border border-[#E2E8F0] rounded-lg overflow-hidden">
-              <table className="w-full text-sm border-collapse">
-                <thead>
-                  <tr className="border-b border-[#E2E8F0] bg-[#F8FAFC]">
-                    <th className="px-4 py-2 text-left text-xs font-semibold text-[#64748B]">Module</th>
-                    {allActions.map(a => (
-                      <th key={a} className="px-4 py-2 text-center text-xs font-semibold text-[#64748B]">{a}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {allModules.map(module => (
-                    <tr key={module} className="border-b border-[#F8FAFC]">
-                      <td className="px-4 py-2 text-sm font-medium text-[#1E293B]">{moduleLabels[module]}</td>
-                      {allActions.map(action => {
-                        const checked = (formData.permissions[module] || []).includes(action)
-                        return (
-                          <td key={action} className="px-4 py-2 text-center">
-                            <input
-                              type="checkbox"
-                              checked={checked}
-                              onChange={() => togglePermission(module, action)}
-                              className="w-4 h-4 rounded border-[#CBD5E1] accent-[#4F46E5]"
-                            />
-                          </td>
-                        )
-                      })}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
+          {!editingRole && (
+            <Input label="Code" placeholder="e.g. WAREHOUSE_MANAGER" value={formData.code}
+              onChange={e => setFormData(f => ({ ...f, code: e.target.value.toUpperCase().replace(/\s+/g, '_') }))} />
+          )}
+          <Input label="Name" placeholder="e.g. Warehouse Manager" value={formData.name}
+            onChange={e => setFormData(f => ({ ...f, name: e.target.value }))} />
+          <Input label="Description" placeholder="Brief description" value={formData.description}
+            onChange={e => setFormData(f => ({ ...f, description: e.target.value }))} />
         </div>
       </Modal>
     </div>

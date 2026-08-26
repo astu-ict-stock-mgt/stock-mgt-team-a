@@ -13,6 +13,7 @@ import {
   amend,
   verifyDispatch,
   getAudit,
+  directIssueController,
 } from './siv.controller.js'
 import { validateRequest } from '../../middleware/validate.middleware.js'
 import { authenticate } from '../../middleware/auth.middleware.js'
@@ -202,6 +203,48 @@ router.get(
 )
 
 router.get('/', authenticate, authorize(PERMISSIONS.ISSUES_READ), list)
+
+/**
+ * @openapi
+ * /sivs/direct-issue:
+ *   post:
+ *     summary: Direct stock issue — one-shot create requisition + SIV + finalize
+ *     tags:
+ *       - Store Issue Vouchers
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - storeId
+ *               - lines
+ *             properties:
+ *               storeId:
+ *                 type: string
+ *               purpose:
+ *                 type: string
+ *               lines:
+ *                 type: array
+ *                 items:
+ *                   type: object
+ *                   required:
+ *                     - itemId
+ *                     - quantity
+ *                   properties:
+ *                     itemId:
+ *                       type: string
+ *                     quantity:
+ *                       type: integer
+ *     responses:
+ *       201:
+ *         description: Stock issued successfully, stock card updated
+ */
+router.post('/direct-issue', authenticate, authorize(PERMISSIONS.ISSUES_CREATE), directIssueController)
+
 router.get('/:id', authenticate, authorize(PERMISSIONS.ISSUES_READ), getById)
 
 export default router

@@ -1,4 +1,4 @@
-import type { ApiResponse, User, Role, Store, Category, Unit, Supplier, Item, StockCard, StockTransaction, AuditEvent, Notification, TransferRequest, StockTake, GoodsReceipt, Requisition } from '../types'
+import type { ApiResponse, User, Role, Store, Category, Unit, Supplier, Item, StockCard, StockTransaction, AuditEvent, Notification, TransferRequest, StockTake, GoodsReceipt, Requisition, SIV } from '../types'
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api'
 
@@ -61,8 +61,8 @@ class ApiClient {
     return this.request<T>(endpoint, { method: 'PATCH', body: body ? JSON.stringify(body) : undefined })
   }
 
-  delete<T>(endpoint: string): Promise<T> {
-    return this.request<T>(endpoint, { method: 'DELETE' })
+  delete<T>(endpoint: string, options?: { body?: any }): Promise<T> {
+    return this.request<T>(endpoint, { method: 'DELETE', body: options?.body ? JSON.stringify(options.body) : undefined })
   }
 
   async healthCheck(): Promise<boolean> {
@@ -109,6 +109,10 @@ export const rolesApi = {
   update: (id: string, data: { name?: string; description?: string | null }) =>
     api.put<ApiResponse<Role>>(`/roles/${id}`, data),
   delete: (id: string) => api.delete<ApiResponse<{ message: string }>>(`/roles/${id}`),
+  assignPermissions: (roleId: string, permissionIds: string[]) =>
+    api.post<ApiResponse<Role>>(`/roles/${roleId}/permissions`, { permissionIds }),
+  removePermissions: (roleId: string, permissionIds: string[]) =>
+    api.delete<ApiResponse<Role>>(`/roles/${roleId}/permissions`, { body: { permissionIds } }),
 }
 
 export const storesApi = {
@@ -283,6 +287,23 @@ export const requisitionsApi = {
   approveDepartment: (id: string) => api.patch<ApiResponse<Requisition>>(`/requisitions/${id}/approve-department`),
   approvePAO: (id: string) => api.patch<ApiResponse<Requisition>>(`/requisitions/${id}/approve-pao`),
   reject: (id: string, reason: string) => api.patch<ApiResponse<Requisition>>(`/requisitions/${id}/reject`, { reason }),
+}
+
+export const sivApi = {
+  create: (data: { requisitionId: string; storeId: string; issuedToUserId: string; notes?: string; lines: Array<{ itemId: string; quantityIssued: number; unitCost?: number }> }) =>
+    api.post<ApiResponse<SIV>>('/sivs', data),
+  directIssue: (data: { storeId: string; purpose?: string; lines: Array<{ itemId: string; quantity: number }> }) =>
+    api.post<ApiResponse<{ requisition: Requisition; siv: unknown }>>('/sivs/direct-issue', data),
+  getAll: (params?: { page?: number; limit?: number; status?: string }) => {
+    const q = new URLSearchParams()
+    if (params?.page) q.set('page', String(params.page))
+    if (params?.limit) q.set('limit', String(params.limit))
+    if (params?.status) q.set('status', params.status)
+    return api.get<ApiResponse<unknown[]>>(`/sivs?${q.toString()}`)
+  },
+  getById: (id: string) => api.get<ApiResponse<unknown>>(`/sivs/${id}`),
+  approve: (id: string) => api.patch<ApiResponse<unknown>>(`/sivs/${id}/approve`),
+  finalize: (id: string) => api.patch<ApiResponse<unknown>>(`/sivs/${id}/finalize`),
 }
 
 export const auditApi = {

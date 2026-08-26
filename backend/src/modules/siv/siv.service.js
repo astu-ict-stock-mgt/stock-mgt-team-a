@@ -322,6 +322,126 @@ export async function verifyDispatchSIV({ id, verifierId, vehicleNumber, driverN
 }
 
 /**
+ * Direct Stock Issue — one-shot create requisition + SIV + finalize (BE-110)
+ * @param {Object} data - { storeId, purpose, userId, lines: [{ itemId, quantity }] }
+ */
+export async function directIssue({ storeId, purpose, userId, lines }) {
+  if (!storeId || !userId) {
+    throw new ValidationError('Store and user are required')
+  }
+  if (!Array.isArray(lines) || lines.length === 0) {
+    throw new ValidationError('At least one item line is required')
+  }
+
+  for (const line of lines) {
+    if (!line.itemId || !line.quantity || line.quantity <= 0) {
+      throw new ValidationError('Each line requires a valid itemId and positive quantity')
+    }
+  }
+
+  // Check stock availability
+  for (const line of lines) {
+    const stockCard = await prisma.stockCard.findUnique({
+      where: { uq_stock_card_item_store: { itemId: line.itemId, storeId } },
+    })
+    if (!stockCard || stockCard.availableQty < line.quantity) {
+      const item = await prisma.item.findUnique({ where: { id: line.itemId }, select: { name: true } })
+      throw new ValidationError(
+        `Insufficient stock for ${item?.name || line.itemId}. Available: ${stockCard?.availableQty || 0}, Requested: ${line.quantity}`
+      )
+    }
+  }
+
+  return prisma.$transaction(async (tx) => {
+    // 1. Create requisition
+    const year = new Date().getFullYear()
+    const reqCount = await tx.requisition.count()
+    const requisitionNumber = `REQ-${year}-${String(reqCount + 1).padStart(5, '0')}`
+
+    const requisition = await tx.requisition.create({
+      data: {
+        requisitionNumber,
+        requesterId: userId,
+        departmentId: '00000000-0000-0000-0000-000000000000',
+        storeId,
+        purpose: purpose || 'Direct stock issue',
+        status: 'PAO_APPROVED',
+        departmentApprovedAt: new Date(),
+        departmentApprovedBy: userId,
+        paoApprovedAt: new Date(),
+        paoApprovedBy: userId,
+        lines: {
+          create: lines.map(l => ({
+            itemId: l.itemId,
+            requestedQuantity: l.quantity,
+            approvedQuantity: l.quantity,
+            issuedQuantity: l.quantity,
+          })),
+        },
+      },
+    })
+
+    // 2. Create SIV
+    const sivCount = await tx.sIV.count()
+    const sivNumber = `SIV-${year}-${String(sivCount + 1).padStart(5, '0')}`
+
+    const siv = await tx.sIV.create({
+      data: {
+        sivNumber,
+        requisitionId: requisition.id,
+        storeId,
+        issuedToUserId: userId,
+        preparedBy: userId,
+        status: 'FINALIZED',
+        approvedBy: userId,
+        lines: {
+          create: lines.map(l => ({
+            itemId: l.itemId,
+            quantityIssued: l.quantity,
+          })),
+        },
+      },
+      include: {
+        lines: true,
+      },
+    })
+
+    // 3. Post stock deductions
+    for (const line of siv.lines) {
+      const stockCard = await tx.stockCard.findUnique({
+        where: { uq_stock_card_item_store: { itemId: line.itemId, storeId } },
+      })
+
+      if (stockCard) {
+        const newQty = Math.max(0, stockCard.quantity - line.quantityIssued)
+        const newAvailable = Math.max(0, stockCard.availableQty - line.quantityIssued)
+
+        await tx.stockCard.update({
+          where: { id: stockCard.id },
+          data: { quantity: newQty, availableQty: newAvailable },
+        })
+
+        await tx.stockCardTransaction.create({
+          data: {
+            stockCardId: stockCard.id,
+            transactionType: 'ISSUE',
+            quantity: -line.quantityIssued,
+            balanceAfter: newQty,
+            referenceType: 'SIV',
+            referenceId: siv.id,
+            referenceNumber: siv.sivNumber,
+            notes: `Direct issue via ${siv.sivNumber}`,
+            createdBy: userId,
+          },
+        })
+      }
+    }
+
+    return { requisition, siv }
+  })
+}
+
+/**
  * Get SIV Issue Transaction Audit Trail & Stock Ledger Integration History (BE-112)
  * @param {string} id - SIV ID
  * @returns {Promise<Object>} Issue transaction audit trail payload

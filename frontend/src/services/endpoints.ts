@@ -232,6 +232,28 @@ export const requisitionsApi = {
     api.post<ApiResponse<unknown>>(`/requisitions/${id}/reject`, { reason }),
 }
 
+export const sivApi = {
+  directIssue: (data: { storeId: string; purpose?: string; lines: Array<{ itemId: string; quantity: number }> }) =>
+    api.post<ApiResponse<{ requisition: unknown; siv: unknown }>>('/sivs/direct-issue', data),
+
+  getAll: (params?: { page?: number; limit?: number; status?: string }) => {
+    const query = new URLSearchParams()
+    if (params?.page) query.set('page', String(params.page))
+    if (params?.limit) query.set('limit', String(params.limit))
+    if (params?.status) query.set('status', params.status)
+    return api.get<ApiResponse<unknown[]>>(`/sivs?${query.toString()}`)
+  },
+
+  getById: (id: string) =>
+    api.get<ApiResponse<unknown>>(`/sivs/${id}`),
+
+  approve: (id: string) =>
+    api.patch<ApiResponse<unknown>>(`/sivs/${id}/approve`),
+
+  finalize: (id: string) =>
+    api.patch<ApiResponse<unknown>>(`/sivs/${id}/finalize`),
+}
+
 export const transfersApi = {
   getAll: (params?: { page?: number; limit?: number; status?: string }) => {
     const query = new URLSearchParams()

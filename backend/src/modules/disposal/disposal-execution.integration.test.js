@@ -124,14 +124,14 @@ describe('Disposal Execution REST API Integration Tests (BE-139)', () => {
       expect(res.body.error?.code).toBe('FORBIDDEN')
     })
 
-    it('should execute disposal successfully with PAO role (200 OK)', async () => {
+    it('should execute disposal successfully with Storekeeper role (200 OK)', async () => {
       const mockExecuted = {
         id: 'disp-123',
         requestNumber: 'DISP-2026-00001',
         status: 'EXECUTED',
         disposalMethod: 'WRITE_OFF',
         reason: 'Expired chemical stock',
-        executedBy: 'usr-pao-01',
+        executedBy: 'usr-storekeeper-01',
         executedAt: new Date().toISOString(),
         witnessName: 'Inspector Gadget',
         certificateNumber: 'CERT-001',
@@ -150,7 +150,7 @@ describe('Disposal Execution REST API Integration Tests (BE-139)', () => {
 
       const res = await request(app)
         .post('/api/disposal-requests/disp-123/execute')
-        .set('Authorization', `Bearer ${paoToken}`)
+        .set('Authorization', `Bearer ${storekeeperToken}`)
         .send({
           executionNotes: 'Safely incinerated in certified facility',
           witnessName: 'Inspector Gadget',

@@ -73,6 +73,7 @@ export const PERMISSIONS = Object.freeze({
   USERS_READ: { key: 'users:read', module: 'Auth', description: 'View user profiles and list users' },
   USERS_UPDATE: { key: 'users:update', module: 'Auth', description: 'Update existing user profiles and role assignments' },
   USERS_DEACTIVATE: { key: 'users:deactivate', module: 'Auth', description: 'Deactivate or reactivate user accounts' },
+  USERS_MANAGE: { key: 'users:manage', module: 'Auth', description: 'Full user management including roles and permissions' },
 
   // --- MASTER DATA MANAGEMENT ---
   STORES_MANAGE: { key: 'stores:manage', module: 'MasterData', description: 'Create, update, and manage stores and department links' },
@@ -158,55 +159,39 @@ export const ALL_PERMISSION_KEYS = Object.freeze(
 );
 
 // ============================================================================
-// 3. ROLE-TO-PERMISSION MAPPING MATRIX
+// 3. ROLE-TO-PERMISSION MAPPING MATRIX (Strict Separation of Duties)
 // ============================================================================
+// Each role owns distinct responsibilities with minimal overlap.
+// Admin = system config only, PAO = approvals only, Storekeeper = operations only.
 const MATRIX = {
-  [ROLES.ADMIN.code]: ALL_PERMISSION_KEYS, // Superuser access
-
-  [ROLES.PAO.code]: [
+  // ADMIN: User management, system config, audit logs. No day-to-day operations.
+  [ROLES.ADMIN.code]: [
+    PERMISSIONS.USERS_MANAGE.key,
+    PERMISSIONS.USERS_CREATE.key,
     PERMISSIONS.USERS_READ.key,
-    PERMISSIONS.STORES_MANAGE.key,
-    PERMISSIONS.CATEGORIES_MANAGE.key,
-    PERMISSIONS.ITEMS_MANAGE.key,
-    PERMISSIONS.UNITS_MANAGE.key,
-    PERMISSIONS.SUPPLIERS_MANAGE.key,
-    PERMISSIONS.LOCATIONS_MANAGE.key,
-    PERMISSIONS.RECEIPTS_CREATE.key,
-    PERMISSIONS.RECEIPTS_READ.key,
-    PERMISSIONS.GRN_GENERATE.key,
-    PERMISSIONS.GRN_READ.key,
-    PERMISSIONS.GOODS_RECEIPT_CREATE.key,
-    PERMISSIONS.GOODS_RECEIPT_READ.key,
-    PERMISSIONS.GOODS_RECEIPT_UPDATE.key,
-    PERMISSIONS.STOCK_CARDS_READ.key,
-    PERMISSIONS.BIN_CARDS_READ.key,
-    PERMISSIONS.BINS_TRANSFER.key,
-    PERMISSIONS.REQUISITIONS_CREATE.key,
-    PERMISSIONS.REQUISITIONS_READ.key,
-    PERMISSIONS.REQUISITIONS_APPROVE.key, // Escalate / Overflow approvals (C-01)
-    PERMISSIONS.SIV_PREPARE.key,
-    PERMISSIONS.SIV_AMEND.key,
-    PERMISSIONS.SIV_APPROVE.key,
-    PERMISSIONS.SIV_FINALIZE.key,
-    PERMISSIONS.ASSETS_REGISTER.key,
-    PERMISSIONS.ASSETS_READ.key,
-    PERMISSIONS.RETURNS_CREATE.key,
-    PERMISSIONS.RETURNS_APPROVE.key,
-    PERMISSIONS.TRANSFERS_CREATE.key,
-    PERMISSIONS.TRANSFERS_APPROVE.key,
-    PERMISSIONS.TRANSFERS_EXECUTE.key,
-    PERMISSIONS.SHELFLIFE_READ.key,
-    PERMISSIONS.DISPOSAL_REQUEST.key,
-    PERMISSIONS.DISPOSAL_APPROVE.key,
-    PERMISSIONS.DISPOSAL_EXECUTE.key,
-    PERMISSIONS.RECONCILIATION_CREATE.key,
-    PERMISSIONS.RECONCILIATION_READ.key,
-    PERMISSIONS.RECONCILIATION_APPROVE.key,
-    PERMISSIONS.RECONCILIATION_POST.key,
-    PERMISSIONS.REPORTS_VIEW.key,
+    PERMISSIONS.USERS_UPDATE.key,
+    PERMISSIONS.USERS_DEACTIVATE.key,
     PERMISSIONS.AUDIT_READ.key,
   ],
 
+  // PAO: Approval/supervision only. No operational tasks (receipts, SIV prep, etc.)
+  [ROLES.PAO.code]: [
+    PERMISSIONS.USERS_READ.key,
+    PERMISSIONS.STOCK_CARDS_READ.key,
+    PERMISSIONS.REQUISITIONS_READ.key,
+    PERMISSIONS.REQUISITIONS_APPROVE.key,
+    PERMISSIONS.SIV_APPROVE.key,
+    PERMISSIONS.SIV_FINALIZE.key,
+    PERMISSIONS.TRANSFERS_APPROVE.key,
+    PERMISSIONS.DISPOSAL_REQUEST.key,
+    PERMISSIONS.DISPOSAL_APPROVE.key,
+    PERMISSIONS.SHELFLIFE_READ.key,
+    PERMISSIONS.RECONCILIATION_READ.key,
+    PERMISSIONS.RECONCILIATION_APPROVE.key,
+    PERMISSIONS.REPORTS_VIEW.key,
+  ],
+
+  // STOREKEEPER: All operational store tasks. No approvals.
   [ROLES.STOREKEEPER.code]: [
     PERMISSIONS.STORES_MANAGE.key,
     PERMISSIONS.CATEGORIES_MANAGE.key,
@@ -227,55 +212,55 @@ const MATRIX = {
     PERMISSIONS.REQUISITIONS_READ.key,
     PERMISSIONS.SIV_PREPARE.key,
     PERMISSIONS.SIV_AMEND.key,
-    PERMISSIONS.SIV_FINALIZE.key,
-    PERMISSIONS.RETURNS_CREATE.key,
-    PERMISSIONS.RETURNS_APPROVE.key,
     PERMISSIONS.TRANSFERS_CREATE.key,
     PERMISSIONS.TRANSFERS_EXECUTE.key,
     PERMISSIONS.SHELFLIFE_READ.key,
     PERMISSIONS.DISPOSAL_REQUEST.key,
+    PERMISSIONS.DISPOSAL_EXECUTE.key,
     PERMISSIONS.RECONCILIATION_CREATE.key,
     PERMISSIONS.RECONCILIATION_READ.key,
     PERMISSIONS.REPORTS_VIEW.key,
   ],
 
+  // TEC: Technical evaluation only. Inspects goods, records decisions.
   [ROLES.TEC.code]: [
     PERMISSIONS.RECEIPTS_READ.key,
     PERMISSIONS.EVALUATIONS_DECIDE.key,
     PERMISSIONS.GRN_READ.key,
     PERMISSIONS.STOCK_CARDS_READ.key,
     PERMISSIONS.RETURNS_EVALUATE.key,
-    PERMISSIONS.DISPOSAL_APPROVE.key,
   ],
 
+  // ACCOUNTANT: Financial reporting, asset registration, valuation.
   [ROLES.ACCOUNTANT.code]: [
     PERMISSIONS.STOCK_CARDS_READ.key,
     PERMISSIONS.BIN_CARDS_READ.key,
     PERMISSIONS.GRN_READ.key,
     PERMISSIONS.ASSETS_REGISTER.key,
     PERMISSIONS.ASSETS_READ.key,
-    PERMISSIONS.DISPOSAL_APPROVE.key,
     PERMISSIONS.REPORTS_VIEW.key,
   ],
 
+  // DEPARTMENT_HEAD: Requisition approval only. No other operations.
   [ROLES.DEPARTMENT_HEAD.code]: [
     PERMISSIONS.STOCK_CARDS_READ.key,
-    PERMISSIONS.REQUISITIONS_CREATE.key,
     PERMISSIONS.REQUISITIONS_READ.key,
-    PERMISSIONS.REQUISITIONS_APPROVE.key, // Standard department requisition approval (C-01)
+    PERMISSIONS.REQUISITIONS_APPROVE.key,
   ],
 
+  // REQUESTER: Create requisitions, view status only.
   [ROLES.REQUESTER.code]: [
     PERMISSIONS.REQUISITIONS_CREATE.key,
     PERMISSIONS.REQUISITIONS_READ.key,
     PERMISSIONS.RETURNS_CREATE.key,
   ],
 
+  // SECURITY_OFFICER: Gate/dispatch verification only.
   [ROLES.SECURITY_OFFICER.code]: [
     PERMISSIONS.DISPATCH_VERIFY.key,
-    PERMISSIONS.SIV_APPROVE.key, // Gate pass sign-off verification
   ],
 
+  // PROPERTY_REGISTRATION_OFFICER: Asset registration only.
   [ROLES.PROPERTY_REGISTRATION_OFFICER.code]: [
     PERMISSIONS.GRN_READ.key,
     PERMISSIONS.ASSETS_REGISTER.key,

@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { ToastContainer, useToast, Icons, SearchBar } from "./components/ui";
 import { useApp } from "./context/AppContext";
 import { api } from "./services/api";
+import { hasPermission, PERMISSIONS, ROLE_NAMES } from "./lib/permissions";
 import Dashboard from "./screens/Dashboard";
 import Inventory from "./screens/Inventory";
 import Categories from "./screens/Categories";
@@ -179,7 +180,48 @@ export default function App() {
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const { toasts, toast, remove } = useToast();
 
-  const { notifications, inventoryItems, stockCards, requisitions, transfers, isAuthenticated, currentUser, login, logout, isLoading, apiStatus } = useApp();
+  const { notifications, inventoryItems, stockCards, requisitions, transfers, isAuthenticated, currentUser, userRoles, login, logout, isLoading, apiStatus } = useApp();
+
+  // Filter navigation based on user permissions
+  const filteredNavGroups = useMemo(() => {
+    if (!userRoles.length) return navGroups
+
+    return navGroups.map(group => ({
+      ...group,
+      items: group.items.filter(item => {
+        switch (item.id) {
+          case 'inventory':
+            return hasPermission(userRoles, PERMISSIONS.STOCK_CARDS_READ)
+          case 'categories':
+          case 'units':
+          case 'stores':
+            return hasPermission(userRoles, PERMISSIONS.STORES_MANAGE)
+          case 'suppliers':
+            return hasPermission(userRoles, PERMISSIONS.SUPPLIERS_MANAGE)
+          case 'stock-receiving':
+            return hasPermission(userRoles, PERMISSIONS.RECEIPTS_CREATE) || hasPermission(userRoles, PERMISSIONS.GOODS_RECEIPT_CREATE)
+          case 'stock-issuing':
+            return hasPermission(userRoles, PERMISSIONS.REQUISITIONS_CREATE) || hasPermission(userRoles, PERMISSIONS.REQUISITIONS_APPROVE) || hasPermission(userRoles, PERMISSIONS.SIV_PREPARE)
+          case 'stock-transfer':
+            return hasPermission(userRoles, PERMISSIONS.TRANSFERS_CREATE) || hasPermission(userRoles, PERMISSIONS.TRANSFERS_APPROVE)
+          case 'stock-tracking':
+            return hasPermission(userRoles, PERMISSIONS.STOCK_CARDS_READ)
+          case 'stock-taking':
+            return hasPermission(userRoles, PERMISSIONS.RECONCILIATION_CREATE) || hasPermission(userRoles, PERMISSIONS.RECONCILIATION_APPROVE)
+          case 'users':
+            return hasPermission(userRoles, PERMISSIONS.USERS_READ)
+          case 'roles':
+            return hasPermission(userRoles, PERMISSIONS.USERS_READ)
+          case 'reports':
+            return hasPermission(userRoles, PERMISSIONS.REPORTS_VIEW)
+          case 'audit':
+            return hasPermission(userRoles, PERMISSIONS.AUDIT_READ)
+          default:
+            return true
+        }
+      }),
+    })).filter(group => group.items.length > 0)
+  }, [userRoles])
   const unreadNotifications = notifications.filter((n) => !n.isRead).length;
   const lowStockCount = inventoryItems.filter(i => stockCards.some(sc => sc.itemId === i.id && sc.availableQty <= i.minimumStock)).length;
   const pendingApprovals = requisitions.filter(r => r.status === 'SUBMITTED').length + transfers.filter(t => t.status === 'SUBMITTED').length;
@@ -267,7 +309,7 @@ export default function App() {
 
         {/* Navigation */}
         <nav className="flex-1 overflow-y-auto py-3 px-2 space-y-0.5">
-          {navGroups.map((group, gi) => (
+          {filteredNavGroups.map((group, gi) => (
             <div key={gi} className={gi > 0 ? "mt-4" : ""}>
               {!sidebarCollapsed && group.label && (
                 <p className="px-2 py-1 text-[10px] font-semibold text-[#475569] uppercase tracking-widest mb-1">
@@ -412,7 +454,7 @@ export default function App() {
                   {currentUser?.fullName || "User"}
                 </p>
                 <p className="text-[10px] text-[#94A3B8] mt-0.5">
-                  {currentUser?.status || "User"}
+                  {userRoles.map(r => ROLE_NAMES[r] || r).join(', ') || 'User'}
                 </p>
               </div>
               <svg
@@ -490,20 +532,20 @@ export default function App() {
         <main className="flex-1 overflow-auto bg-[#F8FAFC] print:bg-white print:overflow-visible">
           <div className="p-6 max-w-[1400px] mx-auto min-h-full print:p-0 print:max-w-none">
             {screen === "dashboard" && <Dashboard />}
-            {screen === "inventory" && <Inventory />}
-            {screen === "categories" && <Categories />}
-            {screen === "units" && <Units />}
-            {screen === "stores" && <Stores />}
-            {screen === "suppliers" && <Suppliers />}
-            {screen === "stock-receiving" && <StockReceiving />}
-            {screen === "stock-issuing" && <StockIssuing />}
-            {screen === "stock-transfer" && <StockTransfer />}
-            {screen === "stock-tracking" && <StockTracking />}
-            {screen === "stock-taking" && <StockTaking />}
-            {screen === "users" && <Users />}
-            {screen === "roles" && <RolesPermissions />}
-            {screen === "reports" && <Reports />}
-            {screen === "audit" && <AuditLog />}
+            {screen === "inventory" && hasPermission(userRoles, PERMISSIONS.STOCK_CARDS_READ) && <Inventory />}
+            {screen === "categories" && hasPermission(userRoles, PERMISSIONS.STORES_MANAGE) && <Categories />}
+            {screen === "units" && hasPermission(userRoles, PERMISSIONS.STORES_MANAGE) && <Units />}
+            {screen === "stores" && hasPermission(userRoles, PERMISSIONS.STORES_MANAGE) && <Stores />}
+            {screen === "suppliers" && hasPermission(userRoles, PERMISSIONS.SUPPLIERS_MANAGE) && <Suppliers />}
+            {screen === "stock-receiving" && (hasPermission(userRoles, PERMISSIONS.RECEIPTS_CREATE) || hasPermission(userRoles, PERMISSIONS.GOODS_RECEIPT_CREATE)) && <StockReceiving />}
+            {screen === "stock-issuing" && (hasPermission(userRoles, PERMISSIONS.REQUISITIONS_CREATE) || hasPermission(userRoles, PERMISSIONS.REQUISITIONS_APPROVE) || hasPermission(userRoles, PERMISSIONS.SIV_PREPARE)) && <StockIssuing />}
+            {screen === "stock-transfer" && (hasPermission(userRoles, PERMISSIONS.TRANSFERS_CREATE) || hasPermission(userRoles, PERMISSIONS.TRANSFERS_APPROVE)) && <StockTransfer />}
+            {screen === "stock-tracking" && hasPermission(userRoles, PERMISSIONS.STOCK_CARDS_READ) && <StockTracking />}
+            {screen === "stock-taking" && (hasPermission(userRoles, PERMISSIONS.RECONCILIATION_CREATE) || hasPermission(userRoles, PERMISSIONS.RECONCILIATION_APPROVE)) && <StockTaking />}
+            {screen === "users" && hasPermission(userRoles, PERMISSIONS.USERS_READ) && <Users />}
+            {screen === "roles" && hasPermission(userRoles, PERMISSIONS.USERS_READ) && <RolesPermissions />}
+            {screen === "reports" && hasPermission(userRoles, PERMISSIONS.REPORTS_VIEW) && <Reports />}
+            {screen === "audit" && hasPermission(userRoles, PERMISSIONS.AUDIT_READ) && <AuditLog />}
             {screen === "notifications" && <Notifications />}
             {screen === "settings" && <Settings />}
           </div>
