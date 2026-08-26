@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react'
 import { Button, Badge, SectionHeader, Card, Select, Input, Tabs, Modal, FormGroup, Icons, useToast } from '../components/ui'
 import { useApp } from '../context/AppContext'
+import { transfersApi } from '../services/api'
 
 const statusColors: Record<string, 'default' | 'warning' | 'primary' | 'success' | 'danger'> = {
   SUBMITTED: 'warning', APPROVED: 'primary', REJECTED: 'danger', IN_TRANSIT: 'warning', COMPLETED: 'success',
@@ -24,6 +25,7 @@ export default function StockTransfer() {
   const [transferType, setTransferType] = useState<'STORE_TO_STORE' | 'DEPARTMENT_TO_DEPARTMENT'>('STORE_TO_STORE')
   const [notes, setNotes] = useState('')
   const [newItems, setNewItems] = useState<{ itemId: string; qty: number; remarks: string }[]>([])
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
   const filteredTransfers = activeTab === 'all' ? transfers : transfers.filter(t => t.status === activeTab)
 
@@ -62,13 +64,27 @@ export default function StockTransfer() {
     setNewItems(prev => prev.filter((_, i) => i !== index))
   }
 
-  const submitTransfer = () => {
+  const submitTransfer = async () => {
     if (newItems.length === 0) { toast.error('Add at least one item to transfer'); return }
     if (sourceStoreId === destinationStoreId) { toast.error('Source and destination must be different'); return }
-    toast.success('Transfer request created and pending approval')
-    setPhase('list')
-    setNewItems([])
-    setNotes('')
+    setIsSubmitting(true)
+    try {
+      await transfersApi.create({
+        sourceStoreId,
+        destinationStoreId,
+        transferType,
+        notes: notes || undefined,
+        lines: newItems.map(item => ({ itemId: item.itemId, quantityRequested: item.qty })),
+      })
+      toast.success('Transfer request created and pending approval')
+      setPhase('list')
+      setNewItems([])
+      setNotes('')
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to create transfer')
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   if (phase === 'detail' && selectedTransfer) {
@@ -147,7 +163,7 @@ export default function StockTransfer() {
           actions={
             <div className="flex gap-2">
               <Button variant="secondary" onClick={() => { setPhase('list'); setNewItems([]) }}>← Cancel</Button>
-              <Button variant="primary" onClick={submitTransfer}>Submit Transfer</Button>
+              <Button variant="primary" onClick={submitTransfer} disabled={isSubmitting}>{isSubmitting ? 'Creating...' : 'Submit Transfer'}</Button>
             </div>
           }
         />
