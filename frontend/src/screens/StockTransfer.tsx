@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react'
 import { Button, Badge, SectionHeader, Card, Select, Input, Tabs, Modal, FormGroup, Icons, useToast } from '../components/ui'
 import { useApp } from '../context/AppContext'
 import { transfersApi } from '../services/api'
+import { hasPermission, PERMISSIONS } from '../lib/permissions'
 
 const statusColors: Record<string, 'default' | 'warning' | 'primary' | 'success' | 'danger'> = {
   SUBMITTED: 'warning', APPROVED: 'primary', REJECTED: 'danger', IN_TRANSIT: 'warning', COMPLETED: 'success',
@@ -12,8 +13,11 @@ const statusLabels: Record<string, string> = {
 }
 
 export default function StockTransfer() {
-  const { transfers, stores, inventoryItems, stockCards, units, addStockMovement } = useApp()
+  const { transfers, stores, inventoryItems, stockCards, units, addStockMovement, userRoles } = useApp()
   const { toast } = useToast()
+  const canCreateTransfer = userRoles.includes('ADMIN') || hasPermission(userRoles, PERMISSIONS.TRANSFERS_CREATE)
+  const canApproveTransfer = userRoles.includes('ADMIN') || hasPermission(userRoles, PERMISSIONS.TRANSFERS_APPROVE)
+  const canExecuteTransfer = userRoles.includes('ADMIN') || hasPermission(userRoles, PERMISSIONS.TRANSFERS_EXECUTE)
 
   const [phase, setPhase] = useState<'setup' | 'list' | 'detail'>('list')
   const [selectedTransfer, setSelectedTransfer] = useState<typeof transfers[0] | null>(null)
@@ -149,7 +153,7 @@ export default function StockTransfer() {
               Created: {new Date(selectedTransfer.createdAt).toLocaleDateString()} · Notes: {selectedTransfer.notes || 'None'}
             </p>
             <div className="flex gap-2">
-              {selectedTransfer.status === 'SUBMITTED' && (
+              {selectedTransfer.status === 'SUBMITTED' && canApproveTransfer && (
                 <Button variant="primary" size="sm" onClick={async () => {
                   try {
                     await transfersApi.approve(selectedTransfer.id, { isApproved: true })
@@ -160,7 +164,7 @@ export default function StockTransfer() {
                   }
                 }}>Approve Transfer</Button>
               )}
-              {selectedTransfer.status === 'APPROVED' && (
+              {selectedTransfer.status === 'APPROVED' && canExecuteTransfer && (
                 <Button variant="primary" size="sm" onClick={async () => {
                   try {
                     await transfersApi.dispatch(selectedTransfer.id)
@@ -171,7 +175,7 @@ export default function StockTransfer() {
                   }
                 }}>Execute Dispatch</Button>
               )}
-              {selectedTransfer.status === 'IN_TRANSIT' && (
+              {selectedTransfer.status === 'IN_TRANSIT' && canExecuteTransfer && (
                 <Button variant="primary" size="sm" onClick={async () => {
                   try {
                     await transfersApi.complete(selectedTransfer.id)
@@ -260,7 +264,7 @@ export default function StockTransfer() {
       <SectionHeader
         title="Stock Transfer & Tracking"
         subtitle="Transfer items between stores and departments"
-        actions={<Button variant="primary" icon={Icons.plus} onClick={() => { setPhase('setup'); setNewItems([]) }}>New Transfer</Button>}
+        actions={canCreateTransfer ? <Button variant="primary" icon={Icons.plus} onClick={() => { setPhase('setup'); setNewItems([]) }}>New Transfer</Button> : undefined}
       />
 
       <div className="grid grid-cols-3 gap-4 mb-5">

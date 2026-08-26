@@ -1,12 +1,14 @@
 import { useState } from 'react'
 import { Table, Button, Badge, Modal, Input, Select, SearchBar, SectionHeader, Icons, Tabs, Pagination, Card, Divider, Breadcrumb, useToast } from '../components/ui'
 import { useApp } from '../context/AppContext'
+import { hasPermission, PERMISSIONS } from '../lib/permissions'
 
 type View = 'list' | 'detail' | 'add'
 
 export default function Suppliers() {
-  const { suppliers, addSupplier } = useApp()
+  const { suppliers, addSupplier, userRoles } = useApp()
   const { toast } = useToast()
+  const canManageSuppliers = userRoles.includes('ADMIN') || hasPermission(userRoles, PERMISSIONS.SUPPLIERS_MANAGE)
 
   const [view, setView] = useState<View>('list')
   const [selected, setSelected] = useState<typeof suppliers[0] | null>(null)
@@ -104,7 +106,9 @@ export default function Suppliers() {
             <Card>
               <h3 className="text-xs font-semibold text-[#94A3B8] uppercase tracking-wide mb-4">Quick Actions</h3>
               <div className="flex flex-col gap-2">
-                <Button variant="primary" className="w-full" icon={Icons.edit}>Edit Supplier</Button>
+                {canManageSuppliers && (
+                  <Button variant="primary" className="w-full" icon={Icons.edit}>Edit Supplier</Button>
+                )}
                 <Button variant="secondary" className="w-full" icon={Icons.plus}>Create PO</Button>
               </div>
             </Card>
@@ -123,7 +127,9 @@ export default function Suppliers() {
         actions={
           <div className="flex items-center gap-2">
             <Button variant="secondary" size="sm" icon={Icons.download}>Export</Button>
-            <Button variant="primary" size="md" icon={Icons.plus} onClick={() => setShowModal(true)}>Add supplier</Button>
+            {canManageSuppliers && (
+              <Button variant="primary" size="md" icon={Icons.plus} onClick={() => setShowModal(true)}>Add supplier</Button>
+            )}
           </div>
         }
       />
