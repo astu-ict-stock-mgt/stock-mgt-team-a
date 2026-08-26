@@ -14,11 +14,12 @@ import {
   notificationsApi,
   transfersApi,
   stockTakesApi,
+  requisitionsApi,
 } from '../services/api';
 import type {
   User, Role, Store, Category, Unit, Supplier, Item,
   StockCard, StockTransaction, AuditEvent, Notification,
-  TransferRequest, StockTake,
+  TransferRequest, StockTake, Requisition,
 } from '../types';
 
 interface AppContextType {
@@ -35,6 +36,7 @@ interface AppContextType {
   notifications: Notification[]
   transfers: TransferRequest[]
   stockTakes: StockTake[]
+  requisitions: Requisition[]
 
   isAuthenticated: boolean
   currentUser: { userId: string; email: string; fullName: string; status: string } | null
@@ -93,12 +95,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [transfers, setTransfers] = useState<TransferRequest[]>([]);
   const [stockTakes, setStockTakes] = useState<StockTake[]>([]);
+  const [requisitions, setRequisitions] = useState<Requisition[]>([]);
 
   const loadAllData = useCallback(async () => {
     try {
       const [
         itemsRes, suppliersRes, usersRes, rolesRes, storesRes,
-        categoriesRes, unitsRes, logsRes, notifsRes, transfersRes, stockTakesRes,
+        categoriesRes, unitsRes, logsRes, notifsRes, transfersRes, stockTakesRes, requisitionsRes,
       ] = await Promise.allSettled([
         itemsApi.getAll(),
         suppliersApi.getAll(),
@@ -111,6 +114,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         notificationsApi.getAll({ limit: 50 }),
         transfersApi.getAll({ limit: 50 }),
         stockTakesApi.getAll({ limit: 50 }),
+        requisitionsApi.getAll({ limit: 50 }),
       ]);
 
       if (itemsRes.status === 'fulfilled') setInventoryItems(itemsRes.value.data);
@@ -124,6 +128,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       if (notifsRes.status === 'fulfilled') setNotifications(notifsRes.value.data);
       if (transfersRes.status === 'fulfilled') setTransfers(transfersRes.value.data);
       if (stockTakesRes.status === 'fulfilled') setStockTakes(stockTakesRes.value.data);
+      if (requisitionsRes.status === 'fulfilled') setRequisitions(requisitionsRes.value.data);
 
       if (storesRes.status === 'fulfilled' && storesRes.value.data.length > 0) {
         const firstStore = storesRes.value.data[0];
@@ -188,6 +193,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setNotifications([]);
     setTransfers([]);
     setStockTakes([]);
+    setRequisitions([]);
   };
 
   const refreshData = async () => { await loadAllData(); };
@@ -223,7 +229,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   return (
     <AppContext.Provider value={{
       inventoryItems, stockCards, suppliers, stockMovements, users, roles,
-      stores, categories, units, auditLogs, notifications, transfers, stockTakes,
+      stores, categories, units, auditLogs, notifications, transfers, stockTakes, requisitions,
       isAuthenticated, currentUser, login, logout,
       addInventoryItem, updateInventoryItem, deleteInventoryItem,
       addSupplier, updateSupplier, deleteSupplier,

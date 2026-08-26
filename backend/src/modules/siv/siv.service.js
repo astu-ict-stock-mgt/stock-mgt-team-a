@@ -194,7 +194,7 @@ export async function finalizeSIV({ id, finalizerId }) {
     for (const line of siv.lines) {
       const stockCard = await tx.stockCard.findUnique({
         where: {
-          itemId_storeId: {
+          uq_stock_card_item_store: {
             itemId: line.itemId,
             storeId: siv.storeId,
           },

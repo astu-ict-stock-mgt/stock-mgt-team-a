@@ -1,6 +1,4 @@
-import { PrismaClient } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import { prisma } from '../../config/database.js';
 
 class InventoryLedgerService {
   async getStockByStore(storeId, filters = {}) {

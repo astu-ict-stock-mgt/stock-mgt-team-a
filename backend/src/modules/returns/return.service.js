@@ -221,7 +221,7 @@ export async function postReturnStock({ id, postingUserId }) {
       for (const line of returnRecord.lines) {
         let stockCard = await tx.stockCard.findUnique({
           where: {
-            itemId_storeId: {
+            uq_stock_card_item_store: {
               itemId: line.itemId,
               storeId: returnRecord.storeId,
             },

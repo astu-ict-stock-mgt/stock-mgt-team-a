@@ -1,0 +1,48 @@
+<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1878B4"/>
+      <stop offset="100%" stop-color="#0F5A87"/>
+    </linearGradient>
+    <linearGradient id="boxTop" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FFFFFF"/>
+      <stop offset="100%" stop-color="#E8F2F8"/>
+    </linearGradient>
+    <linearGradient id="boxLeft" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#CDE3EE"/>
+      <stop offset="100%" stop-color="#B7D6E6"/>
+    </linearGradient>
+    <linearGradient id="boxRight" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#E4F0F6"/>
+      <stop offset="100%" stop-color="#D0E5EF"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="512" height="512" rx="96" fill="url(#bgGrad)"/>
+
+  <!-- Isometric box (package / inventory unit) -->
+  <g transform="translate(256,236)">
+    <!-- top face -->
+    <polygon points="0,-92 80,-48 0,-4 -80,-48" fill="url(#boxTop)"/>
+    <!-- left face -->
+    <polygon points="-80,-48 0,-4 0,86 -80,42" fill="url(#boxLeft)"/>
+    <!-- right face -->
+    <polygon points="80,-48 0,-4 0,86 80,42" fill="url(#boxRight)"/>
+
+    <!-- seams on top face -->
+    <line x1="-80" y1="-48" x2="0" y2="-4" stroke="#9FC4DA" stroke-width="3" stroke-linecap="round"/>
+    <line x1="80" y1="-48" x2="0" y2="-4" stroke="#9FC4DA" stroke-width="3" stroke-linecap="round"/>
+
+    <!-- tape line on left face -->
+    <line x1="-80" y1="-48" x2="-80" y2="42" stroke="#1878B4" stroke-width="4" stroke-linecap="round" opacity="0.35"/>
+    <!-- tape line on right face -->
+    <line x1="80" y1="-48" x2="80" y2="42" stroke="#1878B4" stroke-width="4" stroke-linecap="round" opacity="0.35"/>
+  </g>
+
+  <!-- Upward trend arrow (stock growth / tracking) -->
+  <g transform="translate(256,256)">
+    <path d="M -104,74 L -48,20 L -8,54 L 88,-46" fill="none" stroke="#FFFFFF" stroke-width="14" stroke-linecap="round" stroke-linejoin="round"/>
+    <polygon points="88,-46 46,-52 82,-90" fill="#FFFFFF"/>
+  </g>
+</svg>

@@ -94,6 +94,10 @@ export const PERMISSIONS = Object.freeze({
   BIN_CARDS_READ: { key: 'bin_cards:read', module: 'Ledger', description: 'View Bin Cards and bin-level movements' },
   BINS_TRANSFER: { key: 'bins:transfer', module: 'Ledger', description: 'Perform stock transfer between storage bins' },
 
+  // --- INVENTORY OPERATIONS ---
+  INVENTORY_READ: { key: 'inventory:read', module: 'Inventory', description: 'View stock balances, transactions, and inventory reports' },
+  INVENTORY_POST: { key: 'inventory:post', module: 'Inventory', description: 'Post inventory transactions and adjustments' },
+
   // --- REQUISITION & ISSUE WORKFLOW ---
   REQUISITIONS_CREATE: { key: 'requisitions:create', module: 'Requisition', description: 'Create store material requisitions' },
   REQUISITIONS_READ: { key: 'requisitions:read', module: 'Requisition', description: 'View store requisitions and status' },

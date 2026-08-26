@@ -118,13 +118,7 @@ function LoginScreen({ onLogin }: { onLogin: (email: string, password: string) =
     <div className="min-h-screen flex items-center justify-center bg-[#F8FAFC]">
       <div className="w-full max-w-md p-8 bg-white rounded-2xl shadow-lg">
         <div className="text-center mb-8">
-          <div className="w-12 h-12 mx-auto rounded-xl bg-gradient-to-br from-[#4F46E5] to-[#7C3AED] flex items-center justify-center mb-4">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" className="text-white">
-              <rect x="3" y="3" width="7" height="7" rx="1.5" fill="currentColor" fillOpacity="0.9" />
-              <rect x="14" y="3" width="7" height="7" rx="1.5" fill="currentColor" fillOpacity="0.6" />
-              <rect x="14" y="14" width="7" height="7" rx="1.5" fill="currentColor" fillOpacity="0.9" />
-            </svg>
-          </div>
+          <img src="/stock-management-logo.svg" alt="StockManager" className="w-12 h-12 mx-auto mb-4" />
           <h1 className="text-2xl font-bold text-[#0F172A]">StockManager</h1>
           <p className="text-sm text-[#64748B] mt-1">Sign in to your account</p>
         </div>
@@ -172,21 +166,16 @@ export default function App() {
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const { toasts, toast, remove } = useToast();
 
-  const { notifications, inventoryItems, stockCards, isAuthenticated, currentUser, login, logout, isLoading, apiStatus } = useApp();
+  const { notifications, inventoryItems, stockCards, requisitions, transfers, isAuthenticated, currentUser, login, logout, isLoading, apiStatus } = useApp();
   const unreadNotifications = notifications.filter((n) => !n.isRead).length;
   const lowStockCount = inventoryItems.filter(i => stockCards.some(sc => sc.itemId === i.id && sc.availableQty <= i.minimumStock)).length;
+  const pendingApprovals = requisitions.filter(r => r.status === 'SUBMITTED').length + transfers.filter(t => t.status === 'SUBMITTED').length;
 
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#F8FAFC]">
         <div className="text-center">
-          <div className="w-12 h-12 mx-auto rounded-xl bg-gradient-to-br from-[#4F46E5] to-[#7C3AED] flex items-center justify-center mb-4 animate-pulse">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" className="text-white">
-              <rect x="3" y="3" width="7" height="7" rx="1.5" fill="currentColor" />
-              <rect x="14" y="3" width="7" height="7" rx="1.5" fill="currentColor" fillOpacity="0.6" />
-              <rect x="14" y="14" width="7" height="7" rx="1.5" fill="currentColor" />
-            </svg>
-          </div>
+          <img src="/stock-management-logo.svg" alt="StockManager" className="w-12 h-12 mx-auto mb-4 animate-pulse" />
           <p className="text-sm text-[#64748B]">Loading StockManager...</p>
         </div>
       </div>
@@ -216,45 +205,7 @@ export default function App() {
         <div
           className={`flex items-center gap-3 border-b border-[#1E293B] bg-gradient-to-b from-white/[0.02] to-transparent ${sidebarCollapsed ? "px-3 py-4 justify-center" : "px-4 py-4"}`}
         >
-          <div className="relative w-8 h-8 shrink-0 rounded-lg bg-gradient-to-br from-[#4F46E5] to-[#7C3AED] shadow-[0_0_15px_rgba(79,70,229,0.4)] flex items-center justify-center overflow-hidden">
-            <div className="absolute inset-0 bg-[linear-gradient(45deg,transparent_25%,rgba(255,255,255,0.2)_50%,transparent_75%)] bg-[length:250%_250%,100%_100%] animate-[shimmer_3s_infinite]" />
-            <svg
-              width="18"
-              height="18"
-              viewBox="0 0 24 24"
-              fill="none"
-              className="relative z-10 drop-shadow-md"
-            >
-              <rect
-                x="3"
-                y="3"
-                width="7"
-                height="7"
-                rx="1.5"
-                className="fill-white/90"
-              />
-              <rect
-                x="14"
-                y="3"
-                width="7"
-                height="7"
-                rx="1.5"
-                className="fill-white/60"
-              />
-              <rect
-                x="14"
-                y="14"
-                width="7"
-                height="7"
-                rx="1.5"
-                className="fill-white/90"
-              />
-              <path
-                d="M3 15.5C3 14.6716 3.67157 14 4.5 14H8.5C9.32843 14 10 14.6716 10 15.5V19.5C10 20.3284 9.32843 21 8.5 21H4.5C3.67157 21 3 20.3284 3 19.5V15.5Z"
-                className="fill-[#A5B4FC]"
-              />
-            </svg>
-          </div>
+          <img src="/stock-management-logo.svg" alt="StockManager" className="w-8 h-8 shrink-0 rounded-lg" />
           {!sidebarCollapsed && (
             <div className="flex flex-col">
               <span className="font-bold text-[15px] tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-white via-indigo-100 to-indigo-300">
@@ -386,7 +337,7 @@ export default function App() {
               low stock
             </span>
             <span>
-              <span className="text-[#4F46E5] font-semibold">5</span> pending
+              <span className="text-[#4F46E5] font-semibold">{pendingApprovals}</span> pending
             </span>
           </div>
 

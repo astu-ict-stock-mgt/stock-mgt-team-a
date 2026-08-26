@@ -47,7 +47,7 @@ export async function createStockTake({ storeId, initiatedBy, scheduledDate, not
     if (Array.isArray(itemIds) && itemIds.length > 0) {
       for (const itemId of itemIds) {
         const stockCard = await tx.stockCard.findUnique({
-          where: { itemId_storeId: { itemId, storeId } },
+          where: { uq_stock_card_item_store: { itemId, storeId } },
         })
 
         await tx.stockTakeLine.create({
@@ -282,7 +282,7 @@ export async function reconcileStockTake(id, reconciledBy) {
     for (const line of stockTake.lines) {
       if (line.variance !== 0 && line.physicalCount !== null) {
         const stockCard = await tx.stockCard.findUnique({
-          where: { itemId_storeId: { itemId: line.itemId, storeId: stockTake.storeId } },
+          where: { uq_stock_card_item_store: { itemId: line.itemId, storeId: stockTake.storeId } },
         })
 
         if (stockCard) {

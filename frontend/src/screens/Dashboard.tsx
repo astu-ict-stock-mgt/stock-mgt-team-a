@@ -11,11 +11,12 @@ const COLORS = ['#4F46E5', '#6366F1', '#818CF8', '#A5B4FC', '#C7D2FE', '#E0E7FF'
 
 export default function Dashboard({ loading }: DashboardProps) {
   const [activeIndex, setActiveIndex] = useState<number | null>(null)
-  const { stockMovements, notifications, inventoryItems, stockCards, categories } = useApp()
+  const { stockMovements, notifications, inventoryItems, stockCards, categories, requisitions, transfers } = useApp()
 
   const lowStockCount = inventoryItems.filter(i => stockCards.some(sc => sc.itemId === i.id && sc.availableQty <= i.minimumStock)).length
   const todayTransactions = stockMovements.filter(m => m.createdAt.startsWith(new Date().toISOString().split('T')[0])).length
   const totalValue = stockCards.reduce((sum, sc) => sum + (sc.availableQty * (sc.averageCost || 0)), 0)
+  const pendingApprovals = requisitions.filter(r => r.status === 'SUBMITTED').length + transfers.filter(t => t.status === 'SUBMITTED').length
 
   const chartData = useMemo(() => {
     const movementByDate: Record<string, { received: number; issued: number }> = {}
@@ -47,10 +48,10 @@ export default function Dashboard({ loading }: DashboardProps) {
   }, [stockCards, inventoryItems, categories])
 
   const kpis = [
-    { title: 'Total Inventory Value', value: `$${totalValue.toLocaleString('en-US', { maximumFractionDigits: 0 })}`, change: '4.2%', changeDir: 'up' as const, icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="12" y1="1" x2="12" y2="23" /><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" /></svg>, iconBg: 'bg-[#EEF2FF]', iconColor: 'text-[#4F46E5]' },
-    { title: 'Low Stock Alerts', value: lowStockCount.toString(), change: '1 new', changeDir: 'down' as const, icon: Icons.alert, iconBg: 'bg-[#FFFBEB]', iconColor: 'text-[#D97706]' },
-    { title: 'Pending Approvals', value: '5', change: '2 urgent', changeDir: 'neutral' as const, icon: Icons.stocktake, iconBg: 'bg-[#F0FDF4]', iconColor: 'text-[#16A34A]' },
-    { title: "Today's Transactions", value: todayTransactions.toString(), change: '6 received', changeDir: 'up' as const, icon: Icons.transfer, iconBg: 'bg-[#F5F3FF]', iconColor: 'text-[#7C3AED]' },
+    { title: 'Total Inventory Value', value: `$${totalValue.toLocaleString('en-US', { maximumFractionDigits: 0 })}`, icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="12" y1="1" x2="12" y2="23" /><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" /></svg>, iconBg: 'bg-[#EEF2FF]', iconColor: 'text-[#4F46E5]' },
+    { title: 'Low Stock Alerts', value: lowStockCount.toString(), icon: Icons.alert, iconBg: 'bg-[#FFFBEB]', iconColor: 'text-[#D97706]' },
+    { title: 'Pending Approvals', value: pendingApprovals.toString(), icon: Icons.stocktake, iconBg: 'bg-[#F0FDF4]', iconColor: 'text-[#16A34A]' },
+    { title: "Today's Transactions", value: todayTransactions.toString(), icon: Icons.transfer, iconBg: 'bg-[#F5F3FF]', iconColor: 'text-[#7C3AED]' },
   ]
 
   return (

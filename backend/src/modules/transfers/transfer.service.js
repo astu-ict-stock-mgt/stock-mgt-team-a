@@ -246,7 +246,7 @@ export async function executeTransferPosting({ id, executionUserId }) {
       // --- LEG 1: SOURCE STORE DEDUCTION ---
       const sourceCard = await tx.stockCard.findUnique({
         where: {
-          itemId_storeId: {
+          uq_stock_card_item_store: {
             itemId: line.itemId,
             storeId: transfer.sourceStoreId,
           },
@@ -285,7 +285,7 @@ export async function executeTransferPosting({ id, executionUserId }) {
       // --- LEG 2: DESTINATION STORE ADDITION ---
       let destCard = await tx.stockCard.findUnique({
         where: {
-          itemId_storeId: {
+          uq_stock_card_item_store: {
             itemId: line.itemId,
             storeId: transfer.destinationStoreId,
           },

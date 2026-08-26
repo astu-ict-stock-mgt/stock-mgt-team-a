@@ -1,7 +1,5 @@
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../../config/database.js';
 import { ValidationError } from '../../utils/errors.js';
-
-const prisma = new PrismaClient();
 
 class TransactionPostingEngine {
   async postTransaction(transactionData) {
@@ -34,7 +32,7 @@ class TransactionPostingEngine {
       if (outboundTypes.includes(transactionType) || isNegativeAdjustment) {
         const stockCard = await tx.stockCard.findUnique({
           where: {
-            itemId_storeId: { itemId, storeId },
+            uq_stock_card_item_store: { itemId, storeId },
           },
         });
 
@@ -49,7 +47,7 @@ class TransactionPostingEngine {
       // 3. Get or create stock card
       let stockCard = await tx.stockCard.findUnique({
         where: {
-          itemId_storeId: { itemId, storeId },
+          uq_stock_card_item_store: { itemId, storeId },
         },
       });
 
@@ -168,7 +166,7 @@ class TransactionPostingEngine {
   async getStockBalance(itemId, storeId) {
     const stockCard = await prisma.stockCard.findUnique({
       where: {
-        itemId_storeId: { itemId, storeId },
+        uq_stock_card_item_store: { itemId, storeId },
       },
       include: {
         item: { select: { id: true, code: true, name: true } },
@@ -215,7 +213,8 @@ class TransactionPostingEngine {
   }
 
   async getTransactionHistory(filters = {}) {
-    const { itemId, storeId, transactionType, startDate, endDate, limit = 100 } = filters;
+    const { itemId, storeId, transactionType, startDate, endDate, limit: rawLimit } = filters;
+    const limit = Math.min(100, Math.max(1, parseInt(String(rawLimit), 10) || 100));
 
     const where = {};
 
