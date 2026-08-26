@@ -6,7 +6,7 @@ type StateMode = 'default' | 'empty' | 'loading'
 type View = 'list' | 'detail' | 'add'
 
 export default function Inventory() {
-  const { inventoryItems, stockCards, categories, units, stores, suppliers, stockMovements, addInventoryItem } = useApp()
+  const { inventoryItems, stockCards, categories, units, stores, suppliers, stockMovements, addInventoryItem, updateInventoryItem } = useApp()
   const { toast } = useToast()
 
   const [view, setView] = useState<View>('list')
@@ -18,8 +18,10 @@ export default function Inventory() {
   const [activeTab, setActiveTab] = useState('all')
   const [page, setPage] = useState(1)
   const [showModal, setShowModal] = useState(false)
+  const [showEditModal, setShowEditModal] = useState(false)
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [form, setForm] = useState({ name: '', code: '', categoryId: '', unitId: '', minimumStock: '', maximumStock: '', unitCost: '', supplierId: '' })
+  const [editForm, setEditForm] = useState({ name: '', code: '', categoryId: '', unitId: '', minimumStock: '', maximumStock: '', unitCost: '', supplierId: '' })
 
   const enrichedItems = useMemo(() => inventoryItems.map(item => {
     const totalQty = stockCards.filter(sc => sc.itemId === item.id).reduce((s, sc) => s + sc.quantity, 0)
@@ -112,7 +114,15 @@ export default function Inventory() {
                 </div>
                 <div className="flex items-center gap-2">
                   {statusBadge(s.status)}
-                  <Button variant="secondary" size="sm" icon={Icons.edit}>Edit</Button>
+                  <Button variant="secondary" size="sm" icon={Icons.edit} onClick={() => {
+                    setEditForm({
+                      name: s.name, code: s.code, categoryId: s.categoryId,
+                      unitId: s.unitId || '', supplierId: s.supplierId || '',
+                      minimumStock: String(s.minimumStock || ''), maximumStock: String(s.maximumStock || ''),
+                      unitCost: String(s.unitCost || ''),
+                    })
+                    setShowEditModal(true)
+                  }}>Edit</Button>
                 </div>
               </div>
               <div className="grid grid-cols-3 gap-5">
@@ -195,6 +205,54 @@ export default function Inventory() {
             <Button variant="ghost" className="w-full" onClick={() => setView('list')}>← Back to list</Button>
           </div>
         </div>
+
+        <Modal open={showEditModal} onClose={() => setShowEditModal(false)} title="Edit Item" width="max-w-2xl"
+          footer={<>
+            <Button variant="ghost" onClick={() => setShowEditModal(false)}>Cancel</Button>
+            <Button variant="primary" onClick={async () => {
+              const e: Record<string, string> = {}
+              if (!editForm.name.trim()) e.name = 'Item name is required'
+              if (!editForm.code.trim()) e.code = 'SKU is required'
+              if (!editForm.categoryId) e.categoryId = 'Category is required'
+              if (Object.keys(e).length > 0) { setErrors(e); return }
+              await updateInventoryItem(s.id, {
+                name: editForm.name.trim(), code: editForm.code.trim(),
+                categoryId: editForm.categoryId, unitId: editForm.unitId,
+                supplierId: editForm.supplierId || undefined,
+                minimumStock: Number(editForm.minimumStock) || 0,
+                maximumStock: Number(editForm.maximumStock) || 0,
+                unitCost: Number(editForm.unitCost) || null,
+              })
+              setSelectedItem({ ...selectedItem!, name: editForm.name.trim(), code: editForm.code.trim(),
+                categoryId: editForm.categoryId, unitId: editForm.unitId,
+                minimumStock: Number(editForm.minimumStock) || 0,
+                maximumStock: Number(editForm.maximumStock) || 0,
+                unitCost: Number(editForm.unitCost) || null,
+              })
+              toast.success('Item updated successfully')
+              setShowEditModal(false)
+            }}>Save Changes</Button>
+          </>}>
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-3">
+              <Input label="Item name" placeholder="e.g. Hydraulic Pump Assembly" value={editForm.name} onChange={e => setEditForm(f => ({ ...f, name: e.target.value }))} error={errors.name} />
+              <Input label="SKU / Part number" placeholder="e.g. HPA-12-300" value={editForm.code} onChange={e => setEditForm(f => ({ ...f, code: e.target.value }))} error={errors.code} />
+            </div>
+            <div className="grid grid-cols-3 gap-3">
+              <Select label="Category" options={[{ value: '', label: 'Select...' }, ...categories.map(c => ({ value: c.id, label: c.name }))]}
+                value={editForm.categoryId} onChange={e => setEditForm(f => ({ ...f, categoryId: e.target.value }))} error={errors.categoryId} />
+              <Select label="Unit" options={[{ value: '', label: 'Select...' }, ...units.map(u => ({ value: u.id, label: u.name }))]}
+                value={editForm.unitId} onChange={e => setEditForm(f => ({ ...f, unitId: e.target.value }))} />
+              <Select label="Supplier" options={[{ value: '', label: 'Select...' }, ...suppliers.map(s => ({ value: s.id, label: s.name }))]}
+                value={editForm.supplierId} onChange={e => setEditForm(f => ({ ...f, supplierId: e.target.value }))} />
+            </div>
+            <div className="grid grid-cols-3 gap-3">
+              <Input label="Minimum stock" type="number" placeholder="0" value={editForm.minimumStock} onChange={e => setEditForm(f => ({ ...f, minimumStock: e.target.value }))} />
+              <Input label="Maximum stock" type="number" placeholder="0" value={editForm.maximumStock} onChange={e => setEditForm(f => ({ ...f, maximumStock: e.target.value }))} />
+              <Input label="Unit cost ($)" type="number" placeholder="0.00" value={editForm.unitCost} onChange={e => setEditForm(f => ({ ...f, unitCost: e.target.value }))} />
+            </div>
+          </div>
+        </Modal>
       </div>
     )
   }
