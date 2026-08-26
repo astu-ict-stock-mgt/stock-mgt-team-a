@@ -190,41 +190,39 @@ export default function App() {
     return ['REQUESTER']
   }, [userRoles, currentUser])
 
+  // Strict SRS role-to-screen allowlist — each role sees ONLY its authorized screens
+  const allowedScreensByRole: Record<string, Screen[]> = {
+    ADMIN: ['dashboard', 'inventory', 'categories', 'units', 'stores', 'suppliers',
+            'stock-receiving', 'stock-issuing', 'stock-transfer', 'stock-tracking',
+            'stock-taking', 'users', 'roles', 'reports', 'audit', 'notifications', 'settings'],
+    PAO: ['dashboard', 'inventory', 'stock-issuing', 'stock-transfer',
+          'stock-tracking', 'stock-taking', 'reports', 'notifications', 'settings'],
+    STOREKEEPER: ['dashboard', 'inventory', 'categories', 'units', 'stores', 'suppliers',
+                  'stock-receiving', 'stock-issuing', 'stock-transfer', 'stock-tracking',
+                  'stock-taking', 'reports', 'notifications', 'settings'],
+    TEC: ['dashboard', 'stock-receiving', 'reports', 'notifications'],
+    ACCOUNTANT: ['dashboard', 'inventory', 'reports', 'audit', 'notifications'],
+    DEPARTMENT_HEAD: ['dashboard', 'stock-issuing', 'stock-transfer', 'reports', 'notifications'],
+    REQUESTER: ['dashboard', 'stock-issuing', 'notifications'],
+    SECURITY_OFFICER: ['dashboard', 'stock-receiving', 'notifications'],
+    PROPERTY_REGISTRATION_OFFICER: ['dashboard', 'inventory', 'reports', 'notifications'],
+  }
+
   const filteredNavGroups = useMemo(() => {
+    // Collect all allowed screens from every role the user holds
+    const allowed = new Set<Screen>()
+    for (const role of effectiveRoles) {
+      const screens = allowedScreensByRole[role]
+      if (screens) {
+        for (const s of screens) allowed.add(s)
+      }
+    }
+    // If no known role matched, show only dashboard for safety
+    if (allowed.size === 0) allowed.add('dashboard')
+
     return navGroups.map(group => ({
       ...group,
-      items: group.items.filter(item => {
-        switch (item.id) {
-          case 'inventory':
-            return hasPermission(effectiveRoles, PERMISSIONS.STOCK_CARDS_READ) || hasPermission(effectiveRoles, PERMISSIONS.INVENTORY_READ)
-          case 'categories':
-          case 'units':
-          case 'stores':
-            return hasPermission(effectiveRoles, PERMISSIONS.STORES_MANAGE) || hasPermission(effectiveRoles, PERMISSIONS.CATEGORIES_MANAGE) || hasPermission(effectiveRoles, PERMISSIONS.ITEMS_MANAGE)
-          case 'suppliers':
-            return hasPermission(effectiveRoles, PERMISSIONS.SUPPLIERS_MANAGE)
-          case 'stock-receiving':
-            return hasPermission(effectiveRoles, PERMISSIONS.RECEIPTS_CREATE) || hasPermission(effectiveRoles, PERMISSIONS.GOODS_RECEIPT_CREATE) || hasPermission(effectiveRoles, PERMISSIONS.EVALUATIONS_DECIDE) || hasPermission(effectiveRoles, PERMISSIONS.DISPATCH_VERIFY) || hasPermission(effectiveRoles, PERMISSIONS.GRN_READ)
-          case 'stock-issuing':
-            return hasPermission(effectiveRoles, PERMISSIONS.REQUISITIONS_CREATE) || hasPermission(effectiveRoles, PERMISSIONS.REQUISITIONS_APPROVE) || hasPermission(effectiveRoles, PERMISSIONS.SIV_PREPARE) || hasPermission(effectiveRoles, PERMISSIONS.SIV_APPROVE) || hasPermission(effectiveRoles, PERMISSIONS.REQUISITIONS_READ)
-          case 'stock-transfer':
-            return hasPermission(effectiveRoles, PERMISSIONS.TRANSFERS_CREATE) || hasPermission(effectiveRoles, PERMISSIONS.TRANSFERS_APPROVE) || hasPermission(effectiveRoles, PERMISSIONS.TRANSFERS_EXECUTE)
-          case 'stock-tracking':
-            return hasPermission(effectiveRoles, PERMISSIONS.STOCK_CARDS_READ) || hasPermission(effectiveRoles, PERMISSIONS.BIN_CARDS_READ)
-          case 'stock-taking':
-            return hasPermission(effectiveRoles, PERMISSIONS.RECONCILIATION_CREATE) || hasPermission(effectiveRoles, PERMISSIONS.RECONCILIATION_APPROVE) || hasPermission(effectiveRoles, PERMISSIONS.RECONCILIATION_READ)
-          case 'users':
-            return hasPermission(effectiveRoles, PERMISSIONS.USERS_READ) || hasPermission(effectiveRoles, PERMISSIONS.USERS_MANAGE)
-          case 'roles':
-            return hasPermission(effectiveRoles, PERMISSIONS.USERS_MANAGE)
-          case 'reports':
-            return hasPermission(effectiveRoles, PERMISSIONS.REPORTS_VIEW)
-          case 'audit':
-            return hasPermission(effectiveRoles, PERMISSIONS.AUDIT_READ)
-          default:
-            return true
-        }
-      }),
+      items: group.items.filter(item => allowed.has(item.id)),
     })).filter(group => group.items.length > 0)
   }, [effectiveRoles])
   const unreadNotifications = notifications.filter((n) => !n.isRead).length;
