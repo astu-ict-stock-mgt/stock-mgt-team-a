@@ -55,6 +55,10 @@ interface AppContextType {
   updateCategory: (id: string, updates: Partial<Category>) => void
   deleteCategory: (id: string) => void
 
+  addStore: (store: Store) => void
+  updateStore: (id: string, updates: Partial<Store>) => void
+  deleteStore: (id: string) => void
+
   addUnit: (unit: Unit) => void
   updateUnit: (id: string, updates: Partial<Unit>) => void
   deleteUnit: (id: string) => void
@@ -221,6 +225,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setCategories(prev => prev.map(c => c.id === id ? { ...c, ...updates } : c));
   const deleteCategory = (id: string) => setCategories(prev => prev.filter(c => c.id !== id));
 
+  const addStore = (store: Store) => setStores(prev => [store, ...prev]);
+  const updateStore = (id: string, updates: Partial<Store>) =>
+    setStores(prev => prev.map(s => s.id === id ? { ...s, ...updates } : s));
+  const deleteStore = (id: string) => setStores(prev => prev.filter(s => s.id !== id));
+
   const addUnit = (unit: Unit) => setUnits(prev => [unit, ...prev]);
   const updateUnit = (id: string, updates: Partial<Unit>) =>
     setUnits(prev => prev.map(u => u.id === id ? { ...u, ...updates } : u));
@@ -252,6 +261,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       addInventoryItem, updateInventoryItem, deleteInventoryItem,
       addSupplier, updateSupplier, deleteSupplier,
       addCategory, updateCategory, deleteCategory,
+      addStore, updateStore, deleteStore,
       addUnit, updateUnit, deleteUnit,
       addStockMovement,
       addUser, updateUser, deleteUser,

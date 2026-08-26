@@ -5,6 +5,7 @@ import Dashboard from "./screens/Dashboard";
 import Inventory from "./screens/Inventory";
 import Categories from "./screens/Categories";
 import Units from "./screens/Units";
+import Stores from "./screens/Stores";
 import Suppliers from "./screens/Suppliers";
 import StockReceiving from "./screens/StockReceiving";
 import StockIssuing from "./screens/StockIssuing";
@@ -23,6 +24,7 @@ type Screen =
   | "inventory"
   | "categories"
   | "units"
+  | "stores"
   | "stock-receiving"
   | "stock-issuing"
   | "stock-transfer"
@@ -59,6 +61,7 @@ const navGroups: NavGroup[] = [
       { id: "inventory", label: "Inventory", icon: Icons.inventory },
       { id: "categories", label: "Categories", icon: Icons.dashboard },
       { id: "units", label: "Units", icon: Icons.dashboard },
+      { id: "stores", label: "Stores", icon: Icons.dashboard },
       { id: "suppliers", label: "Suppliers", icon: Icons.suppliers },
     ],
   },
@@ -93,6 +96,7 @@ const screenTitles: Record<Screen, string> = {
   inventory: "Inventory Management",
   categories: "Category Management",
   units: "Unit of Measure",
+  stores: "Store Management",
   suppliers: "Supplier Management",
   "stock-receiving": "Stock Receiving",
   "stock-issuing": "Stock Issuing",
@@ -457,6 +461,7 @@ export default function App() {
             {screen === "inventory" && <Inventory />}
             {screen === "categories" && <Categories />}
             {screen === "units" && <Units />}
+            {screen === "stores" && <Stores />}
             {screen === "suppliers" && <Suppliers />}
             {screen === "stock-receiving" && <StockReceiving />}
             {screen === "stock-issuing" && <StockIssuing />}
