@@ -2,13 +2,19 @@ import { useState } from "react";
 import { ToastContainer, useToast, Icons, SearchBar } from "./components/ui";
 import { useApp } from "./context/AppContext";
 import Dashboard from "./screens/Dashboard";
+import Inventory from "./screens/Inventory";
+import Suppliers from "./screens/Suppliers";
+import StockReceiving from "./screens/StockReceiving";
+import StockIssuing from "./screens/StockIssuing";
+import StockTransfer from "./screens/StockTransfer";
+import StockTracking from "./screens/StockTracking";
+import StockTaking from "./screens/StockTaking";
+import Users from "./screens/Users";
+import RolesPermissions from "./screens/RolesPermissions";
 import Reports from "./screens/Reports";
 import AuditLog from "./screens/AuditLog";
 import Notifications from "./screens/Notifications";
-import StockTransfer from "./screens/StockTransfer";
-import StockTracking from "./screens/StockTracking";
-import Users from "./screens/Users";
-import RolesPermissions from "./screens/RolesPermissions";
+import Settings from "./screens/Settings";
 
 type Screen =
   | "dashboard"
@@ -92,30 +98,6 @@ const screenTitles: Record<Screen, string> = {
   notifications: "Notifications",
   settings: "Settings",
 };
-
-// Placeholder screen component
-function PlaceholderScreen({ title }: { title: string }) {
-  return (
-    <div className="flex flex-col items-center justify-center py-20 text-center">
-      <div className="w-16 h-16 rounded-2xl bg-[#F1F5F9] flex items-center justify-center text-[#CBD5E1] mb-4">
-        <svg
-          width="32"
-          height="32"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="1.5"
-        >
-          <path d="M12 5v14M5 12h14" />
-        </svg>
-      </div>
-      <h3 className="text-lg font-semibold text-[#334155]">{title}</h3>
-      <p className="text-sm text-[#94A3B8] mt-1">
-        This screen will be implemented by the frontend team.
-      </p>
-    </div>
-  );
-}
 
 function LoginScreen({ onLogin }: { onLogin: (email: string, password: string) => Promise<void> }) {
   const [email, setEmail] = useState("admin@stockmgt.gov.et");
@@ -513,25 +495,19 @@ export default function App() {
         <main className="flex-1 overflow-auto bg-[#F8FAFC] print:bg-white print:overflow-visible">
           <div className="p-6 max-w-[1400px] mx-auto min-h-full print:p-0 print:max-w-none">
             {screen === "dashboard" && <Dashboard />}
-            {screen === "inventory" && <PlaceholderScreen title="Inventory" />}
-            {screen === "suppliers" && <PlaceholderScreen title="Suppliers" />}
-            {screen === "stock-receiving" && (
-              <PlaceholderScreen title="Stock Receiving" />
-            )}
-            {screen === "stock-issuing" && (
-              <PlaceholderScreen title="Stock Issuing" />
-            )}
+            {screen === "inventory" && <Inventory />}
+            {screen === "suppliers" && <Suppliers />}
+            {screen === "stock-receiving" && <StockReceiving />}
+            {screen === "stock-issuing" && <StockIssuing />}
             {screen === "stock-transfer" && <StockTransfer />}
             {screen === "stock-tracking" && <StockTracking />}
-            {screen === "stock-taking" && (
-              <PlaceholderScreen title="Stock Taking" />
-            )}
+            {screen === "stock-taking" && <StockTaking />}
             {screen === "users" && <Users />}
             {screen === "roles" && <RolesPermissions />}
             {screen === "reports" && <Reports />}
             {screen === "audit" && <AuditLog />}
             {screen === "notifications" && <Notifications />}
-            {screen === "settings" && <PlaceholderScreen title="Settings" />}
+            {screen === "settings" && <Settings />}
           </div>
         </main>
       </div>

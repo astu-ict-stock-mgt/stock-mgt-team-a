@@ -151,11 +151,6 @@ export default function StockIssuing() {
       setIsSubmitting(true);
 
       try {
-        const transactionDate = new Date()
-          .toISOString()
-          .slice(0, 16)
-          .replace("T", " ");
-
         lines.forEach((line) => {
           addStockMovement({
             id: crypto.randomUUID(),
@@ -181,153 +176,154 @@ export default function StockIssuing() {
         setIsSubmitting(false);
       }
     }
+  }
 
-    if (submitted) {
-      return (
-        <div>
-          <SectionHeader
-            title="Stock Issuing"
-            subtitle="Process outgoing stock requests"
-          />
-          <div className="max-w-2xl mx-auto">
-            <Card>
-              <div className="text-center py-6">
-                <div className="w-14 h-14 rounded-full bg-[#F0FDF4] flex items-center justify-center mx-auto mb-4">
-                  <svg
-                    width="26"
-                    height="26"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="#16A34A"
-                    strokeWidth="2.5"
-                  >
-                    <path d="M20 6 9 17l-5-5" />
-                  </svg>
-                </div>
-                <h2 className="text-xl font-semibold text-[#0F172A]">
-                  Stock Issued Successfully
-                </h2>
-                <p className="text-sm text-[#64748B] mt-1">
-                  Voucher:{" "}
-                  <span className="font-mono font-semibold text-[#4F46E5]">
-                    {issueRef}
-                  </span>
-                </p>
-              </div>
-              <Divider label="Issue Voucher" />
-              <div className="border border-[#E2E8F0] rounded-xl p-5 print:fixed print:inset-0 print:bg-white print:z-[9999] print:border-none print:p-12 print:block">
-                <div className="flex items-start justify-between mb-4">
-                  <div>
-                    <p className="font-semibold text-[#0F172A]">StockManager</p>
-                    <p className="text-xs text-[#64748B]">
-                      Stock Issue Voucher
-                    </p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-sm font-semibold font-mono text-[#4F46E5]">
-                      {issueRef}
-                    </p>
-                    <p className="text-xs text-[#94A3B8]">
-                      {new Date().toISOString().slice(0, 10)}
-                    </p>
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-3 mb-4">
-                  <div>
-                    <p className="text-xs font-medium text-[#94A3B8] uppercase tracking-wide mb-0.5">
-                      Department
-                    </p>
-                    <p className="text-sm text-[#1E293B]">
-                      {form.department || "Maintenance"}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-xs font-medium text-[#94A3B8] uppercase tracking-wide mb-0.5">
-                      Requested by
-                    </p>
-                    <p className="text-sm text-[#1E293B]">
-                      {form.requestedBy || "K. Adebayo"}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-xs font-medium text-[#94A3B8] uppercase tracking-wide mb-0.5">
-                      Purpose
-                    </p>
-                    <p className="text-sm text-[#1E293B]">
-                      {form.purpose || "Equipment maintenance"}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-xs font-medium text-[#94A3B8] uppercase tracking-wide mb-0.5">
-                      Approved by
-                    </p>
-                    <p className="text-sm text-[#1E293B]">
-                      Priya Sharma · Dept. Head
-                    </p>
-                  </div>
-                </div>
-                <table className="w-full text-xs border-collapse">
-                  <thead>
-                    <tr className="border-b border-[#E2E8F0]">
-                      {["Item", "SKU", "Issued Qty", "Unit"].map((h) => (
-                        <th
-                          key={h}
-                          className="py-2 px-2 text-left font-semibold text-[#64748B] uppercase tracking-wide"
-                        >
-                          {h}
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {lines.map((l) => (
-                      <tr key={l.id} className="border-b border-[#F8FAFC]">
-                        <td className="py-2 px-2 font-medium text-[#1E293B]">
-                          {l.itemName}
-                        </td>
-                        <td className="py-2 px-2 font-mono text-[#64748B]">
-                          {l.sku}
-                        </td>
-                        <td className="py-2 px-2 font-semibold text-[#4F46E5]">
-                          {l.requestedQty}
-                        </td>
-                        <td className="py-2 px-2 text-[#64748B]">{l.unit}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-                <div className="mt-4 pt-3 border-t border-[#E2E8F0] flex justify-between text-xs text-[#94A3B8]">
-                  <span>Issued by: James Okafor · Storekeeper</span>
-                  <Badge variant="success">Issued</Badge>
-                </div>
-              </div>
-              <div className="flex gap-2 mt-5 print:hidden">
-                <Button
-                  variant="secondary"
-                  className="flex-1"
-                  onClick={() => window.print()}
-                >
-                  Print voucher
-                </Button>
-                <Button
-                  variant="primary"
-                  className="flex-1"
-                  onClick={() => {
-                    setSubmitted(false);
-                    setStep(0);
-                    setApprovalStatus("pending");
-                  }}
-                >
-                  New request
-                </Button>
-              </div>
-            </Card>
-          </div>
-        </div>
-      );
-    }
-
+  if (submitted) {
     return (
+      <div>
+        <SectionHeader
+          title="Stock Issuing"
+          subtitle="Process outgoing stock requests"
+        />
+        <div className="max-w-2xl mx-auto">
+          <Card>
+            <div className="text-center py-6">
+              <div className="w-14 h-14 rounded-full bg-[#F0FDF4] flex items-center justify-center mx-auto mb-4">
+                <svg
+                  width="26"
+                  height="26"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="#16A34A"
+                  strokeWidth="2.5"
+                >
+                  <path d="M20 6 9 17l-5-5" />
+                </svg>
+              </div>
+              <h2 className="text-xl font-semibold text-[#0F172A]">
+                Stock Issued Successfully
+              </h2>
+              <p className="text-sm text-[#64748B] mt-1">
+                Voucher:{" "}
+                <span className="font-mono font-semibold text-[#4F46E5]">
+                  {issueRef}
+                </span>
+              </p>
+            </div>
+            <Divider label="Issue Voucher" />
+            <div className="border border-[#E2E8F0] rounded-xl p-5 print:fixed print:inset-0 print:bg-white print:z-[9999] print:border-none print:p-12 print:block">
+              <div className="flex items-start justify-between mb-4">
+                <div>
+                  <p className="font-semibold text-[#0F172A]">StockManager</p>
+                  <p className="text-xs text-[#64748B]">
+                    Stock Issue Voucher
+                  </p>
+                </div>
+                <div className="text-right">
+                  <p className="text-sm font-semibold font-mono text-[#4F46E5]">
+                    {issueRef}
+                  </p>
+                  <p className="text-xs text-[#94A3B8]">
+                    {new Date().toISOString().slice(0, 10)}
+                  </p>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3 mb-4">
+                <div>
+                  <p className="text-xs font-medium text-[#94A3B8] uppercase tracking-wide mb-0.5">
+                    Department
+                  </p>
+                  <p className="text-sm text-[#1E293B]">
+                    {form.department || "Maintenance"}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs font-medium text-[#94A3B8] uppercase tracking-wide mb-0.5">
+                    Requested by
+                  </p>
+                  <p className="text-sm text-[#1E293B]">
+                    {form.requestedBy || "K. Adebayo"}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs font-medium text-[#94A3B8] uppercase tracking-wide mb-0.5">
+                    Purpose
+                  </p>
+                  <p className="text-sm text-[#1E293B]">
+                    {form.purpose || "Equipment maintenance"}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs font-medium text-[#94A3B8] uppercase tracking-wide mb-0.5">
+                    Approved by
+                  </p>
+                  <p className="text-sm text-[#1E293B]">
+                    Priya Sharma · Dept. Head
+                  </p>
+                </div>
+              </div>
+              <table className="w-full text-xs border-collapse">
+                <thead>
+                  <tr className="border-b border-[#E2E8F0]">
+                    {["Item", "SKU", "Issued Qty", "Unit"].map((h) => (
+                      <th
+                        key={h}
+                        className="py-2 px-2 text-left font-semibold text-[#64748B] uppercase tracking-wide"
+                      >
+                        {h}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {lines.map((l) => (
+                    <tr key={l.id} className="border-b border-[#F8FAFC]">
+                      <td className="py-2 px-2 font-medium text-[#1E293B]">
+                        {l.itemName}
+                      </td>
+                      <td className="py-2 px-2 font-mono text-[#64748B]">
+                        {l.sku}
+                      </td>
+                      <td className="py-2 px-2 font-semibold text-[#4F46E5]">
+                        {l.requestedQty}
+                      </td>
+                      <td className="py-2 px-2 text-[#64748B]">{l.unit}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              <div className="mt-4 pt-3 border-t border-[#E2E8F0] flex justify-between text-xs text-[#94A3B8]">
+                <span>Issued by: James Okafor · Storekeeper</span>
+                <Badge variant="success">Issued</Badge>
+              </div>
+            </div>
+            <div className="flex gap-2 mt-5 print:hidden">
+              <Button
+                variant="secondary"
+                className="flex-1"
+                onClick={() => window.print()}
+              >
+                Print voucher
+              </Button>
+              <Button
+                variant="primary"
+                className="flex-1"
+                onClick={() => {
+                  setSubmitted(false);
+                  setStep(0);
+                  setApprovalStatus("pending");
+                }}
+              >
+                New request
+              </Button>
+            </div>
+          </Card>
+        </div>
+      </div>
+    );
+  }
+
+  return (
       <div>
         <SectionHeader
           title="Stock Issuing"
@@ -682,5 +678,4 @@ export default function StockIssuing() {
         </div>
       </div>
     );
-  };
-}
+  }
