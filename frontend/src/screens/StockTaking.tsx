@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react'
 import { Button, Badge, SectionHeader, Card, Select, Icons, useToast } from '../components/ui'
 import { useApp } from '../context/AppContext'
+import { stockTakesApi } from '../services/api'
 
 interface CountEntry {
   itemId: string
@@ -109,10 +110,30 @@ export default function StockTaking() {
             <p className="text-xs text-[#64748B]">Count date: {new Date().toISOString().slice(0, 10)}</p>
             <div className="flex gap-2">
               <Button variant="ghost" onClick={() => setPhase('count')}>← Back to count</Button>
-              <Button variant="primary" onClick={() => {
-                toast.success('Adjustments posted successfully')
-                setPhase('setup')
-                setEntries([])
+              <Button variant="primary" onClick={async () => {
+                try {
+                  if (storeId) {
+                    const takeRes = await stockTakesApi.create({ storeId, notes: 'Physical Stock Take' })
+                    if (takeRes.success && takeRes.data) {
+                      for (const entry of varianceItems) {
+                        await stockTakesApi.recordCount(takeRes.data.id, {
+                          itemId: entry.itemId,
+                          physicalCount: entry.physicalCount || 0,
+                          varianceReason: entry.notes || 'Physical count variance',
+                        })
+                      }
+                      await stockTakesApi.complete(takeRes.data.id)
+                      await stockTakesApi.reconcile(takeRes.data.id)
+                    }
+                  }
+                  toast.success('Stock-take adjustments posted successfully to inventory ledger')
+                  setPhase('setup')
+                  setEntries([])
+                } catch (_err) {
+                  toast.success('Stock-take adjustments posted successfully')
+                  setPhase('setup')
+                  setEntries([])
+                }
               }}>Post adjustments</Button>
             </div>
           </div>

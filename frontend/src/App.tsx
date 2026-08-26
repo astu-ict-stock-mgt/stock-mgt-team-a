@@ -183,45 +183,50 @@ export default function App() {
   const { notifications, inventoryItems, stockCards, requisitions, transfers, isAuthenticated, currentUser, userRoles, login, logout, isLoading, apiStatus } = useApp();
 
   // Filter navigation based on user permissions
-  const filteredNavGroups = useMemo(() => {
-    if (!userRoles.length) return navGroups
+  const effectiveRoles = useMemo(() => {
+    if (userRoles && userRoles.length > 0) return userRoles
+    if (currentUser?.roles && currentUser.roles.length > 0) return currentUser.roles
+    if ((currentUser as any)?.role) return [(currentUser as any).role]
+    return ['REQUESTER']
+  }, [userRoles, currentUser])
 
+  const filteredNavGroups = useMemo(() => {
     return navGroups.map(group => ({
       ...group,
       items: group.items.filter(item => {
         switch (item.id) {
           case 'inventory':
-            return hasPermission(userRoles, PERMISSIONS.STOCK_CARDS_READ)
+            return hasPermission(effectiveRoles, PERMISSIONS.STOCK_CARDS_READ) || hasPermission(effectiveRoles, PERMISSIONS.INVENTORY_READ)
           case 'categories':
           case 'units':
           case 'stores':
-            return hasPermission(userRoles, PERMISSIONS.STORES_MANAGE)
+            return hasPermission(effectiveRoles, PERMISSIONS.STORES_MANAGE) || hasPermission(effectiveRoles, PERMISSIONS.CATEGORIES_MANAGE) || hasPermission(effectiveRoles, PERMISSIONS.ITEMS_MANAGE)
           case 'suppliers':
-            return hasPermission(userRoles, PERMISSIONS.SUPPLIERS_MANAGE)
+            return hasPermission(effectiveRoles, PERMISSIONS.SUPPLIERS_MANAGE)
           case 'stock-receiving':
-            return hasPermission(userRoles, PERMISSIONS.RECEIPTS_CREATE) || hasPermission(userRoles, PERMISSIONS.GOODS_RECEIPT_CREATE)
+            return hasPermission(effectiveRoles, PERMISSIONS.RECEIPTS_CREATE) || hasPermission(effectiveRoles, PERMISSIONS.GOODS_RECEIPT_CREATE) || hasPermission(effectiveRoles, PERMISSIONS.EVALUATIONS_DECIDE) || hasPermission(effectiveRoles, PERMISSIONS.DISPATCH_VERIFY) || hasPermission(effectiveRoles, PERMISSIONS.GRN_READ)
           case 'stock-issuing':
-            return hasPermission(userRoles, PERMISSIONS.REQUISITIONS_CREATE) || hasPermission(userRoles, PERMISSIONS.REQUISITIONS_APPROVE) || hasPermission(userRoles, PERMISSIONS.SIV_PREPARE)
+            return hasPermission(effectiveRoles, PERMISSIONS.REQUISITIONS_CREATE) || hasPermission(effectiveRoles, PERMISSIONS.REQUISITIONS_APPROVE) || hasPermission(effectiveRoles, PERMISSIONS.SIV_PREPARE) || hasPermission(effectiveRoles, PERMISSIONS.SIV_APPROVE) || hasPermission(effectiveRoles, PERMISSIONS.REQUISITIONS_READ)
           case 'stock-transfer':
-            return hasPermission(userRoles, PERMISSIONS.TRANSFERS_CREATE) || hasPermission(userRoles, PERMISSIONS.TRANSFERS_APPROVE)
+            return hasPermission(effectiveRoles, PERMISSIONS.TRANSFERS_CREATE) || hasPermission(effectiveRoles, PERMISSIONS.TRANSFERS_APPROVE) || hasPermission(effectiveRoles, PERMISSIONS.TRANSFERS_EXECUTE)
           case 'stock-tracking':
-            return hasPermission(userRoles, PERMISSIONS.STOCK_CARDS_READ)
+            return hasPermission(effectiveRoles, PERMISSIONS.STOCK_CARDS_READ) || hasPermission(effectiveRoles, PERMISSIONS.BIN_CARDS_READ)
           case 'stock-taking':
-            return hasPermission(userRoles, PERMISSIONS.RECONCILIATION_CREATE) || hasPermission(userRoles, PERMISSIONS.RECONCILIATION_APPROVE)
+            return hasPermission(effectiveRoles, PERMISSIONS.RECONCILIATION_CREATE) || hasPermission(effectiveRoles, PERMISSIONS.RECONCILIATION_APPROVE) || hasPermission(effectiveRoles, PERMISSIONS.RECONCILIATION_READ)
           case 'users':
-            return hasPermission(userRoles, PERMISSIONS.USERS_READ)
+            return hasPermission(effectiveRoles, PERMISSIONS.USERS_READ) || hasPermission(effectiveRoles, PERMISSIONS.USERS_MANAGE)
           case 'roles':
-            return hasPermission(userRoles, PERMISSIONS.USERS_READ)
+            return hasPermission(effectiveRoles, PERMISSIONS.USERS_MANAGE)
           case 'reports':
-            return hasPermission(userRoles, PERMISSIONS.REPORTS_VIEW)
+            return hasPermission(effectiveRoles, PERMISSIONS.REPORTS_VIEW)
           case 'audit':
-            return hasPermission(userRoles, PERMISSIONS.AUDIT_READ)
+            return hasPermission(effectiveRoles, PERMISSIONS.AUDIT_READ)
           default:
             return true
         }
       }),
     })).filter(group => group.items.length > 0)
-  }, [userRoles])
+  }, [effectiveRoles])
   const unreadNotifications = notifications.filter((n) => !n.isRead).length;
   const lowStockCount = inventoryItems.filter(i => stockCards.some(sc => sc.itemId === i.id && sc.availableQty <= i.minimumStock)).length;
   const pendingApprovals = requisitions.filter(r => r.status === 'SUBMITTED').length + transfers.filter(t => t.status === 'SUBMITTED').length;

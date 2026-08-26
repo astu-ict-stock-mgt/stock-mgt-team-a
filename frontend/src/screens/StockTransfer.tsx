@@ -144,10 +144,45 @@ export default function StockTransfer() {
               </tbody>
             </table>
           </div>
-          <div className="p-4 border-t border-[#E2E8F0]">
+          <div className="p-4 border-t border-[#E2E8F0] flex items-center justify-between">
             <p className="text-xs text-[#64748B]">
               Created: {new Date(selectedTransfer.createdAt).toLocaleDateString()} · Notes: {selectedTransfer.notes || 'None'}
             </p>
+            <div className="flex gap-2">
+              {selectedTransfer.status === 'SUBMITTED' && (
+                <Button variant="primary" size="sm" onClick={async () => {
+                  try {
+                    await transfersApi.approve(selectedTransfer.id, { isApproved: true })
+                    toast.success('Transfer approved successfully')
+                    setSelectedTransfer({ ...selectedTransfer, status: 'APPROVED' })
+                  } catch (err: any) {
+                    toast.error(err.message || 'Failed to approve transfer')
+                  }
+                }}>Approve Transfer</Button>
+              )}
+              {selectedTransfer.status === 'APPROVED' && (
+                <Button variant="primary" size="sm" onClick={async () => {
+                  try {
+                    await transfersApi.dispatch(selectedTransfer.id)
+                    toast.success('Transfer dispatched (In Transit)')
+                    setSelectedTransfer({ ...selectedTransfer, status: 'IN_TRANSIT' })
+                  } catch (err: any) {
+                    toast.error(err.message || 'Failed to dispatch transfer')
+                  }
+                }}>Execute Dispatch</Button>
+              )}
+              {selectedTransfer.status === 'IN_TRANSIT' && (
+                <Button variant="primary" size="sm" onClick={async () => {
+                  try {
+                    await transfersApi.complete(selectedTransfer.id)
+                    toast.success('Transfer completed & inventory updated')
+                    setSelectedTransfer({ ...selectedTransfer, status: 'COMPLETED' })
+                  } catch (err: any) {
+                    toast.error(err.message || 'Failed to receive transfer')
+                  }
+                }}>Confirm Receipt</Button>
+              )}
+            </div>
           </div>
         </Card>
       </div>
