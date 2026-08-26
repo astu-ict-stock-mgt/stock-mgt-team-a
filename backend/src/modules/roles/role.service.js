@@ -6,6 +6,7 @@
 
 import { prisma } from '../../config/database.js'
 import { NotFoundError, ConflictError, ValidationError } from '../../utils/errors.js'
+import { invalidatePermissionCache } from '../../config/permission-cache.js'
 
 /**
  * Get all roles
@@ -102,12 +103,13 @@ export const createRole = async ({ code, name, description, permissionIds = [] }
   }
 
   // Validate permissions if provided
+  let resolvedPermissions = []
   if (permissionIds.length > 0) {
-    const permissions = await prisma.permission.findMany({
-      where: { id: { in: permissionIds } },
+    resolvedPermissions = await prisma.permission.findMany({
+      where: { code: { in: permissionIds } },
     })
-    if (permissions.length !== permissionIds.length) {
-      throw new ValidationError('One or more permission IDs are invalid')
+    if (resolvedPermissions.length !== permissionIds.length) {
+      throw new ValidationError('One or more permission codes are invalid')
     }
   }
 
@@ -116,9 +118,9 @@ export const createRole = async ({ code, name, description, permissionIds = [] }
       code: normalizedCode,
       name: name.trim(),
       description: description?.trim() || null,
-      rolePermissions: permissionIds.length > 0
+      rolePermissions: resolvedPermissions.length > 0
         ? {
-            create: permissionIds.map((permissionId) => ({ permissionId })),
+            create: resolvedPermissions.map((p) => ({ permissionId: p.id })),
           }
         : undefined,
     },
@@ -199,51 +201,61 @@ export const updateRole = async (roleId, { name, description }) => {
 /**
  * Assign permissions to role
  * @param {string} roleId - Role UUID
- * @param {Array<string>} permissionIds - Permission UUIDs to assign
+ * @param {Array<string>} permissionCodes - Permission codes (e.g. 'users:create') to assign
  * @returns {Promise<Object>} Updated role with permissions
  */
-export const assignPermissionsToRole = async (roleId, permissionIds) => {
+export const assignPermissionsToRole = async (roleId, permissionCodes) => {
   const role = await prisma.role.findUnique({ where: { id: roleId } })
   if (!role) {
     throw new NotFoundError(`Role with ID '${roleId}' not found`)
   }
 
-  // Validate permissions
+  // Look up permissions by code
   const permissions = await prisma.permission.findMany({
-    where: { id: { in: permissionIds } },
+    where: { code: { in: permissionCodes } },
   })
-  if (permissions.length !== permissionIds.length) {
-    throw new ValidationError('One or more permission IDs are invalid')
+  if (permissions.length !== permissionCodes.length) {
+    const found = permissions.map((p) => p.code)
+    const missing = permissionCodes.filter((c) => !found.includes(c))
+    throw new ValidationError(`Invalid permission codes: ${missing.join(', ')}`)
   }
 
   // Remove existing permissions and add new ones
   await prisma.rolePermission.deleteMany({ where: { roleId } })
   await prisma.rolePermission.createMany({
-    data: permissionIds.map((permissionId) => ({ roleId, permissionId })),
+    data: permissions.map((p) => ({ roleId, permissionId: p.id })),
   })
 
+  invalidatePermissionCache(role.code)
   return getRoleById(roleId)
 }
 
 /**
  * Remove permissions from role
  * @param {string} roleId - Role UUID
- * @param {Array<string>} permissionIds - Permission UUIDs to remove
+ * @param {Array<string>} permissionCodes - Permission codes (e.g. 'users:create') to remove
  * @returns {Promise<Object>} Updated role with permissions
  */
-export const removePermissionsFromRole = async (roleId, permissionIds) => {
+export const removePermissionsFromRole = async (roleId, permissionCodes) => {
   const role = await prisma.role.findUnique({ where: { id: roleId } })
   if (!role) {
     throw new NotFoundError(`Role with ID '${roleId}' not found`)
   }
 
-  await prisma.rolePermission.deleteMany({
-    where: {
-      roleId,
-      permissionId: { in: permissionIds },
-    },
+  const permissions = await prisma.permission.findMany({
+    where: { code: { in: permissionCodes } },
   })
 
+  if (permissions.length > 0) {
+    await prisma.rolePermission.deleteMany({
+      where: {
+        roleId,
+        permissionId: { in: permissions.map((p) => p.id) },
+      },
+    })
+  }
+
+  invalidatePermissionCache(role.code)
   return getRoleById(roleId)
 }
 

@@ -2,9 +2,12 @@
  * Central RBAC Authorization Middleware (Deny-by-Default)
  * Task: BE-032 (Implement RBAC Authorization Middleware)
  * SRS Traceability: Appendix C (Role & Permission Matrix), Section 13 (Security)
+ *
+ * Now uses dynamic DB permissions via permission-cache service.
+ * Falls back to hardcoded matrix if DB is unavailable.
  */
 
-import { hasPermission } from '../config/rbac.js'
+import { getPermissionsForRoles } from '../config/permission-cache.js'
 import { UnauthorizedError, ForbiddenError } from '../utils/errors.js'
 
 /**
@@ -15,7 +18,7 @@ import { UnauthorizedError, ForbiddenError } from '../utils/errors.js'
  * @returns {Function} Express middleware function
  */
 export const authorize = (requiredPermissions) => {
-  return (req, res, next) => {
+  return async (req, res, next) => {
     try {
       // 1. Ensure user is authenticated (req.user populated by authenticate middleware)
       if (!req.user) {
@@ -23,7 +26,6 @@ export const authorize = (requiredPermissions) => {
       }
 
       // 2. Extract user role (Default to REQUESTER if unassigned)
-      // Supports: req.user.roles (array from JWT), req.user.roleCode, or single req.user.role
       const userRoles = req.user.roles || (req.user.role ? [req.user.role] : (req.user.roleCode ? [req.user.roleCode] : ['REQUESTER']))
 
       // 3. Normalize required permissions to string keys
@@ -33,17 +35,18 @@ export const authorize = (requiredPermissions) => {
 
       const permissionsArray = rawList.map((p) => {
         const key = (typeof p === 'object' && p?.key ? p.key : String(p))
-        // Normalize: convert dot-separated to colon-separated (items.read -> items:read)
         return key.includes('.') && !key.includes(':') ? key.replace(/\./g, ':') : key
       })
 
-      // 4. Verify user role possesses all required permissions
-      // If user has manage permission, they implicitly have read/create/update/delete
+      // 4. Load user permissions from DB (cached)
+      const userPerms = await getPermissionsForRoles(userRoles)
+
+      // 5. Verify user possesses all required permissions
       const isAuthorized = permissionsArray.every((permKey) => {
-        if (hasPermission(userRoles, permKey)) return true
+        if (userPerms.has(permKey)) return true
         // Check if a parent manage permission covers this
         const [module, action] = permKey.split(':')
-        if (action !== 'manage' && hasPermission(userRoles, `${module}:manage`)) return true
+        if (action !== 'manage' && userPerms.has(`${module}:manage`)) return true
         return false
       })
 

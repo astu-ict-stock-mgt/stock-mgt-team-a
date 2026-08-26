@@ -23,9 +23,8 @@ export const createRoleSchema = Joi.object({
   description: Joi.string().max(500).optional().allow(null, '').messages({
     'string.max': 'Description must not exceed 500 characters',
   }),
-  permissionIds: Joi.array().items(Joi.string().uuid()).optional().messages({
+  permissionIds: Joi.array().items(Joi.string()).optional().messages({
     'array.base': 'Permission IDs must be an array',
-    'string.uuid': 'Invalid permission ID format',
   }),
 })
 
@@ -48,10 +47,9 @@ export const updateRoleSchema = Joi.object({
  * Assign Permissions Schema
  */
 export const assignPermissionsSchema = Joi.object({
-  permissionIds: Joi.array().items(Joi.string().uuid()).min(1).required().messages({
+  permissionIds: Joi.array().items(Joi.string()).min(1).required().messages({
     'array.base': 'Permission IDs must be an array',
     'array.min': 'At least one permission ID must be provided',
-    'string.uuid': 'Invalid permission ID format',
     'any.required': 'Permission IDs are required',
   }),
 })
