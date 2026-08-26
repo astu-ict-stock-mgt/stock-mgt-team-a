@@ -65,7 +65,44 @@ async function main() {
     }
   }
 
-  // 3. Seed Baseline Users (BE-021)
+  // 3. Seed Permissions (atomic permission codes from rbac.js)
+  console.log(`🔑 Seeding ${Object.keys(PERMISSIONS).length} Permissions...`)
+  const permRecords = {}
+  for (const permObj of Object.values(PERMISSIONS)) {
+    try {
+      const perm = await prisma.permission.upsert({
+        where: { code: permObj.key },
+        update: { name: permObj.description || permObj.key, description: permObj.description || null },
+        create: { code: permObj.key, name: permObj.description || permObj.key, description: permObj.description || null },
+      })
+      permRecords[perm.code] = perm
+    } catch (_err) {
+      console.log(`   ℹ️ Permission '${permObj.key}' ready`)
+    }
+  }
+
+  // 4. Seed Role-Permission assignments (MATRIX from rbac.js)
+  console.log(`🔗 Seeding Role-Permission assignments from MATRIX...`)
+  for (const [roleCode, permKeys] of Object.entries(ROLE_PERMISSIONS_MATRIX)) {
+    const role = roleRecords[roleCode]
+    if (!role) continue
+    for (const permKey of permKeys) {
+      const perm = permRecords[permKey]
+      if (!perm) continue
+      try {
+        await prisma.rolePermission.upsert({
+          where: { uq_role_permissions_role_permission: { roleId: role.id, permissionId: perm.id } },
+          update: {},
+          create: { roleId: role.id, permissionId: perm.id },
+        })
+      } catch (_err) {
+        // already exists
+      }
+    }
+    console.log(`   ✅ ${roleCode}: ${permKeys.length} permissions assigned`)
+  }
+
+  // 5. Seed Baseline Users (BE-021)
   const defaultUsers = [
     {
       email: 'admin@stockmgt.gov.et',
