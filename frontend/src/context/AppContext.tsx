@@ -51,6 +51,14 @@ interface AppContextType {
   updateSupplier: (id: string, updates: Partial<Supplier>) => void
   deleteSupplier: (id: string) => void
 
+  addCategory: (category: Category) => void
+  updateCategory: (id: string, updates: Partial<Category>) => void
+  deleteCategory: (id: string) => void
+
+  addUnit: (unit: Unit) => void
+  updateUnit: (id: string, updates: Partial<Unit>) => void
+  deleteUnit: (id: string) => void
+
   addStockMovement: (movement: StockTransaction) => void
 
   addUser: (user: User) => void
@@ -208,6 +216,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setSuppliers(prev => prev.map(s => s.id === id ? { ...s, ...updates } : s));
   const deleteSupplier = (id: string) => setSuppliers(prev => prev.filter(s => s.id !== id));
 
+  const addCategory = (category: Category) => setCategories(prev => [category, ...prev]);
+  const updateCategory = (id: string, updates: Partial<Category>) =>
+    setCategories(prev => prev.map(c => c.id === id ? { ...c, ...updates } : c));
+  const deleteCategory = (id: string) => setCategories(prev => prev.filter(c => c.id !== id));
+
+  const addUnit = (unit: Unit) => setUnits(prev => [unit, ...prev]);
+  const updateUnit = (id: string, updates: Partial<Unit>) =>
+    setUnits(prev => prev.map(u => u.id === id ? { ...u, ...updates } : u));
+  const deleteUnit = (id: string) => setUnits(prev => prev.filter(u => u.id !== id));
+
   const addStockMovement = (movement: StockTransaction) => setStockMovements(prev => [movement, ...prev]);
 
   const addUser = (user: User) => setUsers(prev => [user, ...prev]);
@@ -233,6 +251,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       isAuthenticated, currentUser, login, logout,
       addInventoryItem, updateInventoryItem, deleteInventoryItem,
       addSupplier, updateSupplier, deleteSupplier,
+      addCategory, updateCategory, deleteCategory,
+      addUnit, updateUnit, deleteUnit,
       addStockMovement,
       addUser, updateUser, deleteUser,
       addRole, updateRole, deleteRole,

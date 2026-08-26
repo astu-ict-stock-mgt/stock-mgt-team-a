@@ -3,6 +3,8 @@ import { ToastContainer, useToast, Icons, SearchBar } from "./components/ui";
 import { useApp } from "./context/AppContext";
 import Dashboard from "./screens/Dashboard";
 import Inventory from "./screens/Inventory";
+import Categories from "./screens/Categories";
+import Units from "./screens/Units";
 import Suppliers from "./screens/Suppliers";
 import StockReceiving from "./screens/StockReceiving";
 import StockIssuing from "./screens/StockIssuing";
@@ -19,6 +21,8 @@ import Settings from "./screens/Settings";
 type Screen =
   | "dashboard"
   | "inventory"
+  | "categories"
+  | "units"
   | "stock-receiving"
   | "stock-issuing"
   | "stock-transfer"
@@ -53,6 +57,8 @@ const navGroups: NavGroup[] = [
     label: "Inventory",
     items: [
       { id: "inventory", label: "Inventory", icon: Icons.inventory },
+      { id: "categories", label: "Categories", icon: Icons.dashboard },
+      { id: "units", label: "Units", icon: Icons.dashboard },
       { id: "suppliers", label: "Suppliers", icon: Icons.suppliers },
     ],
   },
@@ -85,6 +91,8 @@ const navGroups: NavGroup[] = [
 const screenTitles: Record<Screen, string> = {
   dashboard: "Dashboard",
   inventory: "Inventory Management",
+  categories: "Category Management",
+  units: "Unit of Measure",
   suppliers: "Supplier Management",
   "stock-receiving": "Stock Receiving",
   "stock-issuing": "Stock Issuing",
@@ -447,6 +455,8 @@ export default function App() {
           <div className="p-6 max-w-[1400px] mx-auto min-h-full print:p-0 print:max-w-none">
             {screen === "dashboard" && <Dashboard />}
             {screen === "inventory" && <Inventory />}
+            {screen === "categories" && <Categories />}
+            {screen === "units" && <Units />}
             {screen === "suppliers" && <Suppliers />}
             {screen === "stock-receiving" && <StockReceiving />}
             {screen === "stock-issuing" && <StockIssuing />}
