@@ -106,7 +106,7 @@ export const rolesApi = {
   getById: (id: string) => api.get<ApiResponse<Role>>(`/roles/${id}`),
   create: (data: { code: string; name: string; description?: string; permissionIds?: string[] }) =>
     api.post<ApiResponse<Role>>('/roles', data),
-  update: (id: string, data: { name?: string; description?: string }) =>
+  update: (id: string, data: { name?: string; description?: string | null }) =>
     api.put<ApiResponse<Role>>(`/roles/${id}`, data),
   delete: (id: string) => api.delete<ApiResponse<{ message: string }>>(`/roles/${id}`),
 }
@@ -120,7 +120,7 @@ export const storesApi = {
     return api.get<ApiResponse<Store[]>>(`/stores?${q.toString()}`)
   },
   getById: (id: string) => api.get<ApiResponse<Store>>(`/stores/${id}`),
-  create: (data: { name: string; code: string; type: string; description?: string }) =>
+  create: (data: { name: string; code: string; type: string; status?: string; description?: string; address?: string; responsibleOfficerId?: string }) =>
     api.post<ApiResponse<Store>>('/stores', data),
   update: (id: string, data: Partial<Store>) => api.put<ApiResponse<Store>>(`/stores/${id}`, data),
   delete: (id: string) => api.delete<ApiResponse<{ message: string }>>(`/stores/${id}`),

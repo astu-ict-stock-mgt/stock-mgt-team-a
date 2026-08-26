@@ -43,35 +43,35 @@ interface AppContextType {
   login: (email: string, password: string) => Promise<void>
   logout: () => void
 
-  addInventoryItem: (item: Item) => void
-  updateInventoryItem: (id: string, updates: Partial<Item>) => void
-  deleteInventoryItem: (id: string) => void
+  addInventoryItem: (item: Item) => Promise<void>
+  updateInventoryItem: (id: string, updates: Partial<Item>) => Promise<void>
+  deleteInventoryItem: (id: string) => Promise<void>
 
-  addSupplier: (supplier: Supplier) => void
-  updateSupplier: (id: string, updates: Partial<Supplier>) => void
-  deleteSupplier: (id: string) => void
+  addSupplier: (supplier: Supplier) => Promise<void>
+  updateSupplier: (id: string, updates: Partial<Supplier>) => Promise<void>
+  deleteSupplier: (id: string) => Promise<void>
 
-  addCategory: (category: Category) => void
-  updateCategory: (id: string, updates: Partial<Category>) => void
-  deleteCategory: (id: string) => void
+  addCategory: (category: Category) => Promise<void>
+  updateCategory: (id: string, updates: Partial<Category>) => Promise<void>
+  deleteCategory: (id: string) => Promise<void>
 
-  addStore: (store: Store) => void
-  updateStore: (id: string, updates: Partial<Store>) => void
-  deleteStore: (id: string) => void
+  addStore: (store: Store) => Promise<void>
+  updateStore: (id: string, updates: Partial<Store>) => Promise<void>
+  deleteStore: (id: string) => Promise<void>
 
-  addUnit: (unit: Unit) => void
-  updateUnit: (id: string, updates: Partial<Unit>) => void
-  deleteUnit: (id: string) => void
+  addUnit: (unit: Unit) => Promise<void>
+  updateUnit: (id: string, updates: Partial<Unit>) => Promise<void>
+  deleteUnit: (id: string) => Promise<void>
 
   addStockMovement: (movement: StockTransaction) => void
 
-  addUser: (user: User) => void
-  updateUser: (id: string, updates: Partial<User>) => void
-  deleteUser: (id: string) => void
+  addUser: (user: User) => Promise<void>
+  updateUser: (id: string, updates: Partial<User>) => Promise<void>
+  deleteUser: (id: string) => Promise<void>
 
-  addRole: (role: Role) => void
-  updateRole: (id: string, updates: Partial<Role>) => void
-  deleteRole: (id: string) => void
+  addRole: (role: Role) => Promise<void>
+  updateRole: (id: string, updates: Partial<Role>) => Promise<void>
+  deleteRole: (id: string) => Promise<void>
 
   addAuditLog: (log: AuditEvent) => void
 
@@ -210,42 +210,98 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const refreshData = async () => { await loadAllData(); };
 
-  const addInventoryItem = (item: Item) => setInventoryItems(prev => [item, ...prev]);
-  const updateInventoryItem = (id: string, updates: Partial<Item>) =>
-    setInventoryItems(prev => prev.map(i => i.id === id ? { ...i, ...updates } : i));
-  const deleteInventoryItem = (id: string) => setInventoryItems(prev => prev.filter(i => i.id !== id));
+  const addInventoryItem = async (item: Item) => {
+    const res = await itemsApi.create(item as any);
+    setInventoryItems(prev => [res.data, ...prev]);
+  };
+  const updateInventoryItem = async (id: string, updates: Partial<Item>) => {
+    const res = await itemsApi.update(id, updates);
+    setInventoryItems(prev => prev.map(i => i.id === id ? res.data : i));
+  };
+  const deleteInventoryItem = async (id: string) => {
+    await itemsApi.delete(id);
+    setInventoryItems(prev => prev.filter(i => i.id !== id));
+  };
 
-  const addSupplier = (supplier: Supplier) => setSuppliers(prev => [supplier, ...prev]);
-  const updateSupplier = (id: string, updates: Partial<Supplier>) =>
-    setSuppliers(prev => prev.map(s => s.id === id ? { ...s, ...updates } : s));
-  const deleteSupplier = (id: string) => setSuppliers(prev => prev.filter(s => s.id !== id));
+  const addSupplier = async (supplier: Supplier) => {
+    const res = await suppliersApi.create(supplier as any);
+    setSuppliers(prev => [res.data, ...prev]);
+  };
+  const updateSupplier = async (id: string, updates: Partial<Supplier>) => {
+    const res = await suppliersApi.update(id, updates);
+    setSuppliers(prev => prev.map(s => s.id === id ? res.data : s));
+  };
+  const deleteSupplier = async (id: string) => {
+    await suppliersApi.delete(id);
+    setSuppliers(prev => prev.filter(s => s.id !== id));
+  };
 
-  const addCategory = (category: Category) => setCategories(prev => [category, ...prev]);
-  const updateCategory = (id: string, updates: Partial<Category>) =>
-    setCategories(prev => prev.map(c => c.id === id ? { ...c, ...updates } : c));
-  const deleteCategory = (id: string) => setCategories(prev => prev.filter(c => c.id !== id));
+  const addCategory = async (category: Category) => {
+    const res = await categoriesApi.create(category as any);
+    setCategories(prev => [res.data, ...prev]);
+  };
+  const updateCategory = async (id: string, updates: Partial<Category>) => {
+    const res = await categoriesApi.update(id, updates);
+    setCategories(prev => prev.map(c => c.id === id ? res.data : c));
+  };
+  const deleteCategory = async (id: string) => {
+    await categoriesApi.delete(id);
+    setCategories(prev => prev.filter(c => c.id !== id));
+  };
 
-  const addStore = (store: Store) => setStores(prev => [store, ...prev]);
-  const updateStore = (id: string, updates: Partial<Store>) =>
-    setStores(prev => prev.map(s => s.id === id ? { ...s, ...updates } : s));
-  const deleteStore = (id: string) => setStores(prev => prev.filter(s => s.id !== id));
+  const addStore = async (store: Store) => {
+    const res = await storesApi.create(store as any);
+    setStores(prev => [res.data, ...prev]);
+  };
+  const updateStore = async (id: string, updates: Partial<Store>) => {
+    const res = await storesApi.update(id, updates);
+    setStores(prev => prev.map(s => s.id === id ? res.data : s));
+  };
+  const deleteStore = async (id: string) => {
+    await storesApi.delete(id);
+    setStores(prev => prev.filter(s => s.id !== id));
+  };
 
-  const addUnit = (unit: Unit) => setUnits(prev => [unit, ...prev]);
-  const updateUnit = (id: string, updates: Partial<Unit>) =>
-    setUnits(prev => prev.map(u => u.id === id ? { ...u, ...updates } : u));
-  const deleteUnit = (id: string) => setUnits(prev => prev.filter(u => u.id !== id));
+  const addUnit = async (unit: Unit) => {
+    const res = await unitsApi.create(unit as any);
+    setUnits(prev => [res.data, ...prev]);
+  };
+  const updateUnit = async (id: string, updates: Partial<Unit>) => {
+    const res = await unitsApi.update(id, updates);
+    setUnits(prev => prev.map(u => u.id === id ? res.data : u));
+  };
+  const deleteUnit = async (id: string) => {
+    await unitsApi.delete(id);
+    setUnits(prev => prev.filter(u => u.id !== id));
+  };
 
   const addStockMovement = (movement: StockTransaction) => setStockMovements(prev => [movement, ...prev]);
 
-  const addUser = (user: User) => setUsers(prev => [user, ...prev]);
-  const updateUser = (id: string, updates: Partial<User>) =>
-    setUsers(prev => prev.map(u => u.id === id ? { ...u, ...updates } : u));
-  const deleteUser = (id: string) => setUsers(prev => prev.filter(u => u.id !== id));
+  const addUser = async (user: User) => {
+    const res = await usersApi.create(user as any);
+    setUsers(prev => [res.data, ...prev]);
+  };
+  const updateUser = async (id: string, updates: Partial<User>) => {
+    const res = await usersApi.update(id, updates);
+    setUsers(prev => prev.map(u => u.id === id ? res.data : u));
+  };
+  const deleteUser = async (id: string) => {
+    await usersApi.delete(id);
+    setUsers(prev => prev.filter(u => u.id !== id));
+  };
 
-  const addRole = (role: Role) => setRoles(prev => [role, ...prev]);
-  const updateRole = (id: string, updates: Partial<Role>) =>
-    setRoles(prev => prev.map(r => r.id === id ? { ...r, ...updates } : r));
-  const deleteRole = (id: string) => setRoles(prev => prev.filter(r => r.id !== id));
+  const addRole = async (role: Role) => {
+    const res = await rolesApi.create(role as any);
+    setRoles(prev => [res.data, ...prev]);
+  };
+  const updateRole = async (id: string, updates: Partial<Role>) => {
+    const res = await rolesApi.update(id, updates);
+    setRoles(prev => prev.map(r => r.id === id ? res.data : r));
+  };
+  const deleteRole = async (id: string) => {
+    await rolesApi.delete(id);
+    setRoles(prev => prev.filter(r => r.id !== id));
+  };
 
   const addAuditLog = (log: AuditEvent) => setAuditLogs(prev => [log, ...prev]);
 
