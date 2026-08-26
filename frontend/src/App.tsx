@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { ToastContainer, useToast, Icons, SearchBar } from "./components/ui";
 import { useApp } from "./context/AppContext";
+import { api } from "./services/api";
 import Dashboard from "./screens/Dashboard";
 import Inventory from "./screens/Inventory";
 import Categories from "./screens/Categories";
@@ -203,6 +204,37 @@ export default function App() {
     );
   }
 
+  if (apiStatus === 'disconnected') {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#F8FAFC]">
+        <div className="w-full max-w-md p-8 bg-white rounded-2xl shadow-lg text-center">
+          <img src="/stock-management-logo.svg" alt="StockManager" className="w-16 h-16 mx-auto mb-5 opacity-40" />
+          <h1 className="text-xl font-bold text-[#0F172A] mb-2">Server Unavailable</h1>
+          <p className="text-sm text-[#64748B] mb-6 leading-relaxed">
+            The backend service is currently offline. Please make sure the server is running and try again.
+          </p>
+          <div className="flex items-center justify-center gap-2 text-xs text-[#94A3B8] mb-6">
+            <span className="w-2 h-2 rounded-full bg-[#DC2626]" />
+            <span>API unreachable</span>
+          </div>
+          <button
+            onClick={() => window.location.reload()}
+            className="h-10 px-6 bg-[#4F46E5] text-white font-medium rounded-lg hover:bg-[#4338CA] transition-colors"
+          >
+            Retry Connection
+          </button>
+          <button
+            onClick={() => { logout(); }}
+            className="h-10 px-6 ml-3 bg-transparent text-[#64748B] font-medium rounded-lg hover:bg-[#F1F5F9] transition-colors"
+          >
+            Sign Out
+          </button>
+        </div>
+        <ToastContainer toasts={toasts} onRemove={remove} />
+      </div>
+    );
+  }
+
   const navigate = (s: Screen) => {
     setScreen(s);
     setUserMenuOpen(false);
@@ -339,8 +371,8 @@ export default function App() {
           {/* Quick stats */}
           <div className="hidden lg:flex items-center gap-4 text-xs text-[#94A3B8] border-r border-[#E2E8F0] pr-4 mr-1">
             <span className="flex items-center gap-1.5">
-              <span className={`w-2 h-2 rounded-full ${apiStatus === 'connected' ? 'bg-[#16A34A]' : apiStatus === 'disconnected' ? 'bg-[#DC2626]' : 'bg-[#D97706] animate-pulse'}`} />
-              {apiStatus === 'connected' ? 'API Connected' : apiStatus === 'disconnected' ? 'Demo Mode' : 'Connecting...'}
+              <span className={`w-2 h-2 rounded-full ${apiStatus === 'connected' ? 'bg-[#16A34A]' : 'bg-[#D97706] animate-pulse'}`} />
+              {apiStatus === 'connected' ? 'API Connected' : 'Connecting...'}
             </span>
             <span>
               <span className="text-[#D97706] font-semibold">
