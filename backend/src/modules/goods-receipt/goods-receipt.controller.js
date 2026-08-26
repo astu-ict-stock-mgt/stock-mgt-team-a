@@ -7,7 +7,8 @@ class GoodsReceiptController {
       const receipt = await goodsReceiptService.create(req.body, req.user.userId);
       return sendSuccess(res, receipt, 201);
     } catch (error) {
-      return sendError(res, error);
+      console.error('GoodsReceipt create error:', error);
+      return sendError(res, error.message || error, error.status || error.statusCode || 500, error.code || 'BAD_REQUEST');
     }
   }
 
