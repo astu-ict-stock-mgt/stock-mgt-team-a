@@ -19,7 +19,7 @@ import { sendCreated, sendSuccess } from '../../utils/response.js'
 export const create = async (req, res, next) => {
   try {
     const record = await createReconciliation({
-      initiatedBy: req.user.id || req.user.userId,
+      initiatedBy: req.user.userId,
       ...req.body,
     })
     sendCreated(res, record)
@@ -63,7 +63,7 @@ export const approve = async (req, res, next) => {
   try {
     const result = await approveReconciliation({
       id: req.params.id,
-      approvedBy: req.user.id || req.user.userId,
+      approvedBy: req.user.userId,
       ...req.body,
     })
     sendSuccess(res, result)
@@ -79,7 +79,7 @@ export const postAdjustments = async (req, res, next) => {
   try {
     const result = await postReconciliationAdjustments({
       id: req.params.id,
-      postedBy: req.user.id || req.user.userId,
+      postedBy: req.user.userId,
     })
     sendSuccess(res, result)
   } catch (err) {

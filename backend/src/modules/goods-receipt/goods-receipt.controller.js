@@ -4,7 +4,7 @@ import { sendSuccess, sendError } from '../../utils/response.js';
 class GoodsReceiptController {
   async create(req, res, next) {
     try {
-      const receipt = await goodsReceiptService.create(req.body, req.user.id);
+      const receipt = await goodsReceiptService.create(req.body, req.user.userId);
       return sendSuccess(res, receipt, 201);
     } catch (error) {
       return sendError(res, error);
@@ -34,7 +34,7 @@ class GoodsReceiptController {
       const receipt = await goodsReceiptService.updateStatus(
         req.params.id,
         req.body.status,
-        req.user.id
+        req.user.userId
       );
       return sendSuccess(res, receipt);
     } catch (error) {

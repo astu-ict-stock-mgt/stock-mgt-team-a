@@ -7,7 +7,7 @@ class InventoryController {
     try {
       const result = await transactionPostingService.postTransaction({
         ...req.body,
-        createdBy: req.user.id,
+        createdBy: req.user.userId,
       });
       return sendSuccess(res, result, 201);
     } catch (error) {

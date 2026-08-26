@@ -4,7 +4,7 @@ import { sendSuccess, sendError } from '../../utils/response.js';
 class GRNController {
   async create(req, res, next) {
     try {
-      const grn = await grnService.create(req.body, req.user.id);
+      const grn = await grnService.create(req.body, req.user.userId);
       return sendSuccess(res, grn, 201);
     } catch (error) {
       return sendError(res, error);
@@ -31,7 +31,7 @@ class GRNController {
 
   async finalize(req, res, next) {
     try {
-      const grn = await grnService.finalize(req.params.id, req.user.id);
+      const grn = await grnService.finalize(req.params.id, req.user.userId);
       return sendSuccess(res, grn);
     } catch (error) {
       return sendError(res, error);

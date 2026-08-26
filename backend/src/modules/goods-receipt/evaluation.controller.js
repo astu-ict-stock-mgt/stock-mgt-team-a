@@ -4,7 +4,7 @@ import { sendSuccess, sendError } from '../../utils/response.js';
 class EvaluationController {
   async create(req, res, next) {
     try {
-      const evaluation = await evaluationService.create(req.body, req.user.id);
+      const evaluation = await evaluationService.create(req.body, req.user.userId);
       return sendSuccess(res, evaluation, 201);
     } catch (error) {
       return sendError(res, error);
@@ -31,7 +31,7 @@ class EvaluationController {
 
   async startEvaluation(req, res, next) {
     try {
-      const evaluation = await evaluationService.startEvaluation(req.params.id, req.user.id);
+      const evaluation = await evaluationService.startEvaluation(req.params.id, req.user.userId);
       return sendSuccess(res, evaluation);
     } catch (error) {
       return sendError(res, error);
@@ -43,7 +43,7 @@ class EvaluationController {
       const evaluation = await evaluationService.updateDecision(
         req.params.id,
         req.body.decision,
-        req.user.id
+        req.user.userId
       );
       return sendSuccess(res, evaluation);
     } catch (error) {

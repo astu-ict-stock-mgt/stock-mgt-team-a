@@ -20,7 +20,7 @@ import { sendCreated, sendSuccess } from '../../utils/response.js'
 export const create = async (req, res, next) => {
   try {
     const record = await createDisposalRequest({
-      requestedBy: req.user.id || req.user.userId,
+      requestedBy: req.user.userId,
       ...req.body,
     })
     sendCreated(res, record)
@@ -64,7 +64,7 @@ export const evaluate = async (req, res, next) => {
   try {
     const result = await evaluateDisposalRequest({
       id: req.params.id,
-      evaluatedBy: req.user.id || req.user.userId,
+      evaluatedBy: req.user.userId,
       ...req.body,
     })
     sendSuccess(res, result)
@@ -80,7 +80,7 @@ export const approve = async (req, res, next) => {
   try {
     const result = await approveDisposalRequest({
       id: req.params.id,
-      approvedBy: req.user.id || req.user.userId,
+      approvedBy: req.user.userId,
       ...req.body,
     })
     sendSuccess(res, result)
@@ -96,7 +96,7 @@ export const complete = async (req, res, next) => {
   try {
     const result = await completeDisposalRequest({
       id: req.params.id,
-      executedBy: req.user.id || req.user.userId,
+      executedBy: req.user.userId,
       ...req.body,
     })
     sendSuccess(res, result)
