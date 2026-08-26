@@ -228,7 +228,7 @@ export default function StockTracking() {
                       <td className="px-4 py-3 font-mono text-sm text-[#334155]">{card.quantity} {card.unit?.symbol || ''}</td>
                       <td className="px-4 py-3 font-mono text-sm text-[#D97706]">{card.reservedQty}</td>
                       <td className="px-4 py-3 font-mono text-sm font-bold text-[#16A34A]">{card.availableQty} {card.unit?.symbol || ''}</td>
-                      <td className="px-4 py-3 font-mono text-sm text-[#334155]">${(card.averageCost || 0).toFixed(2)}</td>
+                      <td className="px-4 py-3 font-mono text-sm text-[#334155]">${Number(card.averageCost || 0).toFixed(2)}</td>
                     </tr>
                   ))
                 )}

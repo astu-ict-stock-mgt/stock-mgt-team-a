@@ -209,7 +209,7 @@ export default function StockTaking() {
               <p className="text-sm font-medium text-[#334155] mb-2">Count summary</p>
               <div className="grid grid-cols-2 gap-3">
                 <div><p className="text-xs text-[#94A3B8]">Items to count</p><p className="text-lg font-bold font-mono text-[#0F172A]">{storeItems.length}</p></div>
-                <div><p className="text-xs text-[#94A3B8]">System total value</p><p className="text-lg font-bold font-mono text-[#0F172A]">${storeItems.reduce((s, si) => s + si.quantity * (si.averageCost || 0), 0).toFixed(2)}</p></div>
+                <div><p className="text-xs text-[#94A3B8]">System total value</p><p className="text-lg font-bold font-mono text-[#0F172A]">${storeItems.reduce((s, si) => s + si.quantity * (Number(si.averageCost) || 0), 0).toFixed(2)}</p></div>
               </div>
             </div>
             <div className="p-3 bg-[#FFFBEB] border border-[#FDE68A] rounded-lg text-xs text-[#92400E]">
@@ -221,7 +221,7 @@ export default function StockTaking() {
               setEntries(storeItems.map(si => ({
                 itemId: si.itemId, name: si.item?.name || '', code: si.item?.code || '',
                 systemCount: si.quantity, physicalCount: null,
-                unitSymbol: si.unit?.symbol || '', unitCost: si.averageCost || 0,
+                unitSymbol: si.unit?.symbol || '', unitCost: Number(si.averageCost) || 0,
                 notes: '', counted: false,
               })))
               setPhase('count')

@@ -80,8 +80,8 @@ export default function Inventory() {
       )
     },
     { key: 'minimumStock', header: 'Min', align: 'right' as const, render: (i: typeof enrichedItems[0]) => <span className="text-xs font-mono text-[#94A3B8] text-right block">{i.minimumStock}</span> },
-    { key: 'unitCost', header: 'Unit Cost', align: 'right' as const, render: (i: typeof enrichedItems[0]) => <span className="text-sm font-mono text-right block">${(i.unitCost || 0).toFixed(2)}</span> },
-    { key: 'totalValue', header: 'Total Value', align: 'right' as const, render: (i: typeof enrichedItems[0]) => <span className="text-sm font-semibold font-mono text-right block">${i.totalValue.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span> },
+    { key: 'unitCost', header: 'Unit Cost', align: 'right' as const, render: (i: typeof enrichedItems[0]) => <span className="text-sm font-mono text-right block">${Number(i.unitCost || 0).toFixed(2)}</span> },
+    { key: 'totalValue', header: 'Total Value', align: 'right' as const, render: (i: typeof enrichedItems[0]) => <span className="text-sm font-semibold font-mono text-right block">${Number(i.totalValue).toLocaleString('en-US', { minimumFractionDigits: 2 })}</span> },
     { key: 'status', header: 'Status', render: (i: typeof enrichedItems[0]) => statusBadge(i.status) },
     {
       key: 'actions', header: '', width: 'w-8',
@@ -132,8 +132,8 @@ export default function Inventory() {
                   { label: 'On hand qty', value: `${totalQty} ${s.unitSymbol}` },
                   { label: 'Minimum qty', value: `${s.minimumStock} ${s.unitSymbol}` },
                   { label: 'Maximum qty', value: `${s.maximumStock} ${s.unitSymbol}` },
-                  { label: 'Unit cost', value: `$${(s.unitCost || 0).toFixed(2)}` },
-                  { label: 'Total value', value: `$${s.totalValue.toLocaleString()}` },
+                  { label: 'Unit cost', value: `$${Number(s.unitCost || 0).toFixed(2)}` },
+                  { label: 'Total value', value: `$${Number(s.totalValue).toLocaleString()}` },
                   { label: 'Supplier', value: s.supplierName || 'N/A' },
                   { label: 'Barcode', value: s.barcode || 'N/A' },
                 ].map(({ label, value }) => (
