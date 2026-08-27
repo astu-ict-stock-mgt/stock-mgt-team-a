@@ -1,5 +1,6 @@
 import { PrismaClient } from '@prisma/client';
 import { NotFoundError, ValidationError } from '../../utils/errors.js';
+import { notifyMaterialDecision } from '../notifications/notification-events.service.js';
 
 const prisma = new PrismaClient();
 
@@ -98,10 +99,20 @@ class EvaluationService {
 
     // Update goods receipt status based on decision
     const newStatus = decision === 'APPROVED' ? 'EVALUATED' : 'REJECTED';
-    await prisma.goodsReceipt.update({
+    const goodsReceipt = await prisma.goodsReceipt.update({
       where: { id: evaluation.goodsReceiptId },
       data: { status: newStatus },
+      select: { id: true, receiptNumber: true },
     });
+
+    // BE-150: Notify STOREKEEPER and PAO of evaluation decision — fire-and-forget
+    notifyMaterialDecision({
+      entityType: 'GOODS_RECEIPT',
+      decision,
+      entityId: goodsReceipt.id,
+      entityNumber: goodsReceipt.receiptNumber,
+      deciderId: userId,
+    }).catch(() => {});
 
     return updated;
   }

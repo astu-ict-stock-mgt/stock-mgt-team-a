@@ -7,6 +7,7 @@ import { NotFoundError, ValidationError } from '../../utils/errors.js';
 import {
   notifyGRNCreated,
   notifyGoodsReceiptEvaluationRequired,
+  notifyPropertyRegistrationRequired,
 } from '../notifications/notification-events.service.js';
 
 const prisma = new PrismaClient();
@@ -158,6 +159,13 @@ class GRNService {
       grnId: updated.id,
       grnNumber: updated.grnNumber,
       creatorId: userId,
+    }).catch(() => {});
+
+    // BE-150: Notify PROPERTY_REGISTRATION_OFFICER for asset tagging — fire-and-forget
+    notifyPropertyRegistrationRequired({
+      entityId: updated.id,
+      entityNumber: updated.grnNumber,
+      entityType: 'GRN',
     }).catch(() => {});
 
     return updated;
