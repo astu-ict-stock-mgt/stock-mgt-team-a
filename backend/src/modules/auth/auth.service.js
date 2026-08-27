@@ -138,10 +138,13 @@ export const logoutUser = async (token) => {
 }
 
 /**
- * Change user password
- * @param {string} userId
- * @param {string} currentPassword
- * @param {string} newPassword
+ * Change user password in the system database
+ * Verifies current password matches existing hash, hashes the new password,
+ * and updates the database record.
+ * @param {string} userId - User identifier (UUID)
+ * @param {string} currentPassword - Raw current password string
+ * @param {string} newPassword - Raw new password to set
+ * @returns {Promise<{ message: string }>} Success message
  */
 export const changeUserPassword = async (userId, currentPassword, newPassword) => {
   const user = await prisma.user.findUnique({ where: { id: userId } })
