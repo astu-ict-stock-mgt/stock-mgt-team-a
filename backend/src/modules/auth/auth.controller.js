@@ -67,6 +67,11 @@ export const logout = async (req, res, next) => {
 
 /**
  * Handle password changes POST /api/auth/change-password
+ * Verifies current user authentication token and checks user credentials
+ * before hashing and saving the new password.
+ * @param {import('express').Request} req - Express request with req.user context
+ * @param {import('express').Response} res - Express response
+ * @param {import('express').NextFunction} next - Express next middleware
  */
 export const changePassword = async (req, res, next) => {
   try {
