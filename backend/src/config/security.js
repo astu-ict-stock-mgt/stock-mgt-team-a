@@ -7,14 +7,15 @@ import rateLimit from 'express-rate-limit'
  * In development, localhost origins are allowed by default.
  */
 export function getCorsOptions() {
-  const allowedOrigins = process.env.CORS_ORIGINS
-    ? process.env.CORS_ORIGINS.split(',').map(o => o.trim())
-    : ['http://localhost:5173', 'http://localhost:3000']
-
   return {
     origin: (origin, callback) => {
       // Allow requests with no origin (mobile apps, curl, server-to-server)
       if (!origin) return callback(null, true)
+      // In development, allow all origins (local network access)
+      if (process.env.NODE_ENV === 'development') return callback(null, true)
+      const allowedOrigins = process.env.CORS_ORIGINS
+        ? process.env.CORS_ORIGINS.split(',').map(o => o.trim())
+        : ['http://localhost:5173', 'http://localhost:3000']
       if (allowedOrigins.includes(origin)) {
         callback(null, true)
       } else {
@@ -65,8 +66,8 @@ export const authRateLimiter = rateLimit({
     }
   },
   skip: (req) => {
-    // Skip rate limiting in test environment
-    return process.env.NODE_ENV === 'test'
+    // Skip rate limiting in test/development environment
+    return process.env.NODE_ENV === 'test' || process.env.NODE_ENV === 'development'
   }
 })
 
@@ -86,8 +87,8 @@ export const apiRateLimiter = rateLimit({
     }
   },
   skip: (req) => {
-    // Skip rate limiting for health checks and in test environment
-    return process.env.NODE_ENV === 'test' || req.path === '/api/health' || req.path === '/health'
+    // Skip rate limiting for health checks and in test/development environment
+    return process.env.NODE_ENV === 'test' || process.env.NODE_ENV === 'development' || req.path === '/api/health' || req.path === '/health'
   }
 })
 

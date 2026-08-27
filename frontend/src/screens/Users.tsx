@@ -1,10 +1,10 @@
 import { useState } from 'react'
-import { Button, Badge, SectionHeader, Card, Input, Select, Modal, FormGroup, Icons, useToast } from '../components/ui'
+import { Button, Badge, SectionHeader, Card, Input, Select, Modal, useToast } from '../components/ui'
 import { useApp } from '../context/AppContext'
 import { usersApi } from '../services/api'
 
 export default function Users() {
-  const { users, roles, addUser, updateUser, deleteUser } = useApp()
+  const { users, roles, addUser, updateUser, deleteUser, currentUser } = useApp()
   const { toast } = useToast()
 
   const [searchTerm, setSearchTerm] = useState('')
@@ -15,7 +15,7 @@ export default function Users() {
     fullName: '',
     email: '',
     password: '',
-    roleId: roles[0]?.id || '',
+    roleIds: [] as string[],
     status: 'ACTIVE' as 'ACTIVE' | 'INACTIVE',
   })
   const [saving, setSaving] = useState(false)
@@ -24,7 +24,8 @@ export default function Users() {
     const matchesSearch = u.fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       u.email.toLowerCase().includes(searchTerm.toLowerCase())
     const matchesStatus = statusFilter === 'all' || u.status === statusFilter
-    return matchesSearch && matchesStatus
+    const isVisible = statusFilter !== 'all' || u.status === 'ACTIVE'
+    return matchesSearch && matchesStatus && isVisible
   })
 
   const stats = {
@@ -35,7 +36,7 @@ export default function Users() {
 
   const openCreateModal = () => {
     setEditingUser(null)
-    setFormData({ fullName: '', email: '', password: '', roleId: roles[0]?.id || '', status: 'ACTIVE' })
+    setFormData({ fullName: '', email: '', password: '', roleIds: [], status: 'ACTIVE' })
     setShowModal(true)
   }
 
@@ -45,10 +46,17 @@ export default function Users() {
       fullName: user.fullName,
       email: user.email,
       password: '',
-      roleId: user.roles?.[0]?.id || '',
+      roleIds: user.roles?.map(r => r.id) || [],
       status: user.status,
     })
     setShowModal(true)
+  }
+
+  const toggleRole = (roleId: string) => {
+    setFormData(f => ({
+      ...f,
+      roleIds: f.roleIds.includes(roleId) ? f.roleIds.filter(id => id !== roleId) : [...f.roleIds, roleId],
+    }))
   }
 
   const saveUser = async () => {
@@ -73,7 +81,18 @@ export default function Users() {
         const res = await usersApi.update(editingUser.id, {
           fullName: formData.fullName,
           email: formData.email,
+          status: formData.status,
         })
+        // Get current role IDs to determine what to add/remove
+        const currentRoleIds = editingUser.roles?.map(r => r.id) || []
+        const rolesToAdd = formData.roleIds.filter(id => !currentRoleIds.includes(id))
+        const rolesToRemove = currentRoleIds.filter(id => !formData.roleIds.includes(id))
+        if (rolesToAdd.length > 0) {
+          await usersApi.assignRoles(editingUser.id, rolesToAdd)
+        }
+        if (rolesToRemove.length > 0) {
+          await usersApi.removeRoles(editingUser.id, rolesToRemove)
+        }
         // Update local state
         updateUser(editingUser.id, { fullName: formData.fullName, email: formData.email, status: formData.status })
         toast.success(`User ${formData.fullName} updated`)
@@ -82,9 +101,8 @@ export default function Users() {
           fullName: formData.fullName,
           email: formData.email,
           password: formData.password,
-          roleIds: formData.roleId ? [formData.roleId] : [],
+          roleIds: formData.roleIds,
         })
-        // Add to local state
         if (res.data) {
           addUser(res.data as any)
         }
@@ -99,6 +117,10 @@ export default function Users() {
   }
 
   const handleDelete = (user: typeof users[0]) => {
+    if (currentUser?.userId === user.id) {
+      toast.error('You cannot delete your own account')
+      return
+    }
     if (confirm(`Delete user ${user.fullName}?`)) {
       deleteUser(user.id)
       toast.success(`User ${user.fullName} deleted`)
@@ -112,7 +134,7 @@ export default function Users() {
         subtitle="Manage system users and their access"
         actions={
           <div className="flex items-center gap-2">
-            <Button variant="primary" size="md" icon={Icons.plus} onClick={openCreateModal}>Add user</Button>
+            <Button variant="primary" size="md" onClick={openCreateModal}>Add user</Button>
           </div>
         }
       />
@@ -143,7 +165,7 @@ export default function Users() {
           <table className="w-full text-sm border-collapse">
             <thead>
               <tr className="border-b border-[#E2E8F0]">
-                {['User', 'Email', 'Role', 'Status', 'Actions'].map(h => (
+                {['User', 'Email', 'Roles', 'Status', 'Actions'].map(h => (
                   <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-[#64748B] uppercase tracking-wide">{h}</th>
                 ))}
               </tr>
@@ -163,12 +185,18 @@ export default function Users() {
                       </div>
                     </td>
                     <td className="px-4 py-3 text-xs text-[#64748B]">{u.email}</td>
-                    <td className="px-4 py-3"><Badge variant="default">{u.roles?.[0]?.name || 'No role'}</Badge></td>
+                    <td className="px-4 py-3">
+                      <div className="flex flex-wrap gap-1">
+                        {u.roles?.length ? u.roles.map(r => (
+                          <Badge key={r.id} variant="default">{r.name}</Badge>
+                        )) : <span className="text-xs text-[#94A3B8]">No role</span>}
+                      </div>
+                    </td>
                     <td className="px-4 py-3"><Badge variant={u.status === 'ACTIVE' ? 'success' : 'danger'} dot>{u.status === 'ACTIVE' ? 'Active' : 'Inactive'}</Badge></td>
                     <td className="px-4 py-3">
                       <div className="flex gap-1">
-                        <Button variant="ghost" size="sm" icon={Icons.edit} onClick={() => openEditModal(u)}>Edit</Button>
-                        <Button variant="ghost" size="sm" icon={Icons.trash} onClick={() => handleDelete(u)}>Delete</Button>
+                        <Button variant="ghost" size="sm" onClick={() => openEditModal(u)}>Edit</Button>
+                        <Button variant="ghost" size="sm" onClick={() => handleDelete(u)}>Delete</Button>
                       </div>
                     </td>
                   </tr>
@@ -190,7 +218,23 @@ export default function Users() {
           {!editingUser && (
             <Input label="Password" type="password" placeholder="Min 8 characters" value={formData.password} onChange={e => setFormData(f => ({ ...f, password: e.target.value }))} />
           )}
-          <Select label="Role" options={roles.map(r => ({ value: r.id, label: r.name }))} value={formData.roleId} onChange={e => setFormData(f => ({ ...f, roleId: e.target.value }))} />
+          <div>
+            <label className="text-sm font-medium text-[#334155]">Roles</label>
+            <div className="mt-1.5 space-y-2 border border-[#E2E8F0] rounded-lg p-3">
+              {roles.map(r => (
+                <label key={r.id} className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={formData.roleIds.includes(r.id)}
+                    onChange={() => toggleRole(r.id)}
+                    className="w-4 h-4 rounded border-[#E2E8F0] text-[#4F46E5] focus:ring-[#C7D2FE]"
+                  />
+                  <span className="text-sm text-[#334155]">{r.name}</span>
+                </label>
+              ))}
+              {roles.length === 0 && <p className="text-xs text-[#94A3B8]">No roles available</p>}
+            </div>
+          </div>
           <Select label="Status" options={[{ value: 'ACTIVE', label: 'Active' }, { value: 'INACTIVE', label: 'Inactive' }]} value={formData.status} onChange={e => setFormData(f => ({ ...f, status: e.target.value as 'ACTIVE' | 'INACTIVE' }))} />
         </div>
       </Modal>

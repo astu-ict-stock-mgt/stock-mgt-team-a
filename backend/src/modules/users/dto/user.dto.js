@@ -41,8 +41,9 @@ export const updateUserSchema = Joi.object({
   email: Joi.string().email().optional().messages({
     'string.email': 'Invalid email format',
   }),
+  status: Joi.string().valid('ACTIVE', 'INACTIVE', 'SUSPENDED').optional(),
 }).min(1).messages({
-  'object.min': 'At least one field must be provided for update',
+  'object.min': 'At least one field must be provided for update'
 })
 
 /**

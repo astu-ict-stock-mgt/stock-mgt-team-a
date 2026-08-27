@@ -84,6 +84,8 @@ interface AppContextType {
   apiStatus: 'connected' | 'disconnected' | 'checking'
 }
 
+import { hasAnyPermission, PERMISSIONS } from '../lib/permissions'
+
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export function AppProvider({ children }: { children: ReactNode }) {
@@ -96,6 +98,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
   });
 
   const userRoles = currentUser?.roles || []
+
+  // Register 401 handler to force logout on expired/invalid tokens
+  useEffect(() => {
+    api.setOnUnauthorized(() => {
+      setIsAuthenticated(false);
+      setCurrentUser(null);
+      localStorage.removeItem('sms_user');
+      localStorage.removeItem('sms_token');
+    });
+  }, []);
 
   const [inventoryItems, setInventoryItems] = useState<Item[]>([]);
   const [stockCards, setStockCards] = useState<StockCard[]>([]);
@@ -113,40 +125,46 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [requisitions, setRequisitions] = useState<Requisition[]>([]);
 
   const loadAllData = useCallback(async () => {
+    const perms = userRoles
+    const fetchIf = async (condition: boolean, fn: () => Promise<any>) => {
+      if (!condition) return null
+      try { return (await fn()).data } catch { return null }
+    }
+
     try {
       const [
-        itemsRes, suppliersRes, usersRes, rolesRes, storesRes,
-        categoriesRes, unitsRes, logsRes, notifsRes, transfersRes, stockTakesRes, requisitionsRes,
-      ] = await Promise.allSettled([
-        itemsApi.getAll(),
-        suppliersApi.getAll(),
-        usersApi.getAll({ limit: 100 }),
-        rolesApi.getAll(),
-        storesApi.getAll(),
-        categoriesApi.getAll(),
-        unitsApi.getAll(),
-        auditApi.getRecent(50),
-        notificationsApi.getAll({ limit: 50 }),
-        transfersApi.getAll({ limit: 50 }),
-        stockTakesApi.getAll({ limit: 50 }),
-        requisitionsApi.getAll({ limit: 50 }),
+        itemsData, suppliersData, usersData, rolesData, storesData,
+        categoriesData, unitsData, logsData, notifsData, transfersData, stockTakesData, requisitionsData,
+      ] = await Promise.all([
+        fetchIf(hasAnyPermission(perms, [PERMISSIONS.ITEMS_READ, PERMISSIONS.ITEMS_MANAGE]), itemsApi.getAll),
+        fetchIf(hasAnyPermission(perms, [PERMISSIONS.SUPPLIERS_READ, PERMISSIONS.SUPPLIERS_MANAGE]), suppliersApi.getAll),
+        fetchIf(hasAnyPermission(perms, [PERMISSIONS.USERS_READ, PERMISSIONS.USERS_MANAGE]), () => usersApi.getAll({ limit: 100 })),
+        fetchIf(hasAnyPermission(perms, [PERMISSIONS.USERS_READ, PERMISSIONS.USERS_MANAGE]), rolesApi.getAll),
+        fetchIf(hasAnyPermission(perms, [PERMISSIONS.STORES_READ, PERMISSIONS.STORES_MANAGE]), storesApi.getAll),
+        fetchIf(hasAnyPermission(perms, [PERMISSIONS.CATEGORIES_READ, PERMISSIONS.CATEGORIES_MANAGE]), categoriesApi.getAll),
+        fetchIf(hasAnyPermission(perms, [PERMISSIONS.UNITS_READ, PERMISSIONS.UNITS_MANAGE]), unitsApi.getAll),
+        fetchIf(hasAnyPermission(perms, [PERMISSIONS.AUDIT_READ]), () => auditApi.getRecent(50)),
+        fetchIf(isAuthenticated, () => notificationsApi.getAll({ limit: 50 })),
+        fetchIf(hasAnyPermission(perms, [PERMISSIONS.TRANSFERS_READ, PERMISSIONS.TRANSFERS_CREATE, PERMISSIONS.TRANSFERS_APPROVE, PERMISSIONS.TRANSFERS_EXECUTE]), () => transfersApi.getAll({ limit: 50 })),
+        fetchIf(hasAnyPermission(perms, [PERMISSIONS.RECONCILIATION_READ, PERMISSIONS.RECONCILIATION_CREATE, PERMISSIONS.RECONCILIATION_APPROVE, PERMISSIONS.RECONCILIATION_POST]), () => stockTakesApi.getAll({ limit: 50 })),
+        fetchIf(hasAnyPermission(perms, [PERMISSIONS.REQUISITIONS_READ, PERMISSIONS.REQUISITIONS_CREATE, PERMISSIONS.REQUISITIONS_APPROVE]), () => requisitionsApi.getAll({ limit: 50 })),
       ]);
 
-      if (itemsRes.status === 'fulfilled') setInventoryItems(itemsRes.value.data);
-      if (suppliersRes.status === 'fulfilled') setSuppliers(suppliersRes.value.data);
-      if (usersRes.status === 'fulfilled') setUsers(usersRes.value.data);
-      if (rolesRes.status === 'fulfilled') setRoles(rolesRes.value.data);
-      if (storesRes.status === 'fulfilled') setStores(storesRes.value.data);
-      if (categoriesRes.status === 'fulfilled') setCategories(categoriesRes.value.data);
-      if (unitsRes.status === 'fulfilled') setUnits(unitsRes.value.data);
-      if (logsRes.status === 'fulfilled') setAuditLogs(logsRes.value.data);
-      if (notifsRes.status === 'fulfilled') setNotifications(notifsRes.value.data);
-      if (transfersRes.status === 'fulfilled') setTransfers(transfersRes.value.data);
-      if (stockTakesRes.status === 'fulfilled') setStockTakes(stockTakesRes.value.data);
-      if (requisitionsRes.status === 'fulfilled') setRequisitions(requisitionsRes.value.data);
+      if (itemsData) setInventoryItems(itemsData);
+      if (suppliersData) setSuppliers(suppliersData);
+      if (usersData) setUsers(usersData);
+      if (rolesData) setRoles(rolesData);
+      if (storesData) setStores(storesData);
+      if (categoriesData) setCategories(categoriesData);
+      if (unitsData) setUnits(unitsData);
+      if (logsData) setAuditLogs(logsData);
+      if (notifsData) setNotifications(notifsData);
+      if (transfersData) setTransfers(transfersData);
+      if (stockTakesData) setStockTakes(stockTakesData);
+      if (requisitionsData) setRequisitions(requisitionsData);
 
-      if (storesRes.status === 'fulfilled' && storesRes.value.data.length > 0) {
-        const firstStore = storesRes.value.data[0];
+      if (hasAnyPermission(perms, [PERMISSIONS.INVENTORY_READ]) && storesData && storesData.length > 0) {
+        const firstStore = storesData[0];
         try {
           const stockRes = await inventoryApi.getStockByStore(firstStore.id);
           setStockCards(stockRes.data);
@@ -155,7 +173,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     } catch (error) {
       console.error('Failed to load data:', error);
     }
-  }, []);
+  }, [userRoles]);
 
   const checkApiAndLoadData = useCallback(async () => {
     setApiStatus('checking');
@@ -180,18 +198,22 @@ export function AppProvider({ children }: { children: ReactNode }) {
     if (response.success && response.data) {
       api.setToken(response.data.token);
       // Decode JWT to get roles
-      const payload = JSON.parse(atob(response.data.token.split('.')[1]));
-      const userData = {
-        userId: payload.userId,
-        email: payload.email,
-        fullName: payload.fullName,
-        status: payload.status,
-        roles: payload.roles || [],
-      };
-      setCurrentUser(userData);
-      localStorage.setItem('sms_user', JSON.stringify(userData));
-      setIsAuthenticated(true);
-      await loadAllData();
+      try {
+        const payload = JSON.parse(atob(response.data.token.split('.')[1]));
+        const userData = {
+          userId: payload.userId,
+          email: payload.email,
+          fullName: payload.fullName,
+          status: payload.status,
+          roles: payload.roles || [],
+        };
+        setCurrentUser(userData);
+        localStorage.setItem('sms_user', JSON.stringify(userData));
+        setIsAuthenticated(true);
+        await loadAllData();
+      } catch {
+        throw new Error('Failed to decode authentication token');
+      }
     } else {
       throw new Error('Login failed');
     }
@@ -222,12 +244,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const refreshData = async () => { await loadAllData(); };
 
   const addInventoryItem = async (item: Item) => {
-    const res = await itemsApi.create(item as any);
-    setInventoryItems(prev => [res.data, ...prev]);
+    await itemsApi.create(item as any);
+    const res = await itemsApi.getAll();
+    setInventoryItems(res.data);
   };
   const updateInventoryItem = async (id: string, updates: Partial<Item>) => {
-    const res = await itemsApi.update(id, updates);
-    setInventoryItems(prev => prev.map(i => i.id === id ? res.data : i));
+    await itemsApi.update(id, updates);
+    const res = await itemsApi.getAll();
+    setInventoryItems(res.data);
   };
   const deleteInventoryItem = async (id: string) => {
     await itemsApi.delete(id);
@@ -235,12 +259,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
   };
 
   const addSupplier = async (supplier: Supplier) => {
-    const res = await suppliersApi.create(supplier as any);
-    setSuppliers(prev => [res.data, ...prev]);
+    await suppliersApi.create(supplier as any);
+    const res = await suppliersApi.getAll();
+    setSuppliers(res.data);
   };
   const updateSupplier = async (id: string, updates: Partial<Supplier>) => {
-    const res = await suppliersApi.update(id, updates);
-    setSuppliers(prev => prev.map(s => s.id === id ? res.data : s));
+    await suppliersApi.update(id, updates);
+    const res = await suppliersApi.getAll();
+    setSuppliers(res.data);
   };
   const deleteSupplier = async (id: string) => {
     await suppliersApi.delete(id);
@@ -248,12 +274,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
   };
 
   const addCategory = async (category: Category) => {
-    const res = await categoriesApi.create(category as any);
-    setCategories(prev => [res.data, ...prev]);
+    await categoriesApi.create(category as any);
+    const res = await categoriesApi.getAll();
+    setCategories(res.data);
   };
   const updateCategory = async (id: string, updates: Partial<Category>) => {
-    const res = await categoriesApi.update(id, updates);
-    setCategories(prev => prev.map(c => c.id === id ? res.data : c));
+    await categoriesApi.update(id, updates);
+    const res = await categoriesApi.getAll();
+    setCategories(res.data);
   };
   const deleteCategory = async (id: string) => {
     await categoriesApi.delete(id);
@@ -261,12 +289,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
   };
 
   const addStore = async (store: Store) => {
-    const res = await storesApi.create(store as any);
-    setStores(prev => [res.data, ...prev]);
+    await storesApi.create(store as any);
+    const res = await storesApi.getAll();
+    setStores(res.data);
   };
   const updateStore = async (id: string, updates: Partial<Store>) => {
-    const res = await storesApi.update(id, updates);
-    setStores(prev => prev.map(s => s.id === id ? res.data : s));
+    await storesApi.update(id, updates);
+    const res = await storesApi.getAll();
+    setStores(res.data);
   };
   const deleteStore = async (id: string) => {
     await storesApi.delete(id);
@@ -274,12 +304,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
   };
 
   const addUnit = async (unit: Unit) => {
-    const res = await unitsApi.create(unit as any);
-    setUnits(prev => [res.data, ...prev]);
+    await unitsApi.create(unit as any);
+    const res = await unitsApi.getAll();
+    setUnits(res.data);
   };
   const updateUnit = async (id: string, updates: Partial<Unit>) => {
-    const res = await unitsApi.update(id, updates);
-    setUnits(prev => prev.map(u => u.id === id ? res.data : u));
+    await unitsApi.update(id, updates);
+    const res = await unitsApi.getAll();
+    setUnits(res.data);
   };
   const deleteUnit = async (id: string) => {
     await unitsApi.delete(id);
@@ -289,25 +321,30 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const addStockMovement = (movement: StockTransaction) => setStockMovements(prev => [movement, ...prev]);
 
   const addUser = async (user: User) => {
-    const res = await usersApi.create(user as any);
-    setUsers(prev => [res.data, ...prev]);
+    await usersApi.create(user as any);
+    const res = await usersApi.getAll({ limit: 100 });
+    setUsers(res.data);
   };
   const updateUser = async (id: string, updates: Partial<User>) => {
-    const res = await usersApi.update(id, updates);
-    setUsers(prev => prev.map(u => u.id === id ? res.data : u));
+    await usersApi.update(id, updates);
+    const res = await usersApi.getAll({ limit: 100 });
+    setUsers(res.data);
   };
   const deleteUser = async (id: string) => {
     await usersApi.delete(id);
-    setUsers(prev => prev.filter(u => u.id !== id));
+    const res = await usersApi.getAll({ limit: 100 });
+    setUsers(res.data);
   };
 
   const addRole = async (role: Role) => {
-    const res = await rolesApi.create(role as any);
-    setRoles(prev => [res.data, ...prev]);
+    await rolesApi.create(role as any);
+    const res = await rolesApi.getAll();
+    setRoles(res.data);
   };
   const updateRole = async (id: string, updates: Partial<Role>) => {
-    const res = await rolesApi.update(id, updates);
-    setRoles(prev => prev.map(r => r.id === id ? res.data : r));
+    await rolesApi.update(id, updates);
+    const res = await rolesApi.getAll();
+    setRoles(res.data);
   };
   const deleteRole = async (id: string) => {
     await rolesApi.delete(id);

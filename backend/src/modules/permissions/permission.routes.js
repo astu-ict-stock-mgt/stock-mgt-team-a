@@ -42,29 +42,6 @@ router.get('/', authenticate, authorize(PERMISSIONS.USERS_READ), listPermissions
 
 /**
  * @openapi
- * /permissions/{permissionId}:
- *   get:
- *     summary: Get permission by ID
- *     tags:
- *       - Permissions
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: permissionId
- *         required: true
- *         schema:
- *           type: string
- *     responses:
- *       200:
- *         description: Permission details
- *       404:
- *         description: Permission not found
- */
-router.get('/:permissionId', authenticate, authorize(PERMISSIONS.USERS_READ), getPermission)
-
-/**
- * @openapi
  * /permissions/code/{code}:
  *   get:
  *     summary: Get permission by code
@@ -85,6 +62,29 @@ router.get('/:permissionId', authenticate, authorize(PERMISSIONS.USERS_READ), ge
  *         description: Permission not found
  */
 router.get('/code/:code', authenticate, authorize(PERMISSIONS.USERS_READ), getPermissionByCodeHandler)
+
+/**
+ * @openapi
+ * /permissions/{permissionId}:
+ *   get:
+ *     summary: Get permission by ID
+ *     tags:
+ *       - Permissions
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: permissionId
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Permission details
+ *       404:
+ *         description: Permission not found
+ */
+router.get('/:permissionId', authenticate, authorize(PERMISSIONS.USERS_READ), getPermission)
 
 /**
  * @openapi

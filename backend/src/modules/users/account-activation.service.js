@@ -32,7 +32,7 @@ export const activateUser = async (userId) => {
       status: true,
       createdAt: true,
       updatedAt: true,
-      userRoles: {
+      roles: {
         select: {
           role: {
             select: {
@@ -48,8 +48,7 @@ export const activateUser = async (userId) => {
 
   return {
     ...updatedUser,
-    roles: updatedUser.userRoles.map((ur) => ur.role),
-    userRoles: undefined,
+    roles: updatedUser.roles.map((ur) => ur.role),
   }
 }
 
@@ -78,7 +77,7 @@ export const deactivateUser = async (userId) => {
       status: true,
       createdAt: true,
       updatedAt: true,
-      userRoles: {
+      roles: {
         select: {
           role: {
             select: {
@@ -94,8 +93,7 @@ export const deactivateUser = async (userId) => {
 
   return {
     ...updatedUser,
-    roles: updatedUser.userRoles.map((ur) => ur.role),
-    userRoles: undefined,
+    roles: updatedUser.roles.map((ur) => ur.role),
   }
 }
 
@@ -122,7 +120,7 @@ export const toggleUserStatus = async (userId) => {
       status: true,
       createdAt: true,
       updatedAt: true,
-      userRoles: {
+      roles: {
         select: {
           role: {
             select: {
@@ -138,8 +136,7 @@ export const toggleUserStatus = async (userId) => {
 
   return {
     ...updatedUser,
-    roles: updatedUser.userRoles.map((ur) => ur.role),
-    userRoles: undefined,
+    roles: updatedUser.roles.map((ur) => ur.role),
   }
 }
 

@@ -179,8 +179,8 @@ export async function approveDepartmentRequisition({ id, approverId, lineApprova
 export async function approvePAORequisition({ id, paoUserId, lineApprovals }) {
   const requisition = await getRequisitionById(id)
 
-  if (!['SUBMITTED', 'DEPARTMENT_APPROVED'].includes(requisition.status)) {
-    throw new ConflictError(`Requisition cannot be PAO-approved from current state '${requisition.status}'`)
+  if (requisition.status !== 'DEPARTMENT_APPROVED') {
+    throw new ConflictError(`Requisition cannot be PAO-approved from current state '${requisition.status}'. It must first be approved at Department level (DEPARTMENT_APPROVED).`)
   }
 
   return prisma.$transaction(async (tx) => {

@@ -40,7 +40,19 @@ export async function getPermissionsFromDB(roleCode) {
       return ROLE_PERMISSIONS_MATRIX[roleCode] || []
     }
 
-    const perms = role.rolePermissions.map((rp) => rp.permission.code)
+    const perms = role.rolePermissions.flatMap((rp) => {
+      const code = rp.permission.code
+      const permObj = PERMISSIONS[code]
+      if (permObj?.key) {
+        return [permObj.key, code]
+      }
+      const key = code.includes(':')
+        ? code
+        : code.includes('.')
+          ? code.replace(/\./g, ':')
+          : code.toLowerCase().replace(/_/g, ':')
+      return [key, code]
+    })
 
     // If DB has no permissions for this role, fall back to matrix
     if (perms.length === 0) {

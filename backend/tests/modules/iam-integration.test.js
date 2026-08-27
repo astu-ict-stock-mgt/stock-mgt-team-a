@@ -33,26 +33,41 @@ let testRoleId
 
 describe('Identity & Access Management Integration Tests', () => {
   beforeAll(async () => {
-    // Create test admin user
-    const existingAdmin = await prisma.user.findUnique({
-      where: { email: 'iam-test-admin@example.com' },
-    })
+    // Clean up any existing test data first
+    await prisma.userRole.deleteMany({ where: { user: { email: { contains: 'iam-test' } } } })
+    await prisma.rolePermission.deleteMany({ where: { role: { code: { contains: 'TEST' } } } })
+    await prisma.user.deleteMany({ where: { email: { contains: 'iam-test' } } })
+    await prisma.role.deleteMany({ where: { code: { contains: 'TEST' } } })
 
-    let adminId
-    if (!existingAdmin) {
-      const passwordHash = await hashPassword('Admin123!')
-      const admin = await prisma.user.create({
-        data: {
-          email: 'iam-test-admin@example.com',
-          fullName: 'IAM Test Admin',
-          passwordHash,
-          status: 'ACTIVE',
-        },
+    // Create test admin user
+    const passwordHash = await hashPassword('Admin123!')
+    const admin = await prisma.user.create({
+      data: {
+        email: 'iam-test-admin@example.com',
+        fullName: 'IAM Test Admin',
+        passwordHash,
+        status: 'ACTIVE',
+      },
+    })
+    const adminId = admin.id
+
+    const adminRole = await prisma.role.findUnique({ where: { code: 'ADMIN' } })
+    if (adminRole) {
+      await prisma.userRole.create({
+        data: { userId: adminId, roleId: adminRole.id },
       })
-      adminId = admin.id
-    } else {
-      adminId = existingAdmin.id
     }
+
+    // Ensure USERS_READ permission fixture exists
+    await prisma.permission.upsert({
+      where: { code: 'USERS_READ' },
+      update: {},
+      create: {
+        code: 'USERS_READ',
+        name: 'View user profiles and list users',
+        description: 'View user profiles and list users',
+      },
+    })
 
     // Get admin token
     const loginResponse = await request(app)
@@ -106,11 +121,28 @@ describe('Identity & Access Management Integration Tests', () => {
     })
 
     it('should logout successfully', async () => {
-      if (!adminToken) return
+      // Obtain a separate session token for a dedicated user to test logout revocation without invalidating adminToken
+      const passwordHash = await hashPassword('User123!')
+      await prisma.user.upsert({
+        where: { email: 'iam-test-logout@example.com' },
+        update: {},
+        create: {
+          email: 'iam-test-logout@example.com',
+          fullName: 'IAM Test Logout User',
+          passwordHash,
+          status: 'ACTIVE',
+        },
+      })
+
+      const loginRes = await request(app)
+        .post('/api/auth/login')
+        .send({ email: 'iam-test-logout@example.com', password: 'User123!' })
+
+      const logoutToken = loginRes.body.data.token
 
       const response = await request(app)
         .post('/api/auth/logout')
-        .set('Authorization', `Bearer ${adminToken}`)
+        .set('Authorization', `Bearer ${logoutToken}`)
 
       expect(response.status).toBe(200)
       expect(response.body.success).toBe(true)

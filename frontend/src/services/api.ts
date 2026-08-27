@@ -5,6 +5,7 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api'
 class ApiClient {
   private baseUrl: string
   private token: string | null = null
+  private onUnauthorized: (() => void) | null = null
 
   constructor(baseUrl: string) {
     this.baseUrl = baseUrl
@@ -24,6 +25,10 @@ class ApiClient {
     return this.token
   }
 
+  setOnUnauthorized(handler: () => void) {
+    this.onUnauthorized = handler
+  }
+
   private async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
     const url = `${this.baseUrl}${endpoint}`
     const headers: Record<string, string> = {
@@ -37,6 +42,14 @@ class ApiClient {
 
     const response = await fetch(url, { ...options, headers })
     const data = await response.json()
+
+    if (response.status === 401 && this.onUnauthorized) {
+      this.token = null
+      localStorage.removeItem('sms_token')
+      localStorage.removeItem('sms_user')
+      this.onUnauthorized()
+      throw new Error('Session expired. Please sign in again.')
+    }
 
     if (!response.ok) {
       throw new Error(data.error?.message || `HTTP ${response.status}`)
@@ -96,9 +109,13 @@ export const usersApi = {
   getById: (id: string) => api.get<ApiResponse<User>>(`/users/${id}`),
   create: (data: { email: string; fullName: string; password: string; roleIds?: string[] }) =>
     api.post<ApiResponse<User>>('/users', data),
-  update: (id: string, data: { fullName?: string; email?: string }) =>
+  update: (id: string, data: { fullName?: string; email?: string; status?: string }) =>
     api.put<ApiResponse<User>>(`/users/${id}`, data),
   delete: (id: string) => api.delete<ApiResponse<{ message: string }>>(`/users/${id}`),
+  assignRoles: (userId: string, roleIds: string[]) =>
+    api.post<ApiResponse<User>>(`/users/${userId}/roles`, { roleIds }),
+  removeRoles: (userId: string, roleIds: string[]) =>
+    api.delete<ApiResponse<User>>(`/users/${userId}/roles`, { body: { roleIds } }),
 }
 
 export const rolesApi = {
@@ -128,6 +145,16 @@ export const storesApi = {
     api.post<ApiResponse<Store>>('/stores', data),
   update: (id: string, data: Partial<Store>) => api.put<ApiResponse<Store>>(`/stores/${id}`, data),
   delete: (id: string) => api.delete<ApiResponse<{ message: string }>>(`/stores/${id}`),
+}
+
+export const departmentsApi = {
+  getAll: (params?: { status?: string; search?: string }) => {
+    const q = new URLSearchParams()
+    if (params?.status) q.set('status', params.status)
+    if (params?.search) q.set('search', params.search)
+    return api.get<ApiResponse<Array<{ id: string; name: string; code: string; status?: string }>>>(`/departments?${q.toString()}`)
+  },
+  getById: (id: string) => api.get<ApiResponse<{ id: string; name: string; code: string }>>(`/departments/${id}`),
 }
 
 export const categoriesApi = {
@@ -286,7 +313,7 @@ export const requisitionsApi = {
     api.post<ApiResponse<Requisition>>('/requisitions', data),
   approveDepartment: (id: string) => api.patch<ApiResponse<Requisition>>(`/requisitions/${id}/approve-department`),
   approvePAO: (id: string) => api.patch<ApiResponse<Requisition>>(`/requisitions/${id}/approve-pao`),
-  reject: (id: string, reason: string) => api.patch<ApiResponse<Requisition>>(`/requisitions/${id}/reject`, { reason }),
+  reject: (id: string, reason: string, level?: 'DEPARTMENT' | 'PAO') => api.patch<ApiResponse<Requisition>>(`/requisitions/${id}/reject`, { reason, level }),
 }
 
 export const sivApi = {

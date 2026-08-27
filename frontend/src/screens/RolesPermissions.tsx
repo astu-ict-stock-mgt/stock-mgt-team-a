@@ -27,6 +27,18 @@ const PERMISSION_MODULES = [
   { key: 'reports', label: 'Reports & Audit', perms: ['reports:view', 'audit:read'] },
 ]
 
+const DEFAULT_ROLE_PERMISSIONS: Record<string, string[]> = {
+  ADMIN: ['users:manage', 'users:create', 'users:read', 'users:update', 'users:deactivate', 'audit:read'],
+  PAO: ['users:read', 'stock_cards:read', 'requisitions:read', 'requisitions:approve', 'siv:approve', 'siv:finalize', 'transfers:approve', 'disposal:request', 'disposal:approve', 'shelflife:read', 'reconciliation:read', 'reconciliation:approve', 'reports:view'],
+  STOREKEEPER: ['stores:manage', 'categories:manage', 'items:manage', 'units:manage', 'suppliers:manage', 'locations:manage', 'receipts:create', 'receipts:read', 'grn:generate', 'grn:read', 'goods-receipt:create', 'goods-receipt:read', 'goods-receipt:update', 'stock_cards:read', 'bin_cards:read', 'bins:transfer', 'requisitions:read', 'siv:prepare', 'siv:amend', 'transfers:create', 'transfers:execute', 'shelflife:read', 'reconciliation:create', 'reconciliation:read'],
+  TEC: ['goods-receipt:read', 'returns:evaluate', 'requisitions:read', 'reconciliation:read'],
+  ACCOUNTANT: ['reports:view', 'audit:read', 'stock_cards:read', 'assets:register', 'assets:read', 'reconciliation:read'],
+  DEPARTMENT_HEAD: ['requisitions:read', 'requisitions:approve'],
+  REQUESTER: ['requisitions:create', 'requisitions:read', 'returns:create'],
+  SECURITY_OFFICER: ['dispatch:verify'],
+  PROPERTY_REGISTRATION_OFFICER: ['grn:read', 'assets:register', 'assets:read'],
+}
+
 const permLabels: Record<string, string> = {
   'users:manage': 'Manage Users (Full)', 'users:create': 'Create Users', 'users:read': 'View Users', 'users:update': 'Update Users', 'users:deactivate': 'Deactivate Users',
   'stores:manage': 'Manage Stores', 'categories:manage': 'Manage Categories', 'items:manage': 'Manage Items', 'units:manage': 'Manage Units', 'suppliers:manage': 'Manage Suppliers', 'locations:manage': 'Manage Locations',
@@ -56,6 +68,14 @@ export default function RolesPermissions() {
   const [editingRole, setEditingRole] = useState<Role | null>(null)
   const [saving, setSaving] = useState(false)
   const [formData, setFormData] = useState({ code: '', name: '', description: '' })
+
+  const hasChanges = editingPerms && selectedRolePerms.length > 0 &&
+    (() => {
+      const original = new Set(selectedRolePerms.map(p => p.code))
+      if (editingPerms.size !== original.size) return true
+      for (const p of editingPerms) { if (!original.has(p)) return true }
+      return false
+    })()
 
   const loadRolePermissions = useCallback(async (roleId: string) => {
     setLoadingPerms(true)
@@ -130,7 +150,6 @@ export default function RolesPermissions() {
         toast.success(`Role ${formData.name} created`)
       }
       setShowModal(false)
-      window.location.reload()
     } catch (err: any) {
       toast.error(err.message || 'Failed to save role')
     } finally {
@@ -148,10 +167,13 @@ export default function RolesPermissions() {
       await rolesApi.delete(role.id)
       toast.success(`Role ${role.name} deleted`)
       if (selectedRole?.id === role.id) setSelectedRole(roles[0] || null)
-      window.location.reload()
     } catch (err: any) {
       toast.error(err.message || 'Failed to delete role')
     }
+  }
+
+  const getDefaultPerms = (roleCode: string): Set<string> => {
+    return new Set(DEFAULT_ROLE_PERMISSIONS[roleCode] || [])
   }
 
   return (
@@ -214,16 +236,14 @@ export default function RolesPermissions() {
                   <p className="text-sm text-[#64748B]">{selectedRole.description || selectedRole.code}</p>
                 </div>
                 <div className="flex gap-2 items-center">
-                  {editingPerms && (
-                    <Button
-                      variant="primary"
-                      size="sm"
-                      onClick={savePerms}
-                      disabled={savingPerms}
-                    >
-                      {savingPerms ? 'Saving...' : 'Save Permissions'}
-                    </Button>
-                  )}
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    onClick={savePerms}
+                    disabled={savingPerms || !hasChanges}
+                  >
+                    {savingPerms ? 'Saving...' : 'Save Permissions'}
+                  </Button>
                   <Button variant="secondary" size="sm" onClick={() => openEditModal(selectedRole)}>Edit</Button>
                   <Button variant="destructive" size="sm" onClick={() => handleDelete(selectedRole)}>Delete</Button>
                 </div>
@@ -232,63 +252,80 @@ export default function RolesPermissions() {
               {loadingPerms ? (
                 <p className="text-center py-8 text-[#64748B]">Loading permissions...</p>
               ) : editingPerms ? (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm border-collapse">
-                    <thead>
-                      <tr className="border-b border-[#E2E8F0]">
-                        <th className="px-4 py-3 text-left text-xs font-semibold text-[#64748B] uppercase tracking-wide">Module</th>
-                        <th className="px-4 py-3 text-center text-xs font-semibold text-[#64748B] uppercase tracking-wide">Create</th>
-                        <th className="px-4 py-3 text-center text-xs font-semibold text-[#64748B] uppercase tracking-wide">Read</th>
-                        <th className="px-4 py-3 text-center text-xs font-semibold text-[#64748B] uppercase tracking-wide">Update</th>
-                        <th className="px-4 py-3 text-center text-xs font-semibold text-[#64748B] uppercase tracking-wide">Delete</th>
-                        <th className="px-4 py-3 text-center text-xs font-semibold text-[#64748B] uppercase tracking-wide">Approve</th>
-                        <th className="px-4 py-3 text-center text-xs font-semibold text-[#64748B] uppercase tracking-wide">Execute</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {PERMISSION_MODULES.map(mod => {
-                        const perms = mod.perms.map(p => editingPerms.has(p))
-                        const activeCount = perms.filter(Boolean).length
-                        return (
-                          <tr key={mod.key} className="border-b border-[#F8FAFC] hover:bg-[#F8FAFC]">
-                            <td className="px-4 py-3">
-                              <div>
-                                <span className="text-sm font-medium text-[#1E293B]">{mod.label}</span>
-                                <span className="ml-2 text-xs text-[#94A3B8]">({activeCount}/{mod.perms.length})</span>
-                              </div>
-                            </td>
-                            {['create', 'read', 'update', 'delete', 'approve', 'execute'].map(action => {
-                              const permForAction = mod.perms.find(p => p.endsWith(`:${action}`))
-                              const hasPerm = permForAction ? editingPerms.has(permForAction) : false
-                              return (
-                                <td key={action} className="px-4 py-3 text-center">
-                                  {permForAction ? (
-                                    <button
-                                      onClick={() => togglePerm(permForAction)}
-                                      className={`inline-flex w-6 h-6 rounded-full items-center justify-center transition-colors ${
-                                        hasPerm
-                                          ? 'bg-[#16A34A] text-white hover:bg-[#DC2626]'
-                                          : 'bg-[#F1F5F9] text-[#CBD5E1] hover:bg-[#16A34A] hover:text-white'
-                                      }`}
-                                      title={`${hasPerm ? 'Revoke' : 'Grant'} ${permLabels[permForAction] || permForAction}`}
-                                    >
-                                      {hasPerm ? (
-                                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M20 6 9 17l-5-5" /></svg>
-                                      ) : (
-                                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 5v14M5 12h14" /></svg>
-                                      )}
-                                    </button>
-                                  ) : (
-                                    <span className="inline-flex w-6 h-6 rounded-full bg-[#F8FAFC] text-[#E2E8F0] items-center justify-center text-xs">—</span>
-                                  )}
-                                </td>
-                              )
-                            })}
-                          </tr>
-                        )
-                      })}
-                    </tbody>
-                  </table>
+                <div>
+                  <div className="flex items-center gap-4 mb-3 text-xs text-[#64748B]">
+                    <span className="inline-flex items-center gap-1.5">
+                      <span className="w-3 h-3 rounded-full bg-[#16A34A]" /> Granted (current)
+                    </span>
+                    <span className="inline-flex items-center gap-1.5">
+                      <span className="w-3 h-3 rounded-full bg-[#BBF7D0]" /> Default for role
+                    </span>
+                    <span className="inline-flex items-center gap-1.5">
+                      <span className="w-3 h-3 rounded-full bg-[#F1F5F9]" /> Not granted
+                    </span>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm border-collapse">
+                      <thead>
+                        <tr className="border-b border-[#E2E8F0]">
+                          <th className="px-4 py-3 text-left text-xs font-semibold text-[#64748B] uppercase tracking-wide">Module</th>
+                          <th className="px-4 py-3 text-center text-xs font-semibold text-[#64748B] uppercase tracking-wide">Create</th>
+                          <th className="px-4 py-3 text-center text-xs font-semibold text-[#64748B] uppercase tracking-wide">Read</th>
+                          <th className="px-4 py-3 text-center text-xs font-semibold text-[#64748B] uppercase tracking-wide">Update</th>
+                          <th className="px-4 py-3 text-center text-xs font-semibold text-[#64748B] uppercase tracking-wide">Delete</th>
+                          <th className="px-4 py-3 text-center text-xs font-semibold text-[#64748B] uppercase tracking-wide">Approve</th>
+                          <th className="px-4 py-3 text-center text-xs font-semibold text-[#64748B] uppercase tracking-wide">Execute</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {PERMISSION_MODULES.map(mod => {
+                          const defaultPerms = getDefaultPerms(selectedRole.code)
+                          const perms = mod.perms.map(p => editingPerms.has(p))
+                          const activeCount = perms.filter(Boolean).length
+                          return (
+                            <tr key={mod.key} className="border-b border-[#F8FAFC] hover:bg-[#F8FAFC]">
+                              <td className="px-4 py-3">
+                                <div>
+                                  <span className="text-sm font-medium text-[#1E293B]">{mod.label}</span>
+                                  <span className="ml-2 text-xs text-[#94A3B8]">({activeCount}/{mod.perms.length})</span>
+                                </div>
+                              </td>
+                              {['create', 'read', 'update', 'delete', 'approve', 'execute'].map(action => {
+                                const permForAction = mod.perms.find(p => p.endsWith(`:${action}`))
+                                const hasPerm = permForAction ? editingPerms.has(permForAction) : false
+                                const isDefault = permForAction ? defaultPerms.has(permForAction) : false
+                                return (
+                                  <td key={action} className="px-4 py-3 text-center">
+                                    {permForAction ? (
+                                      <button
+                                        onClick={() => togglePerm(permForAction)}
+                                        className={`inline-flex w-6 h-6 rounded-full items-center justify-center transition-colors ${
+                                          hasPerm
+                                            ? 'bg-[#16A34A] text-white hover:bg-[#DC2626]'
+                                            : isDefault
+                                              ? 'bg-[#BBF7D0] text-[#16A34A] hover:bg-[#16A34A] hover:text-white'
+                                              : 'bg-[#F1F5F9] text-[#CBD5E1] hover:bg-[#16A34A] hover:text-white'
+                                        }`}
+                                        title={`${hasPerm ? 'Revoke' : 'Grant'} ${permLabels[permForAction] || permForAction}${isDefault ? ' (default)' : ''}`}
+                                      >
+                                        {hasPerm ? (
+                                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M20 6 9 17l-5-5" /></svg>
+                                        ) : (
+                                          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 5v14M5 12h14" /></svg>
+                                        )}
+                                      </button>
+                                    ) : (
+                                      <span className="inline-flex w-6 h-6 rounded-full bg-[#F8FAFC] text-[#E2E8F0] items-center justify-center text-xs">—</span>
+                                    )}
+                                  </td>
+                                )
+                              })}
+                            </tr>
+                          )
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               ) : null}
             </Card>

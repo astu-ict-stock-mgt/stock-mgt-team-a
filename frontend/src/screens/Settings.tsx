@@ -1,10 +1,20 @@
 import { useState } from 'react'
 import { Button, Input, Select, Tabs, Card, Badge, SectionHeader, Divider } from '../components/ui'
+import { useApp } from '../context/AppContext'
+import { ROLE_NAMES } from '../lib/permissions'
 
 export default function Settings() {
+  const { currentUser, userRoles } = useApp()
   const [activeTab, setActiveTab] = useState('profile')
   const [saved, setSaved] = useState(false)
-  const [profile, setProfile] = useState({ name: 'Marcus Thompson', email: 'mthompson@stockmanager.io', phone: '+1 312-555-0192', department: 'Management', language: 'en', timezone: 'America/Chicago' })
+  const [profile, setProfile] = useState({
+    name: currentUser?.fullName || '',
+    email: currentUser?.email || '',
+    phone: '',
+    department: '',
+    language: 'en',
+    timezone: 'America/Chicago'
+  })
   const [passwordForm, setPasswordForm] = useState({ current: '', newPass: '', confirm: '' })
   const [pwErrors, setPwErrors] = useState<Record<string, string>>({})
   const [notifications, setNotifications] = useState({ lowStock: true, pendingApprovals: true, systemAlerts: true, weeklyDigest: false, dailyReport: false })
@@ -50,7 +60,9 @@ export default function Settings() {
             <Card>
               <div className="flex items-center gap-5 mb-6 pb-6 border-b border-[#F1F5F9]">
                 <div className="relative">
-                  <div className="w-16 h-16 rounded-full bg-[#EEF2FF] text-[#4F46E5] text-xl font-bold flex items-center justify-center">MT</div>
+                  <div className="w-16 h-16 rounded-full bg-[#EEF2FF] text-[#4F46E5] text-xl font-bold flex items-center justify-center">
+                    {currentUser?.fullName?.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) || 'U'}
+                  </div>
                   <button className="absolute -bottom-0.5 -right-0.5 w-6 h-6 rounded-full bg-[#4F46E5] text-white flex items-center justify-center hover:bg-[#4338CA] shadow-sm">
                     <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
                   </button>
@@ -58,8 +70,8 @@ export default function Settings() {
                 <div>
                   <h3 className="text-base font-semibold text-[#0F172A]">{profile.name}</h3>
                   <div className="flex items-center gap-2 mt-1">
-                    <Badge variant="primary">Administrator</Badge>
-                    <span className="text-xs text-[#94A3B8]">{profile.department}</span>
+                    <Badge variant="primary">{userRoles.length > 0 ? (ROLE_NAMES[userRoles[0]] || userRoles[0]) : 'User'}</Badge>
+                    {profile.department && <span className="text-xs text-[#94A3B8]">{profile.department}</span>}
                   </div>
                 </div>
               </div>

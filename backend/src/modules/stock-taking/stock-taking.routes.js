@@ -8,19 +8,20 @@ import {
   recordCountSchema,
   stockTakeQuerySchema,
 } from './dto/stock-taking.dto.js'
+import { PERMISSIONS } from '../../config/rbac.js'
 
 const router = Router()
 
 router.use(authenticate)
 
-router.get('/', validateRequest(stockTakeQuerySchema, 'query'), controller.list)
-router.get('/:id', controller.getById)
-router.get('/:id/variance-summary', controller.varianceSummary)
+router.get('/', authorize(PERMISSIONS.RECONCILIATION_READ), validateRequest(stockTakeQuerySchema, 'query'), controller.list)
+router.get('/:id', authorize(PERMISSIONS.RECONCILIATION_READ), controller.getById)
+router.get('/:id/variance-summary', authorize(PERMISSIONS.RECONCILIATION_READ), controller.varianceSummary)
 
-router.post('/', authorize(['inventory.create']), validateRequest(createStockTakeSchema), controller.create)
-router.post('/:id/start', authorize(['inventory.update']), controller.start)
-router.post('/:id/record-count', authorize(['inventory.update']), validateRequest(recordCountSchema), controller.recordCount)
-router.post('/:id/complete', authorize(['inventory.update']), controller.complete)
-router.post('/:id/reconcile', authorize(['inventory.update']), controller.reconcile)
+router.post('/', authorize(PERMISSIONS.RECONCILIATION_CREATE), validateRequest(createStockTakeSchema), controller.create)
+router.post('/:id/start', authorize(PERMISSIONS.RECONCILIATION_CREATE), controller.start)
+router.post('/:id/record-count', authorize(PERMISSIONS.RECONCILIATION_CREATE), validateRequest(recordCountSchema), controller.recordCount)
+router.post('/:id/complete', authorize(PERMISSIONS.RECONCILIATION_CREATE), controller.complete)
+router.post('/:id/reconcile', authorize(PERMISSIONS.RECONCILIATION_POST), controller.reconcile)
 
 export default router

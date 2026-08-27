@@ -1,9 +1,9 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { Button, Input, Select, SectionHeader, Card, Badge, Tabs, Modal, Textarea, useToast } from '../components/ui'
 import { useApp } from '../context/AppContext'
-import { requisitionsApi, sivApi, storesApi, itemsApi } from '../services/api'
+import { requisitionsApi, sivApi, storesApi, itemsApi, departmentsApi, inventoryApi } from '../services/api'
 import { hasPermission, PERMISSIONS } from '../lib/permissions'
-import type { Requisition, SIV, Store, Item } from '../types'
+import type { Requisition, SIV, Store, Item, StockCard } from '../types'
 
 const statusColors: Record<string, 'warning' | 'success' | 'danger' | 'default' | 'primary'> = {
   SUBMITTED: 'warning',
@@ -49,6 +49,9 @@ export default function StockIssuing() {
 
   const [allStores, setAllStores] = useState<Store[]>([])
   const [allItems, setAllItems] = useState<Item[]>([])
+  const [allDepartments, setAllDepartments] = useState<Array<{ id: string; name: string }>>([])
+  const [warehouseStock, setWarehouseStock] = useState<StockCard[]>([])
+  const [loadingWarehouseStock, setLoadingWarehouseStock] = useState(false)
 
   const [requisitions, setRequisitions] = useState<Requisition[]>([])
   const [loadingReqs, setLoadingReqs] = useState(false)
@@ -56,7 +59,7 @@ export default function StockIssuing() {
   const [loadingSivs, setLoadingSivs] = useState(false)
 
   const [showCreateReq, setShowCreateReq] = useState(false)
-  const [reqForm, setReqForm] = useState({ storeId: '', purpose: '', departmentId: '00000000-0000-0000-0000-000000000000' })
+  const [reqForm, setReqForm] = useState({ storeId: '', purpose: '', departmentId: '' })
   const [reqLines, setReqLines] = useState<{ id: string; itemId: string; qty: string }[]>([])
   const [submittingReq, setSubmittingReq] = useState(false)
 
@@ -74,8 +77,22 @@ export default function StockIssuing() {
   const loadStores = useCallback(async () => {
     try {
       const res = await storesApi.getAll()
-      setAllStores(res.data || [])
-    } catch { /* ignore */ }
+      const storesList = res.data || []
+      setAllStores(storesList)
+      return storesList
+    } catch { return [] }
+  }, [])
+
+  const loadDepartments = useCallback(async () => {
+    try {
+      const res = await departmentsApi.getAll()
+      const deptList = res.data || []
+      setAllDepartments(deptList)
+      if (deptList.length > 0) {
+        setReqForm(f => ({ ...f, departmentId: f.departmentId || deptList[0].id }))
+      }
+      return deptList
+    } catch { return [] }
   }, [])
 
   const loadItems = useCallback(async () => {
@@ -84,6 +101,83 @@ export default function StockIssuing() {
       setAllItems(res.data || [])
     } catch { /* ignore */ }
   }, [])
+
+  const loadWarehouseInventory = useCallback(async (storeId: string) => {
+    if (!storeId) {
+      setWarehouseStock([])
+      return
+    }
+    setLoadingWarehouseStock(true)
+    try {
+      const res = await inventoryApi.getStockByStore(storeId)
+      setWarehouseStock(res.data || [])
+    } catch {
+      setWarehouseStock([])
+    } finally {
+      setLoadingWarehouseStock(false)
+    }
+  }, [])
+
+  const handleWarehouseChange = (storeId: string) => {
+    setReqForm(f => ({ ...f, storeId }))
+    loadWarehouseInventory(storeId)
+  }
+
+  const openCreateRequisitionModal = async () => {
+    const storesList = await loadStores()
+    await loadDepartments()
+    loadItems()
+
+    const initialStoreId = reqForm.storeId || (storesList.length === 1 ? storesList[0].id : '')
+    if (initialStoreId) {
+      setReqForm(f => ({ ...f, storeId: initialStoreId }))
+      loadWarehouseInventory(initialStoreId)
+    }
+    if (reqLines.length === 0) {
+      setReqLines([{ id: Date.now().toString(), itemId: '', qty: '1' }])
+    }
+    setShowCreateReq(true)
+  }
+
+  const availableItemOptions = useMemo(() => {
+    if (!reqForm.storeId) {
+      return [{ value: '', label: '⚠️ Select a warehouse first to view available stock' }]
+    }
+    if (loadingWarehouseStock) {
+      return [{ value: '', label: '⏳ Loading available warehouse inventory...' }]
+    }
+
+    const options: Array<{ value: string; label: string }> = [{ value: '', label: 'Select an item from inventory...' }]
+
+    // Partition warehouse stock: In stock vs Out of stock
+    const inStock = warehouseStock.filter(sc => sc.availableQty > 0)
+    const zeroStock = warehouseStock.filter(sc => sc.availableQty <= 0)
+    const stockedItemIds = new Set(warehouseStock.map(sc => sc.itemId))
+    const nonStockedItems = allItems.filter(i => !stockedItemIds.has(i.id))
+
+    if (inStock.length > 0) {
+      options.push(...inStock.map(sc => ({
+        value: sc.itemId,
+        label: `✓ ${sc.item.name} (${sc.item.code}) — Avail: ${sc.availableQty} ${sc.item.unit?.symbol || ''} (On Hand: ${sc.balance})`
+      })))
+    }
+
+    if (zeroStock.length > 0) {
+      options.push(...zeroStock.map(sc => ({
+        value: sc.itemId,
+        label: `⚠️ ${sc.item.name} (${sc.item.code}) — 0 Available (Out of stock)`
+      })))
+    }
+
+    if (nonStockedItems.length > 0) {
+      options.push(...nonStockedItems.map(i => ({
+        value: i.id,
+        label: `ℹ️ ${i.name} (${i.code}) — (0 in this warehouse)`
+      })))
+    }
+
+    return options
+  }, [reqForm.storeId, loadingWarehouseStock, warehouseStock, allItems])
 
   const loadRequisitions = useCallback(async () => {
     setLoadingReqs(true)
@@ -131,18 +225,21 @@ export default function StockIssuing() {
       }
     }
 
+    const deptId = reqForm.departmentId || (allDepartments.length > 0 ? allDepartments[0].id : '00000000-0000-0000-0000-000000000000')
+
     setSubmittingReq(true)
     try {
       await requisitionsApi.create({
-        departmentId: reqForm.departmentId,
+        departmentId: deptId,
         storeId: reqForm.storeId,
         purpose: reqForm.purpose,
         lines: reqLines.map(l => ({ itemId: l.itemId, requestedQuantity: Number(l.qty) })),
       })
       toast.success('Requisition submitted for approval')
       setShowCreateReq(false)
-      setReqForm({ storeId: '', purpose: '', departmentId: '00000000-0000-0000-0000-000000000000' })
+      setReqForm({ storeId: '', purpose: '', departmentId: '' })
       setReqLines([])
+      setWarehouseStock([])
       loadRequisitions()
     } catch (err: any) {
       toast.error(err.message || 'Failed to create requisition')
@@ -150,6 +247,11 @@ export default function StockIssuing() {
       setSubmittingReq(false)
     }
   }
+
+  const isDeptHead = userRoles.includes('DEPARTMENT_HEAD') || userRoles.includes('ADMIN')
+  const isPAO = userRoles.includes('PAO') || userRoles.includes('ADMIN')
+  const isStorekeeper = userRoles.includes('STOREKEEPER') || userRoles.includes('ADMIN')
+  const isRequester = userRoles.includes('REQUESTER') || userRoles.includes('ADMIN')
 
   const handleApproveRequisition = async (id: string, action: 'dept' | 'pao') => {
     setProcessingId(id)
@@ -169,13 +271,13 @@ export default function StockIssuing() {
     }
   }
 
-  const handleRejectRequisition = async (id: string) => {
-    const reason = prompt('Rejection reason:')
+  const handleRejectRequisition = async (id: string, level: 'DEPARTMENT' | 'PAO' = 'DEPARTMENT') => {
+    const reason = prompt(`Rejection reason (${level === 'DEPARTMENT' ? 'Department Level' : 'PAO Level'}):`)
     if (!reason) return
     setProcessingId(id)
     try {
-      await requisitionsApi.reject(id, reason)
-      toast.success('Requisition rejected')
+      await requisitionsApi.reject(id, reason, level)
+      toast.success(`Requisition rejected at ${level === 'DEPARTMENT' ? 'Department' : 'PAO'} level`)
       loadRequisitions()
     } catch (err: any) {
       toast.error(err.message || 'Failed to reject requisition')
@@ -279,7 +381,7 @@ export default function StockIssuing() {
           <div className="flex justify-between items-center mb-4">
             <p className="text-sm text-[#64748B]">{requisitions.length} requisition(s)</p>
             {canCreateRequisition && (
-              <Button variant="primary" onClick={() => setShowCreateReq(true)}>+ New Requisition</Button>
+              <Button variant="primary" onClick={openCreateRequisitionModal}>+ New Requisition</Button>
             )}
           </div>
 
@@ -313,21 +415,54 @@ export default function StockIssuing() {
                         </div>
                       )}
                     </div>
-                    <div className="flex gap-2 ml-4">
-                      {req.status === 'SUBMITTED' && canApproveRequisition && (
-                        <>
-                          <Button variant="primary" size="sm" loading={processingId === req.id} onClick={() => handleApproveRequisition(req.id, 'pao')}>Approve (PAO)</Button>
-                          <Button variant="destructive" size="sm" loading={processingId === req.id} onClick={() => handleRejectRequisition(req.id)}>Reject</Button>
-                        </>
+                    <div className="flex items-center gap-2 ml-4">
+                      {req.status === 'SUBMITTED' && (
+                        isDeptHead ? (
+                          <>
+                            <Button variant="primary" size="sm" loading={processingId === req.id} onClick={() => handleApproveRequisition(req.id, 'dept')}>
+                              Approve (Dept Head)
+                            </Button>
+                            <Button variant="destructive" size="sm" loading={processingId === req.id} onClick={() => handleRejectRequisition(req.id, 'DEPARTMENT')}>
+                              Reject
+                            </Button>
+                          </>
+                        ) : (
+                          <span className="text-xs text-[#D97706] bg-[#FFFBEB] px-2.5 py-1 rounded-md border border-[#FDE68A] font-medium">
+                            Awaiting Dept Approval
+                          </span>
+                        )
                       )}
-                      {req.status === 'DEPARTMENT_APPROVED' && canApproveRequisition && (
-                        <>
-                          <Button variant="primary" size="sm" loading={processingId === req.id} onClick={() => handleApproveRequisition(req.id, 'pao')}>Approve (PAO)</Button>
-                          <Button variant="destructive" size="sm" loading={processingId === req.id} onClick={() => handleRejectRequisition(req.id)}>Reject</Button>
-                        </>
+                      {req.status === 'DEPARTMENT_APPROVED' && (
+                        isPAO ? (
+                          <>
+                            <Button variant="primary" size="sm" loading={processingId === req.id} onClick={() => handleApproveRequisition(req.id, 'pao')}>
+                              Approve (PAO)
+                            </Button>
+                            <Button variant="destructive" size="sm" loading={processingId === req.id} onClick={() => handleRejectRequisition(req.id, 'PAO')}>
+                              Reject
+                            </Button>
+                          </>
+                        ) : (
+                          <span className="text-xs text-[#2563EB] bg-[#EFF6FF] px-2.5 py-1 rounded-md border border-[#BFDBFE] font-medium">
+                            Dept Approved — Awaiting PAO
+                          </span>
+                        )
                       )}
-                      {req.status === 'PAO_APPROVED' && canPrepareSiv && (
-                        <Button variant="primary" size="sm" onClick={() => openCreateSiv(req)}>Create SIV</Button>
+                      {req.status === 'PAO_APPROVED' && (
+                        isStorekeeper ? (
+                          <Button variant="primary" size="sm" onClick={() => openCreateSiv(req)}>
+                            Create SIV
+                          </Button>
+                        ) : (
+                          <span className="text-xs text-[#059669] bg-[#ECFDF5] px-2.5 py-1 rounded-md border border-[#A7F3D0] font-medium">
+                            PAO Approved — Ready for SIV
+                          </span>
+                        )
+                      )}
+                      {req.status === 'PARTIALLY_ISSUED' && isStorekeeper && (
+                        <Button variant="primary" size="sm" onClick={() => openCreateSiv(req)}>
+                          Issue Balance (SIV)
+                        </Button>
                       )}
                       <Button variant="ghost" size="sm" onClick={() => { setDetailType('req'); setShowDetail(req) }}>View</Button>
                     </div>
@@ -348,7 +483,7 @@ export default function StockIssuing() {
           {loadingSivs ? (
             <Card><p className="text-center py-8 text-[#64748B]">Loading...</p></Card>
           ) : sivs.length === 0 ? (
-            <Card><p className="text-center py-8 text-[#64748B]">No SIVs found. Create one from an approved requisition.</p></Card>
+            <Card><p className="text-center py-8 text-[#64748B]">No SIVs found. Create one from a PAO-approved requisition.</p></Card>
           ) : (
             <div className="space-y-3">
               {sivs.map(siv => (
@@ -378,12 +513,33 @@ export default function StockIssuing() {
                         </div>
                       )}
                     </div>
-                    <div className="flex gap-2 ml-4">
-                      {siv.status === 'PREPARED' && canApproveSiv && (
-                        <Button variant="primary" size="sm" loading={processingId === siv.id} onClick={() => handleApproveSiv(siv.id)}>Approve</Button>
+                    <div className="flex items-center gap-2 ml-4">
+                      {siv.status === 'PREPARED' && (
+                        isPAO ? (
+                          <Button variant="primary" size="sm" loading={processingId === siv.id} onClick={() => handleApproveSiv(siv.id)}>
+                            Approve SIV (PAO)
+                          </Button>
+                        ) : (
+                          <span className="text-xs text-[#D97706] bg-[#FFFBEB] px-2.5 py-1 rounded-md border border-[#FDE68A] font-medium">
+                            Awaiting PAO Approval
+                          </span>
+                        )
                       )}
-                      {siv.status === 'APPROVED' && canFinalizeSiv && (
-                        <Button variant="primary" size="sm" loading={processingId === siv.id} onClick={() => handleFinalizeSiv(siv.id)}>Finalize (Deduct Stock)</Button>
+                      {siv.status === 'APPROVED' && (
+                        isStorekeeper ? (
+                          <Button variant="primary" size="sm" loading={processingId === siv.id} onClick={() => handleFinalizeSiv(siv.id)}>
+                            Finalize (Deduct Stock)
+                          </Button>
+                        ) : (
+                          <span className="text-xs text-[#2563EB] bg-[#EFF6FF] px-2.5 py-1 rounded-md border border-[#BFDBFE] font-medium">
+                            SIV Approved — Ready to Finalize
+                          </span>
+                        )
+                      )}
+                      {siv.status === 'FINALIZED' && (
+                        <span className="text-xs text-[#059669] bg-[#ECFDF5] px-2.5 py-1 rounded-md border border-[#A7F3D0] font-medium">
+                          ✓ Stock Deducted
+                        </span>
                       )}
                       <Button variant="ghost" size="sm" onClick={() => { setDetailType('siv'); setShowDetail(siv) }}>View</Button>
                     </div>
@@ -396,26 +552,125 @@ export default function StockIssuing() {
       )}
 
       {/* Create Requisition Modal */}
-      <Modal open={showCreateReq} onClose={() => setShowCreateReq(false)} title="New Requisition" width="max-w-2xl">
+      <Modal open={showCreateReq} onClose={() => setShowCreateReq(false)} title="New Material Requisition" width="max-w-2xl">
         <div className="space-y-4">
-          <Select label="Warehouse *" options={[{ value: '', label: 'Select warehouse...' }, ...allStores.map(s => ({ value: s.id, label: s.name }))]}
-            value={reqForm.storeId} onChange={e => setReqForm(f => ({ ...f, storeId: e.target.value }))} />
-          <Textarea label="Purpose / Justification *" placeholder="Why is this stock needed?" value={reqForm.purpose}
-            onChange={e => setReqForm(f => ({ ...f, purpose: e.target.value }))} />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Select
+              label="Source Warehouse *"
+              options={[{ value: '', label: 'Select warehouse...' }, ...allStores.map(s => ({ value: s.id, label: `${s.name} (${s.code || ''})` }))]}
+              value={reqForm.storeId}
+              onChange={e => handleWarehouseChange(e.target.value)}
+            />
+            {allDepartments.length > 0 && (
+              <Select
+                label="Department"
+                options={allDepartments.map(d => ({ value: d.id, label: d.name }))}
+                value={reqForm.departmentId}
+                onChange={e => setReqForm(f => ({ ...f, departmentId: e.target.value }))}
+              />
+            )}
+          </div>
+
+          {reqForm.storeId && (
+            <div className="bg-[#F8FAFC] border border-[#E2E8F0] px-4 py-2.5 rounded-lg flex items-center justify-between text-xs">
+              <span className="font-medium text-[#334155]">
+                🏬 Warehouse: <strong className="text-[#0F172A]">{allStores.find(s => s.id === reqForm.storeId)?.name}</strong>
+              </span>
+              <span>
+                {loadingWarehouseStock ? (
+                  <span className="text-[#64748B]">⏳ Loading stock...</span>
+                ) : (
+                  <span className="text-[#059669] font-medium">
+                    📦 {warehouseStock.filter(sc => sc.availableQty > 0).length} item(s) in stock
+                  </span>
+                )}
+              </span>
+            </div>
+          )}
+
+          <Textarea
+            label="Purpose / Justification *"
+            placeholder="Why is this stock needed?"
+            value={reqForm.purpose}
+            onChange={e => setReqForm(f => ({ ...f, purpose: e.target.value }))}
+          />
 
           <div>
-            <p className="text-sm font-medium text-[#1E293B] mb-2">Items *</p>
-            {reqLines.map((line, idx) => (
-              <div key={idx} className="flex gap-2 mb-2">
-                <Select options={[{ value: '', label: 'Select item...' }, ...allItems.map(i => ({ value: i.id, label: `${i.name} (${i.code})` }))]}
-                  value={line.itemId} onChange={e => setReqLines(ls => ls.map((l, i) => i === idx ? { ...l, itemId: e.target.value } : l))} className="flex-1" />
-                <Input type="number" min="1" placeholder="Qty" value={line.qty}
-                  onChange={e => setReqLines(ls => ls.map((l, i) => i === idx ? { ...l, qty: e.target.value } : l))} className="w-24" />
-                <button onClick={() => setReqLines(ls => ls.filter((_, i) => i !== idx))} className="px-2 text-[#94A3B8] hover:text-[#DC2626]">✕</button>
-              </div>
-            ))}
-            <button onClick={() => setReqLines(ls => [...ls, { id: Date.now().toString(), itemId: '', qty: '' }])}
-              className="w-full py-2 border-2 border-dashed border-[#E2E8F0] rounded-lg text-sm text-[#64748B] hover:border-[#4F46E5] hover:text-[#4F46E5] transition-all">+ Add item</button>
+            <div className="flex justify-between items-center mb-2">
+              <p className="text-sm font-medium text-[#1E293B]">Requisition Items *</p>
+              <span className="text-xs text-[#64748B]">
+                {reqForm.storeId ? 'Select available items from warehouse inventory' : 'Select a warehouse first'}
+              </span>
+            </div>
+
+            <div className="space-y-3">
+              {reqLines.map((line, idx) => {
+                const selectedStock = warehouseStock.find(sc => sc.itemId === line.itemId)
+                const requestedQty = Number(line.qty) || 0
+                const isOverStock = selectedStock && requestedQty > selectedStock.availableQty
+
+                return (
+                  <div key={idx} className="p-3 bg-[#F8FAFC] rounded-lg border border-[#E2E8F0] space-y-2">
+                    <div className="flex gap-2 items-center">
+                      <Select
+                        options={availableItemOptions}
+                        value={line.itemId}
+                        onChange={e => setReqLines(ls => ls.map((l, i) => i === idx ? { ...l, itemId: e.target.value } : l))}
+                        className="flex-1"
+                        disabled={!reqForm.storeId}
+                      />
+                      <Input
+                        type="number"
+                        min="1"
+                        placeholder="Qty"
+                        value={line.qty}
+                        onChange={e => setReqLines(ls => ls.map((l, i) => i === idx ? { ...l, qty: e.target.value } : l))}
+                        className="w-28"
+                      />
+                      {reqLines.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => setReqLines(ls => ls.filter((_, i) => i !== idx))}
+                          className="px-2 py-1 text-[#94A3B8] hover:text-[#DC2626] transition-colors"
+                          title="Remove item"
+                        >
+                          ✕
+                        </button>
+                      )}
+                    </div>
+
+                    {line.itemId && (
+                      <div className="flex items-center gap-2 text-xs">
+                        {selectedStock ? (
+                          <span className={`px-2 py-0.5 rounded font-medium ${selectedStock.availableQty > 0 ? 'bg-[#ECFDF5] text-[#059669]' : 'bg-[#FEF2F2] text-[#DC2626]'}`}>
+                            {selectedStock.availableQty > 0
+                              ? `✓ Available Stock: ${selectedStock.availableQty} ${selectedStock.item?.unit?.symbol || ''} (Total On Hand: ${selectedStock.balance})`
+                              : '⚠️ 0 Available in this warehouse'}
+                          </span>
+                        ) : (
+                          <span className="px-2 py-0.5 rounded font-medium bg-[#F1F5F9] text-[#64748B]">
+                            ℹ️ No stock card recorded in this warehouse
+                          </span>
+                        )}
+                        {isOverStock && (
+                          <span className="text-[#DC2626] font-medium bg-[#FEF2F2] px-2 py-0.5 rounded">
+                            ⚠️ Requested quantity ({requestedQty}) exceeds available stock ({selectedStock?.availableQty})
+                          </span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setReqLines(ls => [...ls, { id: Date.now().toString(), itemId: '', qty: '1' }])}
+              className="mt-3 w-full py-2 border-2 border-dashed border-[#E2E8F0] rounded-lg text-sm text-[#64748B] hover:border-[#4F46E5] hover:text-[#4F46E5] transition-all"
+            >
+              + Add another item
+            </button>
           </div>
         </div>
         <div slot="footer">

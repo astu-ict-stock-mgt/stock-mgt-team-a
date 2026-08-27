@@ -58,11 +58,10 @@ export const getAllUsers = async ({ page = 1, limit = 10, search = '', status = 
     prisma.user.count({ where }),
   ])
 
-  const formattedUsers = users.map((user) => ({
-    ...user,
-    roles: user.roles.map((ur) => ur.role),
-    roles: undefined,
-  }))
+  const formattedUsers = users.map((user) => {
+    const { roles: rawRoles, ...rest } = user
+    return { ...rest, roles: rawRoles.map((ur) => ur.role) }
+  })
 
   return {
     users: formattedUsers,
@@ -111,7 +110,6 @@ export const getUserById = async (userId) => {
   return {
     ...user,
     roles: user.roles.map((ur) => ur.role),
-    roles: undefined,
   }
 }
 
@@ -189,7 +187,7 @@ export const createUser = async ({ email, fullName, password, roleIds = [] }) =>
  * @param {Object} updateData - { fullName, email }
  * @returns {Promise<Object>} Updated user object
  */
-export const updateUser = async (userId, { fullName, email }) => {
+export const updateUser = async (userId, { fullName, email, status }) => {
   const user = await prisma.user.findUnique({ where: { id: userId } })
   if (!user) {
     throw new NotFoundError(`User with ID '${userId}' not found`)
@@ -207,6 +205,7 @@ export const updateUser = async (userId, { fullName, email }) => {
       updateFields.email = normalizedEmail
     }
   }
+  if (status) updateFields.status = status
 
   const updatedUser = await prisma.user.update({
     where: { id: userId },
@@ -235,7 +234,6 @@ export const updateUser = async (userId, { fullName, email }) => {
   return {
     ...updatedUser,
     roles: updatedUser.roles.map((ur) => ur.role),
-    roles: undefined,
   }
 }
 

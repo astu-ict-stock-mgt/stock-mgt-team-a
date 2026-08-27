@@ -145,7 +145,7 @@ router.patch('/:id/approve', authenticate, authorize(PERMISSIONS.ISSUES_APPROVE)
  *       200:
  *         description: SIV finalized successfully
  */
-router.patch('/:id/finalize', authenticate, authorize(PERMISSIONS.ISSUES_APPROVE), finalize)
+router.patch('/:id/finalize', authenticate, authorize(PERMISSIONS.SIV_FINALIZE), finalize)
 
 /**
  * @openapi

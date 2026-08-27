@@ -145,7 +145,7 @@ router.patch(
   complete
 )
 
-router.get('/', authenticate, authorize(PERMISSIONS.TRANSFERS_CREATE), list)
-router.get('/:id', authenticate, authorize(PERMISSIONS.TRANSFERS_CREATE), getById)
+router.get('/', authenticate, authorize(PERMISSIONS.TRANSFERS_READ), list)
+router.get('/:id', authenticate, authorize(PERMISSIONS.TRANSFERS_READ), getById)
 
 export default router

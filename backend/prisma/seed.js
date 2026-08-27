@@ -126,11 +126,46 @@ async function main() {
       roleCode: ROLES.STOREKEEPER.code,
     },
     {
+      email: 'tec@stockmgt.gov.et',
+      fullName: 'Technical Evaluation Committee Lead',
+      passwordHash: '$2b$10$GWw1R9I4KSEunFrgZtLoPe9.HjJgzWsZ2So61elw7OEhcU6IlmOUy',
+      status: 'ACTIVE',
+      roleCode: ROLES.TEC.code,
+    },
+    {
+      email: 'accountant@stockmgt.gov.et',
+      fullName: 'Chief Financial Accountant',
+      passwordHash: '$2b$10$GWw1R9I4KSEunFrgZtLoPe9.HjJgzWsZ2So61elw7OEhcU6IlmOUy',
+      status: 'ACTIVE',
+      roleCode: ROLES.ACCOUNTANT.code,
+    },
+    {
+      email: 'depthead@stockmgt.gov.et',
+      fullName: 'Department Head',
+      passwordHash: '$2b$10$GWw1R9I4KSEunFrgZtLoPe9.HjJgzWsZ2So61elw7OEhcU6IlmOUy',
+      status: 'ACTIVE',
+      roleCode: ROLES.DEPARTMENT_HEAD.code,
+    },
+    {
       email: 'requester@stockmgt.gov.et',
       fullName: 'Department Requester',
       passwordHash: '$2b$10$GWw1R9I4KSEunFrgZtLoPe9.HjJgzWsZ2So61elw7OEhcU6IlmOUy',
       status: 'ACTIVE',
       roleCode: ROLES.REQUESTER.code,
+    },
+    {
+      email: 'security@stockmgt.gov.et',
+      fullName: 'Security Gate Officer',
+      passwordHash: '$2b$10$GWw1R9I4KSEunFrgZtLoPe9.HjJgzWsZ2So61elw7OEhcU6IlmOUy',
+      status: 'ACTIVE',
+      roleCode: ROLES.SECURITY_OFFICER.code,
+    },
+    {
+      email: 'property@stockmgt.gov.et',
+      fullName: 'Property Registration Officer',
+      passwordHash: '$2b$10$GWw1R9I4KSEunFrgZtLoPe9.HjJgzWsZ2So61elw7OEhcU6IlmOUy',
+      status: 'ACTIVE',
+      roleCode: ROLES.PROPERTY_REGISTRATION_OFFICER.code,
     },
   ]
 

@@ -69,7 +69,7 @@ const router = Router()
  *       403:
  *         description: Forbidden
  */
-router.get('/', authenticate, authorize(PERMISSIONS.USERS_READ), listAuditEvents)
+router.get('/', authenticate, authorize(PERMISSIONS.AUDIT_READ), listAuditEvents)
 
 /**
  * @openapi
@@ -86,7 +86,7 @@ router.get('/', authenticate, authorize(PERMISSIONS.USERS_READ), listAuditEvents
  *       401:
  *         description: Unauthorized
  */
-router.get('/types', authenticate, authorize(PERMISSIONS.USERS_READ), getEventTypes)
+router.get('/types', authenticate, authorize(PERMISSIONS.AUDIT_READ), getEventTypes)
 
 /**
  * @openapi
@@ -109,7 +109,7 @@ router.get('/types', authenticate, authorize(PERMISSIONS.USERS_READ), getEventTy
  *       401:
  *         description: Unauthorized
  */
-router.get('/recent', authenticate, authorize(PERMISSIONS.USERS_READ), listRecentAuditEvents)
+router.get('/recent', authenticate, authorize(PERMISSIONS.AUDIT_READ), listRecentAuditEvents)
 
 /**
  * @openapi
@@ -142,7 +142,7 @@ router.get('/recent', authenticate, authorize(PERMISSIONS.USERS_READ), listRecen
  *       401:
  *         description: Unauthorized
  */
-router.get('/user/:userId', authenticate, authorize(PERMISSIONS.USERS_READ), listUserAuditEvents)
+router.get('/user/:userId', authenticate, authorize(PERMISSIONS.AUDIT_READ), listUserAuditEvents)
 
 /**
  * @openapi
@@ -175,7 +175,7 @@ router.get('/user/:userId', authenticate, authorize(PERMISSIONS.USERS_READ), lis
  *       401:
  *         description: Unauthorized
  */
-router.get('/type/:eventType', authenticate, authorize(PERMISSIONS.USERS_READ), listAuditEventsByType)
+router.get('/type/:eventType', authenticate, authorize(PERMISSIONS.AUDIT_READ), listAuditEventsByType)
 
 /**
  * @openapi
@@ -198,7 +198,7 @@ router.get('/type/:eventType', authenticate, authorize(PERMISSIONS.USERS_READ), 
  *       404:
  *         description: Event not found
  */
-router.get('/:eventId', authenticate, authorize(PERMISSIONS.USERS_READ), getAuditEvent)
+router.get('/:eventId', authenticate, authorize(PERMISSIONS.AUDIT_READ), getAuditEvent)
 
 /**
  * @openapi
@@ -234,7 +234,7 @@ router.get('/:eventId', authenticate, authorize(PERMISSIONS.USERS_READ), getAudi
  *       400:
  *         description: Validation error
  */
-router.post('/', authenticate, authorize(PERMISSIONS.USERS_MANAGE), validateRequest({ body: createAuditEventSchema }), createNewAuditEvent)
+router.post('/', authenticate, authorize(PERMISSIONS.AUDIT_MANAGE), validateRequest({ body: createAuditEventSchema }), createNewAuditEvent)
 
 /**
  * @openapi
@@ -261,6 +261,6 @@ router.post('/', authenticate, authorize(PERMISSIONS.USERS_MANAGE), validateRequ
  *       401:
  *         description: Unauthorized
  */
-router.post('/cleanup', authenticate, authorize(PERMISSIONS.USERS_MANAGE), validateRequest({ body: deleteOldEventsSchema }), deleteOldEvents)
+router.post('/cleanup', authenticate, authorize(PERMISSIONS.AUDIT_MANAGE), validateRequest({ body: deleteOldEventsSchema }), deleteOldEvents)
 
 export default router

@@ -11,6 +11,7 @@ import {
   authenticateUser,
   logoutUser,
 } from './auth.service.js'
+import { getPermissionsForRoles } from '../../config/permission-cache.js'
 import { sendSuccess } from '../../utils/response.js'
 import { NotFoundError } from '../../utils/errors.js'
 
@@ -24,6 +25,18 @@ export const getPermissions = (req, res) => {
 
 export const getMatrix = (req, res) => {
   sendSuccess(res, fetchMatrix())
+}
+
+export const getMyPermissions = async (req, res, next) => {
+  try {
+    const roles = (req.user?.roles?.length ? req.user.roles : null)
+      || (req.user?.role ? [req.user.role] : null)
+      || ['REQUESTER']
+    const permissions = await getPermissionsForRoles(roles)
+    sendSuccess(res, { roles, permissions })
+  } catch (err) {
+    next(err)
+  }
 }
 
 export const getRoleByCode = (req, res, next) => {

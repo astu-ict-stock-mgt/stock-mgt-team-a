@@ -28,7 +28,7 @@ import returnRoutes from '../modules/returns/return.routes.js'
 import transferRoutes from '../modules/transfers/transfer.routes.js'
 import assetRoutes from '../modules/assets/asset.routes.js'
 import shelflifeRoutes from '../modules/shelflife/shelflife.routes.js'
-import disposalRoutes from '../modules/disposals/disposal.routes.js'
+import { disposalRoutes } from '../modules/disposal/index.js'
 import reconciliationRoutes from '../modules/reconciliation/reconciliation.routes.js'
 import stockTakingRoutes from '../modules/stock-taking/stock-taking.routes.js'
 import notificationsRoutes from '../modules/notifications/notifications.routes.js'
@@ -63,6 +63,7 @@ router.use('/transfers', transferRoutes)
 router.use('/assets', assetRoutes)
 router.use('/shelflife', shelflifeRoutes)
 router.use('/disposals', disposalRoutes)
+router.use('/disposal-requests', disposalRoutes)
 router.use('/reconciliations', reconciliationRoutes)
 router.use('/stocktakes', stockTakingRoutes)
 router.use('/notifications', notificationsRoutes)

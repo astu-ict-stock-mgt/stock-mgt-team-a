@@ -26,7 +26,10 @@ export const authorize = (requiredPermissions) => {
       }
 
       // 2. Extract user role (Default to REQUESTER if unassigned)
-      const userRoles = req.user.roles || (req.user.role ? [req.user.role] : (req.user.roleCode ? [req.user.roleCode] : ['REQUESTER']))
+      const userRoles = (req.user.roles?.length ? req.user.roles : null)
+        || (req.user.role ? [req.user.role] : null)
+        || (req.user.roleCode ? [req.user.roleCode] : null)
+        || ['REQUESTER']
 
       // 3. Normalize required permissions to string keys
       const rawList = Array.isArray(requiredPermissions)

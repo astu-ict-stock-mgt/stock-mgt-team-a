@@ -114,8 +114,8 @@ const screenTitles: Record<Screen, string> = {
 };
 
 function LoginScreen({ onLogin }: { onLogin: (email: string, password: string) => Promise<void> }) {
-  const [email, setEmail] = useState("admin@stockmgt.gov.et");
-  const [password, setPassword] = useState("password");
+  const [email, setEmail] = useState("")
+  const [password, setPassword] = useState("")
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -164,9 +164,6 @@ function LoginScreen({ onLogin }: { onLogin: (email: string, password: string) =
           >
             {loading ? "Signing in..." : "Sign In"}
           </button>
-          <p className="text-xs text-[#94A3B8] text-center mt-2">
-            Demo: admin@stockmgt.gov.et / password
-          </p>
         </form>
       </div>
     </div>
@@ -193,9 +190,11 @@ export default function App() {
           case 'inventory':
             return hasPermission(userRoles, PERMISSIONS.STOCK_CARDS_READ)
           case 'categories':
+            return hasPermission(userRoles, PERMISSIONS.CATEGORIES_READ) || hasPermission(userRoles, PERMISSIONS.CATEGORIES_MANAGE)
           case 'units':
+            return hasPermission(userRoles, PERMISSIONS.UNITS_READ) || hasPermission(userRoles, PERMISSIONS.UNITS_MANAGE)
           case 'stores':
-            return hasPermission(userRoles, PERMISSIONS.STORES_MANAGE)
+            return hasPermission(userRoles, PERMISSIONS.STORES_READ) || hasPermission(userRoles, PERMISSIONS.STORES_MANAGE)
           case 'suppliers':
             return hasPermission(userRoles, PERMISSIONS.SUPPLIERS_MANAGE)
           case 'stock-receiving':
@@ -211,7 +210,7 @@ export default function App() {
           case 'users':
             return hasPermission(userRoles, PERMISSIONS.USERS_READ)
           case 'roles':
-            return hasPermission(userRoles, PERMISSIONS.USERS_READ)
+            return hasPermission(userRoles, PERMISSIONS.ROLES_READ)
           case 'reports':
             return hasPermission(userRoles, PERMISSIONS.REPORTS_VIEW)
           case 'audit':
@@ -533,9 +532,9 @@ export default function App() {
           <div className="p-6 max-w-[1400px] mx-auto min-h-full print:p-0 print:max-w-none">
             {screen === "dashboard" && <Dashboard />}
             {screen === "inventory" && hasPermission(userRoles, PERMISSIONS.STOCK_CARDS_READ) && <Inventory />}
-            {screen === "categories" && hasPermission(userRoles, PERMISSIONS.STORES_MANAGE) && <Categories />}
-            {screen === "units" && hasPermission(userRoles, PERMISSIONS.STORES_MANAGE) && <Units />}
-            {screen === "stores" && hasPermission(userRoles, PERMISSIONS.STORES_MANAGE) && <Stores />}
+            {screen === "categories" && (hasPermission(userRoles, PERMISSIONS.CATEGORIES_READ) || hasPermission(userRoles, PERMISSIONS.CATEGORIES_MANAGE)) && <Categories />}
+            {screen === "units" && (hasPermission(userRoles, PERMISSIONS.UNITS_READ) || hasPermission(userRoles, PERMISSIONS.UNITS_MANAGE)) && <Units />}
+            {screen === "stores" && (hasPermission(userRoles, PERMISSIONS.STORES_READ) || hasPermission(userRoles, PERMISSIONS.STORES_MANAGE)) && <Stores />}
             {screen === "suppliers" && hasPermission(userRoles, PERMISSIONS.SUPPLIERS_MANAGE) && <Suppliers />}
             {screen === "stock-receiving" && (hasPermission(userRoles, PERMISSIONS.RECEIPTS_CREATE) || hasPermission(userRoles, PERMISSIONS.GOODS_RECEIPT_CREATE)) && <StockReceiving />}
             {screen === "stock-issuing" && (hasPermission(userRoles, PERMISSIONS.REQUISITIONS_CREATE) || hasPermission(userRoles, PERMISSIONS.REQUISITIONS_APPROVE) || hasPermission(userRoles, PERMISSIONS.SIV_PREPARE)) && <StockIssuing />}
@@ -543,7 +542,7 @@ export default function App() {
             {screen === "stock-tracking" && hasPermission(userRoles, PERMISSIONS.STOCK_CARDS_READ) && <StockTracking />}
             {screen === "stock-taking" && (hasPermission(userRoles, PERMISSIONS.RECONCILIATION_CREATE) || hasPermission(userRoles, PERMISSIONS.RECONCILIATION_APPROVE)) && <StockTaking />}
             {screen === "users" && hasPermission(userRoles, PERMISSIONS.USERS_READ) && <Users />}
-            {screen === "roles" && hasPermission(userRoles, PERMISSIONS.USERS_READ) && <RolesPermissions />}
+            {screen === "roles" && hasPermission(userRoles, PERMISSIONS.ROLES_READ) && <RolesPermissions />}
             {screen === "reports" && hasPermission(userRoles, PERMISSIONS.REPORTS_VIEW) && <Reports />}
             {screen === "audit" && hasPermission(userRoles, PERMISSIONS.AUDIT_READ) && <AuditLog />}
             {screen === "notifications" && <Notifications />}

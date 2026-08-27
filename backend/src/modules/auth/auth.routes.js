@@ -4,7 +4,7 @@
  */
 
 import { Router } from 'express'
-import { getRoles, getPermissions, getMatrix, getRoleByCode, login, logout } from './auth.controller.js'
+import { getRoles, getPermissions, getMatrix, getMyPermissions, getRoleByCode, login, logout } from './auth.controller.js'
 import { validateRequest } from '../../middleware/validate.middleware.js'
 import { authenticate } from '../../middleware/auth.middleware.js'
 import { authorize } from '../../middleware/rbac.middleware.js'
@@ -83,9 +83,10 @@ router.get('/me', authenticate, (req, res) => {
   sendSuccess(res, req.user)
 })
 
-router.get('/roles', authenticate, authorize(PERMISSIONS.USERS_READ), getRoles)
-router.get('/roles/:roleCode', authenticate, authorize(PERMISSIONS.USERS_READ), getRoleByCode)
-router.get('/permissions', authenticate, authorize(PERMISSIONS.USERS_READ), getPermissions)
-router.get('/matrix', authenticate, authorize(PERMISSIONS.USERS_READ), getMatrix)
+router.get('/me/permissions', authenticate, getMyPermissions)
+router.get('/roles', authenticate, getRoles)
+router.get('/roles/:roleCode', authenticate, getRoleByCode)
+router.get('/permissions', authenticate, getPermissions)
+router.get('/matrix', authenticate, getMatrix)
 
 export default router

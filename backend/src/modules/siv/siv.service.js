@@ -40,8 +40,8 @@ export async function createSIV({ requisitionId, storeId, issuedToUserId, prepar
     throw new NotFoundError(`Requisition with ID '${requisitionId}' not found`)
   }
 
-  if (!['PAO_APPROVED', 'DEPARTMENT_APPROVED', 'SUBMITTED'].includes(requisition.status)) {
-    throw new ConflictError(`SIV cannot be issued for requisition in status '${requisition.status}'`)
+  if (!['PAO_APPROVED', 'PARTIALLY_ISSUED'].includes(requisition.status)) {
+    throw new ConflictError(`SIV cannot be issued for requisition in status '${requisition.status}'. Requisition must be PAO_APPROVED before SIV creation.`)
   }
 
   for (const line of lines) {
@@ -235,6 +235,22 @@ export async function finalizeSIV({ id, finalizerId }) {
         },
         data: {
           issuedQuantity: { increment: line.quantityIssued },
+        },
+      })
+    }
+
+    // Update parent requisition lifecycle state based on fulfilled line quantities
+    if (siv.requisitionId) {
+      const updatedLines = await tx.requisitionLine.findMany({
+        where: { requisitionId: siv.requisitionId },
+      })
+      const isFullyIssued = updatedLines.length > 0 && updatedLines.every((l) => (l.issuedQuantity || 0) >= (l.approvedQuantity || l.requestedQuantity || 0))
+      const hasAnyIssued = updatedLines.some((l) => (l.issuedQuantity || 0) > 0)
+
+      await tx.requisition.update({
+        where: { id: siv.requisitionId },
+        data: {
+          status: isFullyIssued ? 'COMPLETED' : hasAnyIssued ? 'PARTIALLY_ISSUED' : 'PAO_APPROVED',
         },
       })
     }

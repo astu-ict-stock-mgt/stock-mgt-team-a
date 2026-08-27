@@ -281,4 +281,7 @@ export const deleteRole = async (roleId) => {
   // Delete role permissions first
   await prisma.rolePermission.deleteMany({ where: { roleId } })
   await prisma.role.delete({ where: { id: roleId } })
+
+  // Invalidate permission cache for this role
+  invalidatePermissionCache(role.code)
 }
