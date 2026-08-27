@@ -8,15 +8,15 @@ class ApiClient {
 
   constructor(baseUrl: string) {
     this.baseUrl = baseUrl
-    this.token = localStorage.getItem('sms_token')
+    this.token = sessionStorage.getItem('sms_token')
   }
 
   setToken(token: string | null) {
     this.token = token
     if (token) {
-      localStorage.setItem('sms_token', token)
+      sessionStorage.setItem('sms_token', token)
     } else {
-      localStorage.removeItem('sms_token')
+      sessionStorage.removeItem('sms_token')
     }
   }
 

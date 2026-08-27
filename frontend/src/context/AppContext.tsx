@@ -99,9 +99,9 @@ const AppContext = createContext<AppContextType | undefined>(undefined);
 export function AppProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
   const [apiStatus, setApiStatus] = useState<'connected' | 'disconnected' | 'checking'>('checking');
-  const [isAuthenticated, setIsAuthenticated] = useState(() => localStorage.getItem('sms_token') !== null);
+  const [isAuthenticated, setIsAuthenticated] = useState(() => sessionStorage.getItem('sms_token') !== null);
   const [currentUser, setCurrentUser] = useState<{ userId: string; email: string; fullName: string; status: string; roles: string[] } | null>(() => {
-    const saved = localStorage.getItem('sms_user');
+    const saved = sessionStorage.getItem('sms_user');
     return saved ? JSON.parse(saved) : null;
   });
 
@@ -231,7 +231,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         roles: payload.roles || [],
       };
       setCurrentUser(userData);
-      localStorage.setItem('sms_user', JSON.stringify(userData));
+      sessionStorage.setItem('sms_user', JSON.stringify(userData));
       setIsAuthenticated(true);
       await loadAllData();
     } else {
@@ -242,8 +242,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const logout = () => {
     api.setToken(null);
     setCurrentUser(null);
-    localStorage.removeItem('sms_user');
-    localStorage.removeItem('sms_token');
+    sessionStorage.removeItem('sms_user');
+    sessionStorage.removeItem('sms_token');
     setIsAuthenticated(false);
     setInventoryItems([]);
     setStockCards([]);

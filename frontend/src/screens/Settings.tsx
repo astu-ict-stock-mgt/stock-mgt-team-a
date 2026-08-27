@@ -106,10 +106,10 @@ export default function Settings() {
       toast.error('Full name and email are required')
       return
     }
-    // Simulate updating current user in localStorage for persistence
+    // Simulate updating current user in sessionStorage for persistence
     if (currentUser) {
       const updatedUser = { ...currentUser, fullName: profile.name, email: profile.email }
-      localStorage.setItem('sms_user', JSON.stringify(updatedUser))
+      sessionStorage.setItem('sms_user', JSON.stringify(updatedUser))
     }
     setSavedProfile(true)
     toast.success('Profile details saved successfully')
