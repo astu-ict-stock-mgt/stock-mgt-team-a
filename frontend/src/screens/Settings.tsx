@@ -503,14 +503,13 @@ export default function Settings() {
           <p className="text-xs text-[#64748B]">Scan the QR Code using your Google Authenticator or Microsoft Authenticator app on your phone, then enter the generated 6-digit code below.</p>
           
           <div className="flex flex-col items-center p-4 bg-[#F8FAFC] rounded-xl border border-[#E2E8F0]">
-            {/* Simulated Premium Authenticator QR representation */}
-            <div className="w-40 h-40 bg-white border border-[#CBD5E1] p-2 flex flex-col items-center justify-center rounded-lg shadow-sm">
-              {/* Visual QR Code Placeholder with grid lines */}
-              <div className="w-full h-full bg-[#1E293B] text-white font-mono text-[9px] p-2 flex flex-col items-center justify-center rounded">
-                <span className="text-xl mb-1">🔑</span>
-                <span>STOCKMGT-MFA</span>
-                <span className="text-[7px] text-[#94A3B8] mt-1">JBSW Y3DP EHPK 3PXP</span>
-              </div>
+            {/* Real scannable QR code generated using qrserver API */}
+            <div className="w-40 h-40 bg-white p-2 flex flex-col items-center justify-center rounded-lg shadow-sm">
+              <img 
+                src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=otpauth://totp/StockMgt:${profile.email}?secret=JBSWY3DPEHPK3PXP&issuer=StockMgt`} 
+                alt="2FA QR Code" 
+                className="w-full h-full object-contain"
+              />
             </div>
             <p className="text-[11px] text-[#64748B] font-mono mt-3">Manual Key: <span className="font-semibold select-all text-[#1E293B]">JBSWY3DPEHPK3PXP</span></p>
           </div>
