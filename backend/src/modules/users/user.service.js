@@ -61,7 +61,6 @@ export const getAllUsers = async ({ page = 1, limit = 10, search = '', status = 
   const formattedUsers = users.map((user) => ({
     ...user,
     roles: user.roles.map((ur) => ur.role),
-    roles: undefined,
   }))
 
   return {
@@ -111,7 +110,6 @@ export const getUserById = async (userId) => {
   return {
     ...user,
     roles: user.roles.map((ur) => ur.role),
-    roles: undefined,
   }
 }
 
@@ -179,7 +177,6 @@ export const createUser = async ({ email, fullName, password, roleIds = [] }) =>
   return {
     ...user,
     roles: user.roles.map((ur) => ur.role),
-    roles: undefined,
   }
 }
 
@@ -235,7 +232,6 @@ export const updateUser = async (userId, { fullName, email }) => {
   return {
     ...updatedUser,
     roles: updatedUser.roles.map((ur) => ur.role),
-    roles: undefined,
   }
 }
 
