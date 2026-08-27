@@ -10,6 +10,7 @@ import {
   fetchRoleDetails,
   authenticateUser,
   logoutUser,
+  changeUserPassword,
 } from './auth.service.js'
 import { sendSuccess } from '../../utils/response.js'
 import { NotFoundError } from '../../utils/errors.js'
@@ -58,6 +59,19 @@ export const logout = async (req, res, next) => {
     const authHeader = req.headers.authorization || req.headers.Authorization
     const token = authHeader?.split(' ')[1]
     const result = await logoutUser(token)
+    sendSuccess(res, result)
+  } catch (err) {
+    next(err)
+  }
+}
+
+/**
+ * Handle password changes POST /api/auth/change-password
+ */
+export const changePassword = async (req, res, next) => {
+  try {
+    const { currentPassword, newPassword } = req.body
+    const result = await changeUserPassword(req.user.userId, currentPassword, newPassword)
     sendSuccess(res, result)
   } catch (err) {
     next(err)

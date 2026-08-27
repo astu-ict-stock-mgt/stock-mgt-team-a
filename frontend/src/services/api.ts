@@ -82,6 +82,8 @@ export const authApi = {
     api.post<ApiResponse<{ user: User; token: string }>>('/auth/login', { email, password }),
   logout: () => api.post<ApiResponse<{ message: string }>>('/auth/logout'),
   me: () => api.get<ApiResponse<{ userId: string; email: string; fullName: string; status: string }>>('/auth/me'),
+  changePassword: (data: { currentPassword: string; newPassword: string }) =>
+    api.post<ApiResponse<{ message: string }>>('/auth/change-password', data),
 }
 
 export const usersApi = {

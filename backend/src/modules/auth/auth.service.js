@@ -7,8 +7,8 @@
 import jwt from 'jsonwebtoken'
 import { env } from '../../config/env.js'
 import { prisma } from '../../config/database.js'
-import { verifyPassword } from '../../utils/password.js'
-import { UnauthorizedError } from '../../utils/errors.js'
+import { verifyPassword, hashPassword } from '../../utils/password.js'
+import { UnauthorizedError, ValidationError, NotFoundError } from '../../utils/errors.js'
 import { ROLES, PERMISSIONS, ROLE_PERMISSIONS_MATRIX } from '../../config/rbac.js'
 
 // In-Memory Token Blacklist / Revocation Cache (SRS FR-03)
@@ -135,4 +135,30 @@ export const logoutUser = async (token) => {
 
   revokeToken(token)
   return { message: 'Successfully logged out and session revoked' }
+}
+
+/**
+ * Change user password
+ * @param {string} userId
+ * @param {string} currentPassword
+ * @param {string} newPassword
+ */
+export const changeUserPassword = async (userId, currentPassword, newPassword) => {
+  const user = await prisma.user.findUnique({ where: { id: userId } })
+  if (!user) {
+    throw new NotFoundError('User not found')
+  }
+
+  const isMatch = await verifyPassword(currentPassword, user.passwordHash)
+  if (!isMatch) {
+    throw new ValidationError('Incorrect current password')
+  }
+
+  const newHash = await hashPassword(newPassword)
+  await prisma.user.update({
+    where: { id: userId },
+    data: { passwordHash: newHash }
+  })
+
+  return { message: 'Password updated successfully' }
 }
