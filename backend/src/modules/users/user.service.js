@@ -58,10 +58,11 @@ export const getAllUsers = async ({ page = 1, limit = 10, search = '', status = 
     prisma.user.count({ where }),
   ])
 
-  const formattedUsers = users.map((user) => {
-    const { roles: userRoles, ...rest } = user
-    return { ...rest, roles: userRoles.map((ur) => ur.role) }
-  })
+  const formattedUsers = users.map((user) => ({
+    ...user,
+    roles: user.roles.map((ur) => ur.role),
+    roles: undefined,
+  }))
 
   return {
     users: formattedUsers,
@@ -107,8 +108,11 @@ export const getUserById = async (userId) => {
     throw new NotFoundError(`User with ID '${userId}' not found`)
   }
 
-  const { roles: userRoles, ...rest } = user
-  return { ...rest, roles: userRoles.map((ur) => ur.role) }
+  return {
+    ...user,
+    roles: user.roles.map((ur) => ur.role),
+    roles: undefined,
+  }
 }
 
 /**
@@ -172,8 +176,11 @@ export const createUser = async ({ email, fullName, password, roleIds = [] }) =>
     },
   })
 
-  const { roles: createdRoles, ...createdRest } = user
-  return { ...createdRest, roles: createdRoles.map((ur) => ur.role) }
+  return {
+    ...user,
+    roles: user.roles.map((ur) => ur.role),
+    roles: undefined,
+  }
 }
 
 /**
@@ -225,8 +232,11 @@ export const updateUser = async (userId, { fullName, email }) => {
     },
   })
 
-  const { roles: updatedRoles, ...updatedRest } = updatedUser
-  return { ...updatedRest, roles: updatedRoles.map((ur) => ur.role) }
+  return {
+    ...updatedUser,
+    roles: updatedUser.roles.map((ur) => ur.role),
+    roles: undefined,
+  }
 }
 
 /**

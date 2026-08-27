@@ -70,31 +70,27 @@ export default function Users() {
     setSaving(true)
     try {
       if (editingUser) {
-        await usersApi.update(editingUser.id, {
+        const res = await usersApi.update(editingUser.id, {
           fullName: formData.fullName,
           email: formData.email,
         })
+        // Update local state
+        updateUser(editingUser.id, { fullName: formData.fullName, email: formData.email, status: formData.status })
         toast.success(`User ${formData.fullName} updated`)
       } else {
-        await usersApi.create({
+        const res = await usersApi.create({
           fullName: formData.fullName,
           email: formData.email,
           password: formData.password,
           roleIds: formData.roleId ? [formData.roleId] : [],
         })
+        // Add to local state
+        if (res.data) {
+          addUser(res.data as any)
+        }
         toast.success(`User ${formData.fullName} created — they can now login with the password you set`)
       }
       setShowModal(false)
-      // Reload full user list from server to ensure roles are populated
-      try {
-        const res = await usersApi.getAll({ limit: 100 })
-        if (res.data) {
-          // Update local state via a full page reload to re-sync context
-          window.location.reload()
-        }
-      } catch {
-        window.location.reload()
-      }
     } catch (err: any) {
       toast.error(err.message || 'Failed to save user')
     } finally {

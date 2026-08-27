@@ -16,7 +16,7 @@ export default function Dashboard({ loading }: DashboardProps) {
   const lowStockCount = inventoryItems.filter(i => stockCards.some(sc => sc.itemId === i.id && sc.availableQty <= i.minimumStock)).length
   const todayTransactions = stockMovements.filter(m => m.createdAt.startsWith(new Date().toISOString().split('T')[0])).length
   const totalValue = stockCards.reduce((sum, sc) => sum + (sc.availableQty * (sc.averageCost || 0)), 0)
-  const pendingApprovals = requisitions.filter(r => r.status === 'SUBMITTED').length + transfers.filter(t => t.status === 'SUBMITTED').length
+  const pendingApprovals = requisitions.filter(r => r.status === 'SUBMITTED' || r.status === 'DEPARTMENT_APPROVED').length + transfers.filter(t => t.status === 'SUBMITTED').length
 
   const chartData = useMemo(() => {
     const movementByDate: Record<string, { received: number; issued: number }> = {}

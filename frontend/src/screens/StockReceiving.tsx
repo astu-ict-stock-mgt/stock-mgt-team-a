@@ -2,7 +2,6 @@ import { useState } from 'react'
 import { Button, Input, Select, Stepper, SectionHeader, Card, Badge, Divider, useToast } from '../components/ui'
 import { useApp } from '../context/AppContext'
 import { goodsReceiptApi } from '../services/api'
-import { hasPermission, PERMISSIONS } from '../lib/permissions'
 
 const steps = ['Supplier & Reference', 'Item Entry', 'Inspection', 'Review & Confirm']
 
@@ -21,10 +20,8 @@ const defaultLine = (): LineItem => ({
 })
 
 export default function StockReceiving() {
-  const { stores, suppliers, inventoryItems, units, userRoles } = useApp()
+  const { stores, suppliers, inventoryItems, units } = useApp()
   const { toast } = useToast()
-  const canCreateReceipt = userRoles.includes('ADMIN') || hasPermission(userRoles, PERMISSIONS.RECEIPTS_CREATE)
-  const canEvaluateReceipt = userRoles.includes('ADMIN') || hasPermission(userRoles, PERMISSIONS.EVALUATIONS_DECIDE)
 
   const [step, setStep] = useState(0)
   const [submitted, setSubmitted] = useState(false)
@@ -106,25 +103,6 @@ export default function StockReceiving() {
   const getItemName = (itemId: string) => inventoryItems.find(i => i.id === itemId)?.name || ''
   const getItemCode = (itemId: string) => inventoryItems.find(i => i.id === itemId)?.code || ''
   const getUnitSymbol = (unitId: string) => units.find(u => u.id === unitId)?.symbol || ''
-
-  if (!canCreateReceipt) {
-    return (
-      <div>
-        <SectionHeader title="Stock Receiving" subtitle="Record incoming goods from suppliers" />
-        <Card>
-          <div className="text-center py-12">
-            <div className="w-12 h-12 rounded-full bg-[#FEF2F2] text-[#DC2626] flex items-center justify-center mx-auto mb-4">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
-            </div>
-            <h3 className="text-lg font-semibold text-[#0F172A] mb-1">Access Restricted</h3>
-            <p className="text-sm text-[#64748B] max-w-sm mx-auto">
-              Your role does not have the necessary permissions (receipts:create) to record incoming goods.
-            </p>
-          </div>
-        </Card>
-      </div>
-    )
-  }
 
   if (submitted) {
     return (

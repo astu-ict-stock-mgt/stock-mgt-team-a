@@ -10,7 +10,7 @@ import { ROLES, PERMISSIONS, ROLE_PERMISSIONS_MATRIX } from '../src/config/rbac.
 const prisma = new PrismaClient({
   datasources: {
     db: {
-      url: env.DATABASE_URL,
+      url: process.env.DIRECT_URL || env.DATABASE_URL,
     },
   },
 })

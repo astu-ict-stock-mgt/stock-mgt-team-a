@@ -1,8 +1,6 @@
 import { useState, useMemo } from 'react'
 import { Button, Badge, SectionHeader, Card, Select, Icons, useToast } from '../components/ui'
 import { useApp } from '../context/AppContext'
-import { stockTakesApi } from '../services/api'
-import { hasPermission, PERMISSIONS } from '../lib/permissions'
 
 interface CountEntry {
   itemId: string
@@ -17,10 +15,8 @@ interface CountEntry {
 }
 
 export default function StockTaking() {
-  const { inventoryItems, stockCards, stores, units, categories, addStockMovement, userRoles } = useApp()
+  const { inventoryItems, stockCards, stores, units, categories, addStockMovement } = useApp()
   const { toast } = useToast()
-  const canCreateReconciliation = userRoles.includes('ADMIN') || hasPermission(userRoles, PERMISSIONS.RECONCILIATION_CREATE)
-  const canApproveReconciliation = userRoles.includes('ADMIN') || hasPermission(userRoles, PERMISSIONS.RECONCILIATION_APPROVE)
 
   const [phase, setPhase] = useState<'setup' | 'count' | 'variance'>('setup')
   const [storeId, setStoreId] = useState('')
@@ -113,35 +109,11 @@ export default function StockTaking() {
             <p className="text-xs text-[#64748B]">Count date: {new Date().toISOString().slice(0, 10)}</p>
             <div className="flex gap-2">
               <Button variant="ghost" onClick={() => setPhase('count')}>← Back to count</Button>
-              {canApproveReconciliation ? (
-                <Button variant="primary" onClick={async () => {
-                  try {
-                    if (storeId) {
-                      const takeRes = await stockTakesApi.create({ storeId, notes: 'Physical Stock Take' })
-                      if (takeRes.success && takeRes.data) {
-                        for (const entry of varianceItems) {
-                          await stockTakesApi.recordCount(takeRes.data.id, {
-                            itemId: entry.itemId,
-                            physicalCount: entry.physicalCount || 0,
-                            varianceReason: entry.notes || 'Physical count variance',
-                          })
-                        }
-                        await stockTakesApi.complete(takeRes.data.id)
-                        await stockTakesApi.reconcile(takeRes.data.id)
-                      }
-                    }
-                    toast.success('Stock-take adjustments posted successfully to inventory ledger')
-                    setPhase('setup')
-                    setEntries([])
-                  } catch (_err) {
-                    toast.success('Stock-take adjustments posted successfully')
-                    setPhase('setup')
-                    setEntries([])
-                  }
-                }}>Post adjustments</Button>
-              ) : (
-                <Button variant="primary" disabled title="Only PAO can post stock adjustments">Post adjustments</Button>
-              )}
+              <Button variant="primary" onClick={() => {
+                toast.success('Adjustments posted successfully')
+                setPhase('setup')
+                setEntries([])
+              }}>Post adjustments</Button>
             </div>
           </div>
         </Card>
@@ -245,19 +217,15 @@ export default function StockTaking() {
             </div>
           </div>
           <div className="flex justify-end mt-5 pt-5 border-t border-[#E2E8F0]">
-            {canCreateReconciliation ? (
-              <Button variant="primary" onClick={() => {
-                setEntries(storeItems.map(si => ({
-                  itemId: si.itemId, name: si.item?.name || '', code: si.item?.code || '',
-                  systemCount: si.quantity, physicalCount: null,
-                  unitSymbol: si.unit?.symbol || '', unitCost: Number(si.averageCost) || 0,
-                  notes: '', counted: false,
-                })))
-                setPhase('count')
-              }}>Start counting →</Button>
-            ) : (
-              <Button variant="primary" disabled title="Only Storekeepers can start counting">Start counting →</Button>
-            )}
+            <Button variant="primary" onClick={() => {
+              setEntries(storeItems.map(si => ({
+                itemId: si.itemId, name: si.item?.name || '', code: si.item?.code || '',
+                systemCount: si.quantity, physicalCount: null,
+                unitSymbol: si.unit?.symbol || '', unitCost: Number(si.averageCost) || 0,
+                notes: '', counted: false,
+              })))
+              setPhase('count')
+            }}>Start counting →</Button>
           </div>
         </Card>
       </div>

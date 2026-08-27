@@ -65,8 +65,8 @@ export const authRateLimiter = rateLimit({
     }
   },
   skip: (req) => {
-    // Skip rate limiting in test environment
-    return process.env.NODE_ENV === 'test'
+    // Skip rate limiting in development and test environments
+    return process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test'
   }
 })
 
@@ -86,8 +86,13 @@ export const apiRateLimiter = rateLimit({
     }
   },
   skip: (req) => {
-    // Skip rate limiting for health checks and in test environment
-    return process.env.NODE_ENV === 'test' || req.path === '/api/health' || req.path === '/health'
+    // Skip rate limiting for health checks, in development, and in test environment
+    return (
+      process.env.NODE_ENV === 'development' ||
+      process.env.NODE_ENV === 'test' ||
+      req.path === '/api/health' ||
+      req.path === '/health'
+    )
   }
 })
 

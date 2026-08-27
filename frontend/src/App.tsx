@@ -178,57 +178,54 @@ export default function App() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [globalSearch, setGlobalSearch] = useState("");
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [notifPanelOpen, setNotifPanelOpen] = useState(false);
   const { toasts, toast, remove } = useToast();
 
-  const { notifications, inventoryItems, stockCards, requisitions, transfers, isAuthenticated, currentUser, userRoles, login, logout, isLoading, apiStatus } = useApp();
+  const { notifications, inventoryItems, stockCards, requisitions, transfers, unreadCount, markNotificationRead, markAllNotificationsRead, refreshNotifications, isAuthenticated, currentUser, userRoles, login, logout, isLoading, apiStatus } = useApp();
 
   // Filter navigation based on user permissions
-  const effectiveRoles = useMemo(() => {
-    if (userRoles && userRoles.length > 0) return userRoles
-    if (currentUser?.roles && currentUser.roles.length > 0) return currentUser.roles
-    if ((currentUser as any)?.role) return [(currentUser as any).role]
-    return ['REQUESTER']
-  }, [userRoles, currentUser])
-
-  // Strict SRS role-to-screen allowlist — each role sees ONLY its authorized screens
-  const allowedScreensByRole: Record<string, Screen[]> = {
-    ADMIN: ['dashboard', 'inventory', 'categories', 'units', 'stores', 'suppliers',
-            'stock-receiving', 'stock-issuing', 'stock-transfer', 'stock-tracking',
-            'stock-taking', 'users', 'roles', 'reports', 'audit', 'notifications', 'settings'],
-    PAO: ['dashboard', 'inventory', 'categories', 'units', 'stores', 'suppliers',
-          'stock-receiving', 'stock-issuing', 'stock-transfer', 'stock-tracking',
-          'stock-taking', 'reports', 'audit', 'notifications', 'settings'],
-    STOREKEEPER: ['dashboard', 'inventory', 'categories', 'units', 'stores', 'suppliers',
-                  'stock-receiving', 'stock-issuing', 'stock-transfer', 'stock-tracking',
-                  'stock-taking', 'reports', 'notifications', 'settings'],
-    TEC: ['dashboard', 'stock-receiving', 'reports', 'notifications'],
-    ACCOUNTANT: ['dashboard', 'inventory', 'stock-tracking', 'reports', 'audit', 'notifications'],
-    DEPARTMENT_HEAD: ['dashboard', 'stock-issuing', 'reports', 'notifications'],
-    REQUESTER: ['dashboard', 'stock-issuing', 'notifications'],
-    SECURITY_OFFICER: ['dashboard', 'stock-receiving', 'notifications'],
-    PROPERTY_REGISTRATION_OFFICER: ['dashboard', 'inventory', 'reports', 'notifications'],
-  }
-
   const filteredNavGroups = useMemo(() => {
-    // Collect all allowed screens from every role the user holds
-    const allowed = new Set<Screen>()
-    for (const role of effectiveRoles) {
-      const screens = allowedScreensByRole[role]
-      if (screens) {
-        for (const s of screens) allowed.add(s)
-      }
-    }
-    // If no known role matched, show only dashboard for safety
-    if (allowed.size === 0) allowed.add('dashboard')
+    if (!userRoles.length) return navGroups
 
     return navGroups.map(group => ({
       ...group,
-      items: group.items.filter(item => allowed.has(item.id)),
+      items: group.items.filter(item => {
+        switch (item.id) {
+          case 'inventory':
+            return hasPermission(userRoles, PERMISSIONS.STOCK_CARDS_READ)
+          case 'categories':
+          case 'units':
+          case 'stores':
+            return hasPermission(userRoles, PERMISSIONS.STORES_MANAGE)
+          case 'suppliers':
+            return hasPermission(userRoles, PERMISSIONS.SUPPLIERS_MANAGE)
+          case 'stock-receiving':
+            return hasPermission(userRoles, PERMISSIONS.RECEIPTS_CREATE) || hasPermission(userRoles, PERMISSIONS.GOODS_RECEIPT_CREATE)
+          case 'stock-issuing':
+            return hasPermission(userRoles, PERMISSIONS.REQUISITIONS_CREATE) || hasPermission(userRoles, PERMISSIONS.REQUISITIONS_APPROVE) || hasPermission(userRoles, PERMISSIONS.SIV_PREPARE)
+          case 'stock-transfer':
+            return hasPermission(userRoles, PERMISSIONS.TRANSFERS_CREATE) || hasPermission(userRoles, PERMISSIONS.TRANSFERS_APPROVE)
+          case 'stock-tracking':
+            return hasPermission(userRoles, PERMISSIONS.STOCK_CARDS_READ)
+          case 'stock-taking':
+            return hasPermission(userRoles, PERMISSIONS.RECONCILIATION_CREATE) || hasPermission(userRoles, PERMISSIONS.RECONCILIATION_APPROVE)
+          case 'users':
+            return hasPermission(userRoles, PERMISSIONS.USERS_READ)
+          case 'roles':
+            return hasPermission(userRoles, PERMISSIONS.USERS_READ)
+          case 'reports':
+            return hasPermission(userRoles, PERMISSIONS.REPORTS_VIEW)
+          case 'audit':
+            return hasPermission(userRoles, PERMISSIONS.AUDIT_READ)
+          default:
+            return true
+        }
+      }),
     })).filter(group => group.items.length > 0)
-  }, [effectiveRoles])
-  const unreadNotifications = notifications.filter((n) => !n.isRead).length;
+  }, [userRoles])
+  const unreadNotifications = unreadCount;
   const lowStockCount = inventoryItems.filter(i => stockCards.some(sc => sc.itemId === i.id && sc.availableQty <= i.minimumStock)).length;
-  const pendingApprovals = requisitions.filter(r => r.status === 'SUBMITTED').length + transfers.filter(t => t.status === 'SUBMITTED').length;
+  const pendingApprovals = requisitions.filter(r => r.status === 'SUBMITTED' || r.status === 'DEPARTMENT_APPROVED').length + transfers.filter(t => t.status === 'SUBMITTED').length;
 
   if (isLoading) {
     return (
@@ -284,6 +281,7 @@ export default function App() {
   const navigate = (s: Screen) => {
     setScreen(s);
     setUserMenuOpen(false);
+    setNotifPanelOpen(false);
   };
 
   return (
@@ -426,23 +424,116 @@ export default function App() {
               </span>{" "}
               low stock
             </span>
-            <span>
-              <span className="text-[#4F46E5] font-semibold">{pendingApprovals}</span> pending
+            <span title={`Requisitions: ${requisitions.filter(r => r.status === 'SUBMITTED' || r.status === 'DEPARTMENT_APPROVED').length}\nTransfers: ${transfers.filter(t => t.status === 'SUBMITTED').length}`}>
+              <span className="text-[#4F46E5] font-semibold cursor-help border-b border-dotted border-[#94A3B8]">{pendingApprovals}</span> pending approvals
             </span>
           </div>
 
-          {/* Notification bell */}
-          <button
-            onClick={() => navigate("notifications")}
-            className="relative w-9 h-9 rounded-lg hover:bg-[#F1F5F9] flex items-center justify-center text-[#64748B] hover:text-[#1E293B] transition-colors"
-          >
-            {Icons.notifications}
-            {unreadNotifications > 0 && (
-              <span className="absolute top-1 right-1 w-4 h-4 bg-[#DC2626] text-white text-[9px] rounded-full flex items-center justify-center font-bold">
-                {unreadNotifications}
-              </span>
+          {/* Notification bell with dropdown panel */}
+          <div className="relative">
+            <button
+              id="notification-bell"
+              onClick={() => {
+                setNotifPanelOpen(o => {
+                  const next = !o;
+                  if (next) {
+                    refreshNotifications().catch(() => {});
+                  }
+                  return next;
+                });
+                setUserMenuOpen(false);
+              }}
+              className="relative w-9 h-9 rounded-lg hover:bg-[#F1F5F9] flex items-center justify-center text-[#64748B] hover:text-[#1E293B] transition-colors"
+              aria-label="Notifications"
+            >
+              {Icons.notifications}
+              {unreadNotifications > 0 && (
+                <span className="absolute top-1 right-1 w-4 h-4 bg-[#DC2626] text-white text-[9px] rounded-full flex items-center justify-center font-bold">
+                  {unreadNotifications > 99 ? '99+' : unreadNotifications}
+                </span>
+              )}
+            </button>
+
+            {/* Notification dropdown panel */}
+            {notifPanelOpen && (
+              <div className="absolute right-0 top-full mt-2 w-80 bg-white rounded-xl border border-[#E2E8F0] shadow-xl z-40 overflow-hidden">
+                {/* Panel header */}
+                <div className="flex items-center justify-between px-4 py-3 border-b border-[#F1F5F9]">
+                  <div className="flex items-center gap-2">
+                    <p className="text-sm font-semibold text-[#0F172A]">Notifications</p>
+                    {unreadNotifications > 0 && (
+                      <span className="px-1.5 py-0.5 bg-[#4F46E5] text-white text-[10px] rounded-full font-bold">
+                        {unreadNotifications}
+                      </span>
+                    )}
+                  </div>
+                  {unreadNotifications > 0 && (
+                    <button
+                      onClick={() => markAllNotificationsRead()}
+                      className="text-xs text-[#4F46E5] hover:text-[#4338CA] font-medium transition-colors"
+                    >
+                      Mark all read
+                    </button>
+                  )}
+                </div>
+
+                {/* Recent notifications list */}
+                <div className="max-h-72 overflow-y-auto">
+                  {notifications.length === 0 ? (
+                    <div className="flex flex-col items-center py-10 text-center">
+                      <span className="text-2xl mb-2">🔔</span>
+                      <p className="text-xs text-[#94A3B8]">No notifications yet</p>
+                    </div>
+                  ) : (
+                    notifications.slice(0, 8).map(n => {
+                      const iconMap: Record<string, string> = {
+                        APPROVAL_REQUIRED: '📋', APPROVED: '✅', REJECTED: '❌',
+                        STATUS_UPDATE: '🔄', GRN_READY: '📦',
+                        LOW_STOCK: '📉', EXPIRY_WARNING: '⚠', DISPOSAL_CANDIDATE: '🗑',
+                        SECURITY_EVENT: '🔒', INFO: 'ℹ',
+                      };
+                      const priorityDot: Record<string, string> = {
+                        HIGH: 'bg-[#DC2626]', MEDIUM: 'bg-[#D97706]', LOW: 'bg-[#94A3B8]',
+                      };
+
+                      return (
+                        <button
+                          key={n.id}
+                          onClick={() => { markNotificationRead(n.id); setNotifPanelOpen(false); }}
+                          className={`w-full flex items-start gap-3 px-4 py-3 text-left hover:bg-[#F8FAFC] transition-colors border-b border-[#F8FAFC] last:border-0 ${
+                            !n.isRead ? 'bg-[#FAFBFF]' : 'bg-white'
+                          }`}
+                        >
+                          <span className="text-base shrink-0 mt-0.5">{iconMap[n.type] || 'ℹ'}</span>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-1.5 mb-0.5">
+                              <p className={`text-xs font-semibold truncate ${
+                                n.isRead ? 'text-[#64748B]' : 'text-[#0F172A]'
+                              }`}>{n.title}</p>
+                              {!n.isRead && (
+                                <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${priorityDot[n.priority] || 'bg-[#4F46E5]'}`} />
+                              )}
+                            </div>
+                            <p className="text-[11px] text-[#64748B] leading-relaxed line-clamp-2">{n.message}</p>
+                          </div>
+                        </button>
+                      );
+                    })
+                  )}
+                </div>
+
+                {/* View all link */}
+                <div className="px-4 py-2.5 border-t border-[#F1F5F9] bg-[#FAFAFA]">
+                  <button
+                    onClick={() => navigate('notifications')}
+                    className="w-full text-center text-xs text-[#4F46E5] hover:text-[#4338CA] font-medium transition-colors py-0.5"
+                  >
+                    View all notifications →
+                  </button>
+                </div>
+              </div>
             )}
-          </button>
+          </div>
 
           {/* User menu */}
           <div className="relative">

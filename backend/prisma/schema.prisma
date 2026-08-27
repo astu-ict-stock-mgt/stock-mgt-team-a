@@ -1526,6 +1526,7 @@ model Notification {
   title         String
   message       String
   type          String    @default("INFO")
+  priority      String    @default("MEDIUM")
   referenceId   String?   @map("reference_id")
   referenceType String?   @map("reference_type")
   isRead        Boolean   @default(false) @map("is_read")
@@ -1535,7 +1536,8 @@ model Notification {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
-  @@index([isRead])
+  @@index([userId, isRead])
+  @@index([userId, isRead, createdAt])
   @@index([type])
   @@index([createdAt])
   @@map("notifications")

@@ -2,7 +2,6 @@ import { useState, useMemo } from 'react'
 import { Button, Badge, SectionHeader, Card, Select, Input, Tabs, Modal, FormGroup, Icons, useToast } from '../components/ui'
 import { useApp } from '../context/AppContext'
 import { transfersApi } from '../services/api'
-import { hasPermission, PERMISSIONS } from '../lib/permissions'
 
 const statusColors: Record<string, 'default' | 'warning' | 'primary' | 'success' | 'danger'> = {
   SUBMITTED: 'warning', APPROVED: 'primary', REJECTED: 'danger', IN_TRANSIT: 'warning', COMPLETED: 'success',
@@ -13,11 +12,8 @@ const statusLabels: Record<string, string> = {
 }
 
 export default function StockTransfer() {
-  const { transfers, stores, inventoryItems, stockCards, units, addStockMovement, userRoles } = useApp()
+  const { transfers, stores, inventoryItems, stockCards, units, addStockMovement, refreshData } = useApp()
   const { toast } = useToast()
-  const canCreateTransfer = userRoles.includes('ADMIN') || hasPermission(userRoles, PERMISSIONS.TRANSFERS_CREATE)
-  const canApproveTransfer = userRoles.includes('ADMIN') || hasPermission(userRoles, PERMISSIONS.TRANSFERS_APPROVE)
-  const canExecuteTransfer = userRoles.includes('ADMIN') || hasPermission(userRoles, PERMISSIONS.TRANSFERS_EXECUTE)
 
   const [phase, setPhase] = useState<'setup' | 'list' | 'detail'>('list')
   const [selectedTransfer, setSelectedTransfer] = useState<typeof transfers[0] | null>(null)
@@ -81,6 +77,7 @@ export default function StockTransfer() {
         lines: newItems.map(item => ({ itemId: item.itemId, quantityRequested: item.qty })),
       })
       toast.success('Transfer request created and pending approval')
+      refreshData().catch(() => {})
       setPhase('list')
       setNewItems([])
       setNotes('')
@@ -148,45 +145,10 @@ export default function StockTransfer() {
               </tbody>
             </table>
           </div>
-          <div className="p-4 border-t border-[#E2E8F0] flex items-center justify-between">
+          <div className="p-4 border-t border-[#E2E8F0]">
             <p className="text-xs text-[#64748B]">
               Created: {new Date(selectedTransfer.createdAt).toLocaleDateString()} · Notes: {selectedTransfer.notes || 'None'}
             </p>
-            <div className="flex gap-2">
-              {selectedTransfer.status === 'SUBMITTED' && canApproveTransfer && (
-                <Button variant="primary" size="sm" onClick={async () => {
-                  try {
-                    await transfersApi.approve(selectedTransfer.id, { isApproved: true })
-                    toast.success('Transfer approved successfully')
-                    setSelectedTransfer({ ...selectedTransfer, status: 'APPROVED' })
-                  } catch (err: any) {
-                    toast.error(err.message || 'Failed to approve transfer')
-                  }
-                }}>Approve Transfer</Button>
-              )}
-              {selectedTransfer.status === 'APPROVED' && canExecuteTransfer && (
-                <Button variant="primary" size="sm" onClick={async () => {
-                  try {
-                    await transfersApi.dispatch(selectedTransfer.id)
-                    toast.success('Transfer dispatched (In Transit)')
-                    setSelectedTransfer({ ...selectedTransfer, status: 'IN_TRANSIT' })
-                  } catch (err: any) {
-                    toast.error(err.message || 'Failed to dispatch transfer')
-                  }
-                }}>Execute Dispatch</Button>
-              )}
-              {selectedTransfer.status === 'IN_TRANSIT' && canExecuteTransfer && (
-                <Button variant="primary" size="sm" onClick={async () => {
-                  try {
-                    await transfersApi.complete(selectedTransfer.id)
-                    toast.success('Transfer completed & inventory updated')
-                    setSelectedTransfer({ ...selectedTransfer, status: 'COMPLETED' })
-                  } catch (err: any) {
-                    toast.error(err.message || 'Failed to receive transfer')
-                  }
-                }}>Confirm Receipt</Button>
-              )}
-            </div>
           </div>
         </Card>
       </div>
@@ -264,7 +226,7 @@ export default function StockTransfer() {
       <SectionHeader
         title="Stock Transfer & Tracking"
         subtitle="Transfer items between stores and departments"
-        actions={canCreateTransfer ? <Button variant="primary" icon={Icons.plus} onClick={() => { setPhase('setup'); setNewItems([]) }}>New Transfer</Button> : undefined}
+        actions={<Button variant="primary" icon={Icons.plus} onClick={() => { setPhase('setup'); setNewItems([]) }}>New Transfer</Button>}
       />
 
       <div className="grid grid-cols-3 gap-4 mb-5">

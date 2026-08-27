@@ -77,8 +77,10 @@ export const PERMISSIONS = Object.freeze({
 
   // --- MASTER DATA MANAGEMENT ---
   STORES_MANAGE: { key: 'stores:manage', module: 'MasterData', description: 'Create, update, and manage stores and department links' },
+  STORES_READ: { key: 'stores:read', module: 'MasterData', description: 'View stores and departments' },
   CATEGORIES_MANAGE: { key: 'categories:manage', module: 'MasterData', description: 'Maintain item classification categories' },
   ITEMS_MANAGE: { key: 'items:manage', module: 'MasterData', description: 'Create and update item master data and reorder levels' },
+  ITEMS_READ: { key: 'items:read', module: 'MasterData', description: 'View items list and item master data' },
   UNITS_MANAGE: { key: 'units:manage', module: 'MasterData', description: 'Manage standard units of measure (UOM)' },
   SUPPLIERS_MANAGE: { key: 'suppliers:manage', module: 'MasterData', description: 'Manage supplier and donor profiles' },
   LOCATIONS_MANAGE: { key: 'locations:manage', module: 'MasterData', description: 'Define physical store storage hierarchy (area -> rack -> bin)' },
@@ -172,6 +174,8 @@ const MATRIX = {
     PERMISSIONS.USERS_UPDATE.key,
     PERMISSIONS.USERS_DEACTIVATE.key,
     PERMISSIONS.AUDIT_READ.key,
+    PERMISSIONS.STORES_READ.key,
+    PERMISSIONS.ITEMS_READ.key,
   ],
 
   // PAO: Approval/supervision only. No operational tasks (receipts, SIV prep, etc.)
@@ -189,6 +193,8 @@ const MATRIX = {
     PERMISSIONS.RECONCILIATION_READ.key,
     PERMISSIONS.RECONCILIATION_APPROVE.key,
     PERMISSIONS.REPORTS_VIEW.key,
+    PERMISSIONS.STORES_READ.key,
+    PERMISSIONS.ITEMS_READ.key,
   ],
 
   // STOREKEEPER: All operational store tasks. No approvals.
@@ -220,6 +226,8 @@ const MATRIX = {
     PERMISSIONS.RECONCILIATION_CREATE.key,
     PERMISSIONS.RECONCILIATION_READ.key,
     PERMISSIONS.REPORTS_VIEW.key,
+    PERMISSIONS.STORES_READ.key,
+    PERMISSIONS.ITEMS_READ.key,
   ],
 
   // TEC: Technical evaluation only. Inspects goods, records decisions.
@@ -229,6 +237,8 @@ const MATRIX = {
     PERMISSIONS.GRN_READ.key,
     PERMISSIONS.STOCK_CARDS_READ.key,
     PERMISSIONS.RETURNS_EVALUATE.key,
+    PERMISSIONS.STORES_READ.key,
+    PERMISSIONS.ITEMS_READ.key,
   ],
 
   // ACCOUNTANT: Financial reporting, asset registration, valuation.
@@ -239,6 +249,8 @@ const MATRIX = {
     PERMISSIONS.ASSETS_REGISTER.key,
     PERMISSIONS.ASSETS_READ.key,
     PERMISSIONS.REPORTS_VIEW.key,
+    PERMISSIONS.STORES_READ.key,
+    PERMISSIONS.ITEMS_READ.key,
   ],
 
   // DEPARTMENT_HEAD: Requisition approval only. No other operations.
@@ -246,6 +258,8 @@ const MATRIX = {
     PERMISSIONS.STOCK_CARDS_READ.key,
     PERMISSIONS.REQUISITIONS_READ.key,
     PERMISSIONS.REQUISITIONS_APPROVE.key,
+    PERMISSIONS.STORES_READ.key,
+    PERMISSIONS.ITEMS_READ.key,
   ],
 
   // REQUESTER: Create requisitions, view status only.
@@ -253,11 +267,15 @@ const MATRIX = {
     PERMISSIONS.REQUISITIONS_CREATE.key,
     PERMISSIONS.REQUISITIONS_READ.key,
     PERMISSIONS.RETURNS_CREATE.key,
+    PERMISSIONS.STORES_READ.key,
+    PERMISSIONS.ITEMS_READ.key,
   ],
 
   // SECURITY_OFFICER: Gate/dispatch verification only.
   [ROLES.SECURITY_OFFICER.code]: [
     PERMISSIONS.DISPATCH_VERIFY.key,
+    PERMISSIONS.STORES_READ.key,
+    PERMISSIONS.ITEMS_READ.key,
   ],
 
   // PROPERTY_REGISTRATION_OFFICER: Asset registration only.
@@ -265,6 +283,8 @@ const MATRIX = {
     PERMISSIONS.GRN_READ.key,
     PERMISSIONS.ASSETS_REGISTER.key,
     PERMISSIONS.ASSETS_READ.key,
+    PERMISSIONS.STORES_READ.key,
+    PERMISSIONS.ITEMS_READ.key,
   ],
 };
 

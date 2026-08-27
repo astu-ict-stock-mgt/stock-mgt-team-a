@@ -1,14 +1,12 @@
 import { useState } from 'react'
 import { Table, Button, Badge, Modal, Input, SearchBar, SectionHeader, Icons, Tabs, Pagination, Card, Breadcrumb, useToast } from '../components/ui'
 import { useApp } from '../context/AppContext'
-import { hasPermission, PERMISSIONS } from '../lib/permissions'
 
 type View = 'list' | 'detail' | 'add'
 
 export default function Units() {
-  const { units, addUnit, updateUnit, deleteUnit, userRoles } = useApp()
+  const { units, addUnit, updateUnit, deleteUnit } = useApp()
   const { toast } = useToast()
-  const canManageUnits = userRoles.includes('ADMIN') || hasPermission(userRoles, PERMISSIONS.UNITS_MANAGE)
 
   const [view, setView] = useState<View>('list')
   const [selected, setSelected] = useState<typeof units[0] | null>(null)
@@ -107,21 +105,17 @@ export default function Units() {
             <Card>
               <h3 className="text-xs font-semibold text-[#94A3B8] uppercase tracking-wide mb-4">Quick Actions</h3>
               <div className="flex flex-col gap-2">
-                {canManageUnits && (
-                  <>
-                    <Button variant="primary" className="w-full" icon={Icons.edit} onClick={() => {
-                      setEditForm({ name: u.name, code: u.code, symbol: u.symbol })
-                      setShowEditModal(true)
-                    }}>Edit Unit</Button>
-                    <Button variant="ghost" className="w-full text-[#DC2626] hover:bg-[#FEF2F2]" onClick={() => {
-                      if (confirm('Delete this unit?')) {
-                        deleteUnit(u.id)
-                        toast.success('Unit deleted')
-                        setView('list')
-                      }
-                    }}>Delete</Button>
-                  </>
-                )}
+                <Button variant="primary" className="w-full" icon={Icons.edit} onClick={() => {
+                  setEditForm({ name: u.name, code: u.code, symbol: u.symbol })
+                  setShowEditModal(true)
+                }}>Edit Unit</Button>
+                <Button variant="ghost" className="w-full text-[#DC2626] hover:bg-[#FEF2F2]" onClick={() => {
+                  if (confirm('Delete this unit?')) {
+                    deleteUnit(u.id)
+                    toast.success('Unit deleted')
+                    setView('list')
+                  }
+                }}>Delete</Button>
               </div>
             </Card>
             <Button variant="ghost" className="w-full" onClick={() => setView('list')}>← Back to list</Button>
@@ -156,9 +150,7 @@ export default function Units() {
         subtitle="Manage standard units for item quantities"
         actions={
           <div className="flex items-center gap-2">
-            {canManageUnits && (
-              <Button variant="primary" size="md" icon={Icons.plus} onClick={() => setShowModal(true)}>Add unit</Button>
-            )}
+            <Button variant="primary" size="md" icon={Icons.plus} onClick={() => setShowModal(true)}>Add unit</Button>
           </div>
         }
       />
