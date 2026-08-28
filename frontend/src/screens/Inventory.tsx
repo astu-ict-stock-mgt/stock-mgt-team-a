@@ -1,13 +1,15 @@
 import { useState, useMemo } from 'react'
 import { Table, Button, Badge, Modal, Input, Select, SearchBar, SectionHeader, Icons, Tabs, Pagination, Card, Breadcrumb, useToast } from '../components/ui'
 import { useApp } from '../context/AppContext'
+import { hasPermission, PERMISSIONS } from '../lib/permissions'
 
 type StateMode = 'default' | 'empty' | 'loading'
 type View = 'list' | 'detail' | 'add'
 
 export default function Inventory() {
-  const { inventoryItems, stockCards, categories, units, stores, suppliers, stockMovements, addInventoryItem, updateInventoryItem } = useApp()
+  const { inventoryItems, stockCards, categories, units, stores, suppliers, stockMovements, addInventoryItem, updateInventoryItem, userRoles } = useApp()
   const { toast } = useToast()
+  const canManageItems = userRoles.includes('ADMIN') || hasPermission(userRoles, PERMISSIONS.ITEMS_MANAGE)
 
   const [view, setView] = useState<View>('list')
   const [stateMode, setStateMode] = useState<StateMode>('default')
@@ -114,15 +116,17 @@ export default function Inventory() {
                 </div>
                 <div className="flex items-center gap-2">
                   {statusBadge(s.status)}
-                  <Button variant="secondary" size="sm" icon={Icons.edit} onClick={() => {
-                    setEditForm({
-                      name: s.name, code: s.code, categoryId: s.categoryId,
-                      unitId: s.unitId || '', supplierId: s.supplierId || '',
-                      minimumStock: String(s.minimumStock || ''), maximumStock: String(s.maximumStock || ''),
-                      unitCost: String(s.unitCost || ''),
-                    })
-                    setShowEditModal(true)
-                  }}>Edit</Button>
+                  {canManageItems && (
+                    <Button variant="secondary" size="sm" icon={Icons.edit} onClick={() => {
+                      setEditForm({
+                        name: s.name, code: s.code, categoryId: s.categoryId,
+                        unitId: s.unitId || '', supplierId: s.supplierId || '',
+                        minimumStock: String(s.minimumStock || ''), maximumStock: String(s.maximumStock || ''),
+                        unitCost: String(s.unitCost || ''),
+                      })
+                      setShowEditModal(true)
+                    }}>Edit</Button>
+                  )}
                 </div>
               </div>
               <div className="grid grid-cols-3 gap-5">
@@ -267,7 +271,9 @@ export default function Inventory() {
             <Select options={[{ value: 'default', label: 'Default' }, { value: 'empty', label: 'Empty' }, { value: 'loading', label: 'Loading' }]}
               value={stateMode} onChange={e => setStateMode(e.target.value as StateMode)} className="w-32 h-8 text-xs" />
             <Button variant="secondary" size="sm" icon={Icons.download}>Export</Button>
-            <Button variant="primary" size="md" icon={Icons.plus} onClick={() => setShowModal(true)}>Add item</Button>
+            {canManageItems && (
+              <Button variant="primary" size="md" icon={Icons.plus} onClick={() => setShowModal(true)}>Add item</Button>
+            )}
           </div>
         }
       />

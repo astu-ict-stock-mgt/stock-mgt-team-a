@@ -180,8 +180,43 @@ export default function App() {
   const { notifications, inventoryItems, stockCards, requisitions, transfers, isAuthenticated, currentUser, userRoles, login, logout, isLoading, apiStatus } = useApp();
 
   // Filter navigation based on user permissions
+  const effectiveRoles = useMemo(() => {
+    if (userRoles && userRoles.length > 0) return userRoles
+    if (currentUser?.roles && currentUser.roles.length > 0) return currentUser.roles
+    if ((currentUser as any)?.role) return [(currentUser as any).role]
+    return ['REQUESTER']
+  }, [userRoles, currentUser])
+
+  // Strict SRS role-to-screen allowlist — each role sees ONLY its authorized screens
+  const allowedScreensByRole: Record<string, Screen[]> = {
+    ADMIN: ['dashboard', 'inventory', 'categories', 'units', 'stores', 'suppliers',
+            'stock-receiving', 'stock-issuing', 'stock-transfer', 'stock-tracking',
+            'stock-taking', 'users', 'roles', 'reports', 'audit', 'notifications', 'settings'],
+    PAO: ['dashboard', 'inventory', 'categories', 'units', 'stores', 'suppliers',
+          'stock-receiving', 'stock-issuing', 'stock-transfer', 'stock-tracking',
+          'stock-taking', 'reports', 'audit', 'notifications', 'settings'],
+    STOREKEEPER: ['dashboard', 'inventory', 'categories', 'units', 'stores', 'suppliers',
+                  'stock-receiving', 'stock-issuing', 'stock-transfer', 'stock-tracking',
+                  'stock-taking', 'reports', 'notifications', 'settings'],
+    TEC: ['dashboard', 'stock-receiving', 'reports', 'notifications'],
+    ACCOUNTANT: ['dashboard', 'inventory', 'stock-tracking', 'reports', 'audit', 'notifications'],
+    DEPARTMENT_HEAD: ['dashboard', 'stock-issuing', 'reports', 'notifications'],
+    REQUESTER: ['dashboard', 'stock-issuing', 'notifications'],
+    SECURITY_OFFICER: ['dashboard', 'stock-receiving', 'notifications'],
+    PROPERTY_REGISTRATION_OFFICER: ['dashboard', 'inventory', 'reports', 'notifications'],
+  }
+
   const filteredNavGroups = useMemo(() => {
-    if (!userRoles.length) return navGroups
+    // Collect all allowed screens from every role the user holds
+    const allowed = new Set<Screen>()
+    for (const role of effectiveRoles) {
+      const screens = allowedScreensByRole[role]
+      if (screens) {
+        for (const s of screens) allowed.add(s)
+      }
+    }
+    // If no known role matched, show only dashboard for safety
+    if (allowed.size === 0) allowed.add('dashboard')
 
     return navGroups.map(group => ({
       ...group,
@@ -220,7 +255,7 @@ export default function App() {
         }
       }),
     })).filter(group => group.items.length > 0)
-  }, [userRoles])
+  }, [effectiveRoles])
   const unreadNotifications = notifications.filter((n) => !n.isRead).length;
   const lowStockCount = inventoryItems.filter(i => stockCards.some(sc => sc.itemId === i.id && sc.availableQty <= i.minimumStock)).length;
   const pendingApprovals = requisitions.filter(r => r.status === 'SUBMITTED').length + transfers.filter(t => t.status === 'SUBMITTED').length;
