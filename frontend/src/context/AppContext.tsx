@@ -34,9 +34,13 @@ interface AppContextType {
   units: Unit[]
   auditLogs: AuditEvent[]
   notifications: Notification[]
+  unreadCount: number
   transfers: TransferRequest[]
   stockTakes: StockTake[]
   requisitions: Requisition[]
+  setRequisitions: React.Dispatch<React.SetStateAction<Requisition[]>>
+  setTransfers: React.Dispatch<React.SetStateAction<TransferRequest[]>>
+  setStockTakes: React.Dispatch<React.SetStateAction<StockTake[]>>
 
   isAuthenticated: boolean
   currentUser: { userId: string; email: string; fullName: string; status: string; roles: string[] } | null
@@ -76,8 +80,14 @@ interface AppContextType {
 
   addAuditLog: (log: AuditEvent) => void
 
-  markNotificationRead: (id: string) => void
+  /** Mark a single notification as read — calls backend API */
+  markNotificationRead: (id: string) => Promise<void>
+  /** Mark all notifications as read — calls backend API */
+  markAllNotificationsRead: () => Promise<void>
+  /** @deprecated Use markAllNotificationsRead */
   clearAllNotifications: () => void
+  /** Refresh notifications from backend */
+  refreshNotifications: () => Promise<void>
 
   refreshData: () => Promise<void>
   isLoading: boolean
@@ -120,6 +130,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [units, setUnits] = useState<Unit[]>([]);
   const [auditLogs, setAuditLogs] = useState<AuditEvent[]>([]);
   const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [unreadCount, setUnreadCount] = useState<number>(0);
   const [transfers, setTransfers] = useState<TransferRequest[]>([]);
   const [stockTakes, setStockTakes] = useState<StockTake[]>([]);
   const [requisitions, setRequisitions] = useState<Requisition[]>([]);
@@ -158,7 +169,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
       if (categoriesData) setCategories(categoriesData);
       if (unitsData) setUnits(unitsData);
       if (logsData) setAuditLogs(logsData);
-      if (notifsData) setNotifications(notifsData);
+      if (notifsData) {
+        setNotifications(notifsData);
+        setUnreadCount(notifsData.filter((n: Notification) => !n.isRead).length);
+      }
       if (transfersData) setTransfers(transfersData);
       if (stockTakesData) setStockTakes(stockTakesData);
       if (requisitionsData) setRequisitions(requisitionsData);
@@ -192,6 +206,34 @@ export function AppProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     checkApiAndLoadData();
   }, [checkApiAndLoadData]);
+
+  // ─── Notification polling: fast unread count refresh every 30s ───
+  useEffect(() => {
+    if (!isAuthenticated || apiStatus !== 'connected') return;
+
+    const refreshUnreadCount = async () => {
+      try {
+        const res = await notificationsApi.getUnreadCount();
+        if (res?.data?.unreadCount !== undefined) {
+          setUnreadCount(res.data.unreadCount);
+          // If unread count increased, refresh full notification list
+          setUnreadCount(prev => {
+            if (res.data.unreadCount > prev) {
+              notificationsApi.getAll({ limit: 50 })
+                .then(r => setNotifications(r.data))
+                .catch(() => {});
+            }
+            return res.data.unreadCount;
+          });
+        }
+      } catch {
+        // Silently ignore polling errors
+      }
+    };
+
+    const interval = setInterval(refreshUnreadCount, 30_000);
+    return () => clearInterval(interval);
+  }, [isAuthenticated, apiStatus]);
 
   const login = async (email: string, password: string) => {
     const response = await authApi.login(email, password);
@@ -353,14 +395,56 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const addAuditLog = (log: AuditEvent) => setAuditLogs(prev => [log, ...prev]);
 
-  const markNotificationRead = (id: string) =>
-    setNotifications(prev => prev.map(n => n.id === id ? { ...n, isRead: true } : n));
+  /**
+   * Mark a single notification as read.
+   * Optimistically updates local state, then calls backend API.
+   */
+  const markNotificationRead = async (id: string) => {
+    setNotifications(prev => prev.map(n => n.id === id ? { ...n, isRead: true, readAt: new Date().toISOString() } : n));
+    setUnreadCount(prev => Math.max(0, prev - 1));
+    try {
+      await notificationsApi.markRead(id);
+    } catch {
+      // Revert on failure
+      setNotifications(prev => prev.map(n => n.id === id ? { ...n, isRead: false, readAt: null } : n));
+      setUnreadCount(prev => prev + 1);
+    }
+  };
+
+  /**
+   * Mark all notifications as read.
+   * Optimistically updates local state, then calls backend API.
+   */
+  const markAllNotificationsRead = async () => {
+    const prevNotifs = notifications;
+    const prevCount = unreadCount;
+    setNotifications(prev => prev.map(n => ({ ...n, isRead: true, readAt: new Date().toISOString() })));
+    setUnreadCount(0);
+    try {
+      await notificationsApi.markAllRead();
+    } catch {
+      setNotifications(prevNotifs);
+      setUnreadCount(prevCount);
+    }
+  };
+
+  /** Refresh notification list from backend */
+  const refreshNotifications = async () => {
+    try {
+      const res = await notificationsApi.getAll({ limit: 50 });
+      setNotifications(res.data);
+      setUnreadCount(res.data.filter((n: Notification) => !n.isRead).length);
+    } catch { /* silently ignore */ }
+  };
+
+  /** @deprecated kept for backward compat — use markAllNotificationsRead */
   const clearAllNotifications = () => setNotifications([]);
 
   return (
     <AppContext.Provider value={{
       inventoryItems, stockCards, suppliers, stockMovements, users, roles,
-      stores, categories, units, auditLogs, notifications, transfers, stockTakes, requisitions,
+      stores, categories, units, auditLogs, notifications, unreadCount, transfers, stockTakes, requisitions,
+      setRequisitions, setTransfers, setStockTakes,
       isAuthenticated, currentUser, userRoles, login, logout,
       addInventoryItem, updateInventoryItem, deleteInventoryItem,
       addSupplier, updateSupplier, deleteSupplier,
@@ -371,7 +455,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
       addUser, updateUser, deleteUser,
       addRole, updateRole, deleteRole,
       addAuditLog,
-      markNotificationRead, clearAllNotifications,
+      markNotificationRead,
+      markAllNotificationsRead,
+      clearAllNotifications,
+      refreshNotifications,
       refreshData, isLoading, apiStatus,
     }}>
       {children}

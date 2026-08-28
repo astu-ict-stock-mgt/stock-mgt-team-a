@@ -6,6 +6,7 @@
 
 import { prisma } from '../../config/database.js'
 import { NotFoundError, ValidationError, ConflictError } from '../../utils/errors.js'
+import { notifySecurityEvent } from '../notifications/notification-events.service.js'
 
 /**
  * Generate sequential SIV Number SIV-YYYY-XXXXX
@@ -319,6 +320,14 @@ export async function verifyDispatchSIV({ id, verifierId, vehicleNumber, driverN
   if (!['FINALIZED', 'APPROVED'].includes(siv.status)) {
     throw new ConflictError(`Cannot verify gate exit for un-finalized SIV in status '${siv.status}'`)
   }
+
+  // BE-150: Notify SECURITY_OFFICER and ADMIN of gate verification — fire-and-forget
+  notifySecurityEvent({
+    title: 'SIV Gate Verification',
+    message: `SIV ${siv.sivNumber} exit verification completed at Gate ${gateNumber || 'MAIN_GATE_01'}. Driver: ${driverName || 'N/A'}. Vehicle: ${vehicleNumber || 'N/A'}.`,
+    referenceId: siv.id,
+    referenceType: 'SIV',
+  }).catch(() => {})
 
   return {
     verified: true,

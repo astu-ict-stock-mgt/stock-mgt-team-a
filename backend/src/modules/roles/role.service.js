@@ -30,9 +30,10 @@ export const getAllRoles = async () => {
     },
   })
 
-  return roles.map(({ _count, ...rest }) => ({
-    ...rest,
-    userCount: _count.users,
+  return roles.map((role) => ({
+    ...role,
+    userCount: role._count.users,
+    _count: undefined,
   }))
 }
 
@@ -75,11 +76,12 @@ export const getRoleById = async (roleId) => {
     throw new NotFoundError(`Role with ID '${roleId}' not found`)
   }
 
-  const { rolePermissions, _count, ...rest } = role
   return {
-    ...rest,
-    permissions: rolePermissions.map((rp) => rp.permission),
-    userCount: _count.users,
+    ...role,
+    permissions: role.rolePermissions.map((rp) => rp.permission),
+    rolePermissions: undefined,
+    userCount: role._count.users,
+    _count: undefined,
   }
 }
 
@@ -142,10 +144,10 @@ export const createRole = async ({ code, name, description, permissionIds = [] }
     },
   })
 
-  const { rolePermissions, ...rest } = role
   return {
-    ...rest,
-    permissions: rolePermissions.map((rp) => rp.permission),
+    ...role,
+    permissions: role.rolePermissions.map((rp) => rp.permission),
+    rolePermissions: undefined,
   }
 }
 
@@ -189,10 +191,10 @@ export const updateRole = async (roleId, { name, description }) => {
     },
   })
 
-  const { rolePermissions, ...updatedRest } = updatedRole
   return {
-    ...updatedRest,
-    permissions: rolePermissions.map((rp) => rp.permission),
+    ...updatedRole,
+    permissions: updatedRole.rolePermissions.map((rp) => rp.permission),
+    rolePermissions: undefined,
   }
 }
 

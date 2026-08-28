@@ -495,6 +495,8 @@ const MATRIX = {
     PERMISSIONS.DISPOSALS_APPROVE.key,
     PERMISSIONS.RECONCILIATION_READ.key,
     PERMISSIONS.REPORTS_VIEW.key,
+    PERMISSIONS.STORES_READ.key,
+    PERMISSIONS.ITEMS_READ.key,
   ],
 
   // DEPARTMENT_HEAD: Requisition approval, departmental oversight per SRS Appendix C
@@ -515,6 +517,8 @@ const MATRIX = {
     PERMISSIONS.TRANSFERS_READ.key,
     PERMISSIONS.ASSETS_READ.key,
     PERMISSIONS.REPORTS_VIEW.key,
+    PERMISSIONS.STORES_READ.key,
+    PERMISSIONS.ITEMS_READ.key,
   ],
 
   // REQUESTER: Material requisitioning and status tracking per SRS Appendix C

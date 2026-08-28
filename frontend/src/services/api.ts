@@ -353,8 +353,11 @@ export const notificationsApi = {
     if (params?.limit) q.set('limit', String(params.limit))
     return api.get<ApiResponse<Notification[]>>(`/notifications?${q.toString()}`)
   },
-  markRead: (id: string) => api.post<ApiResponse<Notification>>(`/notifications/${id}/read`),
-  markAllRead: () => api.post<ApiResponse<{ count: number }>>('/notifications/mark-all-read'),
+  getById: (id: string) => api.get<ApiResponse<Notification>>(`/notifications/${id}`),
+  getUnreadCount: () => api.get<ApiResponse<{ unreadCount: number }>>('/notifications/unread-count'),
+  markRead: (id: string) => api.patch<ApiResponse<Notification>>(`/notifications/${id}/read`),
+  markAllRead: () => api.patch<ApiResponse<{ count: number }>>('/notifications/read-all'),
+  delete: (id: string) => api.delete<ApiResponse<Notification>>(`/notifications/${id}`),
 }
 
 export const reportsApi = {

@@ -2,10 +2,15 @@
  * Central Stock Transfer Request Service & Workflow Engine
  * Tasks: BE-121, BE-122, BE-123, BE-126 (Implement Transfer Execution Posting)
  * SRS Traceability: Section 8 (Stock Transfer Module), SRS BR-15, Clarification Register C-10
+ * BE-150: Notification events integrated — all calls are fire-and-forget.
  */
 
 import { prisma } from '../../config/database.js'
 import { NotFoundError, ValidationError, ConflictError } from '../../utils/errors.js'
+import {
+  notifyApprovalPending,
+  notifyStatusChange,
+} from '../notifications/notification-events.service.js'
 
 /**
  * Generate sequential Transfer Request Number STR-YYYY-XXXXX
@@ -82,6 +87,14 @@ export async function createTransfer({
         lines: { include: { item: { select: { id: true, name: true, code: true } } } },
       },
     })
+
+    // BE-150: Notify PAO for approval — fire-and-forget
+    notifyApprovalPending({
+      entityType: 'TRANSFER',
+      entityId: transfer.id,
+      entityNumber: transfer.transferNumber,
+      submitterId: requestedBy,
+    }).catch(() => {})
 
     return transfer
   })
@@ -170,7 +183,7 @@ export async function approveTransfer({ id, approverId, notes, isApproved = true
 
   const targetStatus = isApproved ? 'APPROVED' : 'REJECTED'
 
-  return prisma.transferRequest.update({
+  const updated = await prisma.transferRequest.update({
     where: { id },
     data: {
       status: targetStatus,
@@ -180,6 +193,18 @@ export async function approveTransfer({ id, approverId, notes, isApproved = true
     },
     include: { lines: true },
   })
+
+  // BE-150: Notify requester of approval/rejection decision
+  notifyStatusChange({
+    userId: transfer.requestedBy,
+    entityType: 'TRANSFER',
+    entityId: transfer.id,
+    entityNumber: transfer.transferNumber,
+    oldStatus: 'SUBMITTED',
+    newStatus: targetStatus,
+  }).catch(() => {})
+
+  return updated
 }
 
 /**
@@ -194,11 +219,23 @@ export async function dispatchTransfer({ id }) {
     throw new ConflictError(`Transfer request cannot be dispatched from current status '${transfer.status}'`)
   }
 
-  return prisma.transferRequest.update({
+  const updated = await prisma.transferRequest.update({
     where: { id },
     data: { status: 'IN_TRANSIT' },
     include: { lines: true },
   })
+
+  // BE-150: Notify STOREKEEPER role of dispatch
+  notifyStatusChange({
+    userId: transfer.requestedBy,
+    entityType: 'TRANSFER',
+    entityId: transfer.id,
+    entityNumber: transfer.transferNumber,
+    oldStatus: 'APPROVED',
+    newStatus: 'IN_TRANSIT',
+  }).catch(() => {})
+
+  return updated
 }
 
 /**

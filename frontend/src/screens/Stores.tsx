@@ -1,14 +1,12 @@
 import { useState } from 'react'
 import { Table, Button, Badge, Modal, Input, Select, SearchBar, SectionHeader, Icons, Tabs, Pagination, Card, Breadcrumb, useToast } from '../components/ui'
 import { useApp } from '../context/AppContext'
-import { hasPermission, PERMISSIONS } from '../lib/permissions'
 
 type View = 'list' | 'detail' | 'add'
 
 export default function Stores() {
-  const { stores, addStore, updateStore, deleteStore, users, userRoles } = useApp()
+  const { stores, addStore, updateStore, deleteStore, users } = useApp()
   const { toast } = useToast()
-  const canManageStores = userRoles.includes('ADMIN') || hasPermission(userRoles, PERMISSIONS.STORES_MANAGE)
 
   const [view, setView] = useState<View>('list')
   const [selected, setSelected] = useState<typeof stores[0] | null>(null)
@@ -143,25 +141,21 @@ export default function Stores() {
             <Card>
               <h3 className="text-xs font-semibold text-[#94A3B8] uppercase tracking-wide mb-4">Quick Actions</h3>
               <div className="flex flex-col gap-2">
-                {canManageStores && (
-                  <>
-                    <Button variant="primary" className="w-full" icon={Icons.edit} onClick={() => {
-                      setEditForm({
-                        name: s.name, code: s.code, type: s.type, status: s.status,
-                        description: s.description || '', address: s.address || '',
-                        responsibleOfficerId: s.responsibleOfficerId || ''
-                      })
-                      setShowEditModal(true)
-                    }}>Edit Store</Button>
-                    <Button variant="ghost" className="w-full text-[#DC2626] hover:bg-[#FEF2F2]" onClick={() => {
-                      if (confirm('Delete this store?')) {
-                        deleteStore(s.id)
-                        toast.success('Store deleted')
-                        setView('list')
-                      }
-                    }}>Delete</Button>
-                  </>
-                )}
+                <Button variant="primary" className="w-full" icon={Icons.edit} onClick={() => {
+                  setEditForm({
+                    name: s.name, code: s.code, type: s.type, status: s.status,
+                    description: s.description || '', address: s.address || '',
+                    responsibleOfficerId: s.responsibleOfficerId || ''
+                  })
+                  setShowEditModal(true)
+                }}>Edit Store</Button>
+                <Button variant="ghost" className="w-full text-[#DC2626] hover:bg-[#FEF2F2]" onClick={() => {
+                  if (confirm('Delete this store?')) {
+                    deleteStore(s.id)
+                    toast.success('Store deleted')
+                    setView('list')
+                  }
+                }}>Delete</Button>
               </div>
             </Card>
             <Button variant="ghost" className="w-full" onClick={() => setView('list')}>← Back to list</Button>
@@ -219,9 +213,7 @@ export default function Stores() {
         subtitle="Manage warehouses, stores, and storage locations"
         actions={
           <div className="flex items-center gap-2">
-            {canManageStores && (
-              <Button variant="primary" size="md" icon={Icons.plus} onClick={() => setShowModal(true)}>Add store</Button>
-            )}
+            <Button variant="primary" size="md" icon={Icons.plus} onClick={() => setShowModal(true)}>Add store</Button>
           </div>
         }
       />

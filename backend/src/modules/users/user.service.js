@@ -174,8 +174,11 @@ export const createUser = async ({ email, fullName, password, roleIds = [] }) =>
     },
   })
 
-  const { roles: createdRoles, ...createdRest } = user
-  return { ...createdRest, roles: createdRoles.map((ur) => ur.role) }
+  return {
+    ...user,
+    roles: user.roles.map((ur) => ur.role),
+    roles: undefined,
+  }
 }
 
 /**

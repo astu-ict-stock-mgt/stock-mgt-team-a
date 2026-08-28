@@ -36,7 +36,7 @@ const statusLabels: Record<string, string> = {
 }
 
 export default function StockIssuing() {
-  const { currentUser, userRoles } = useApp()
+  const { currentUser, userRoles, refreshData, requisitions, setRequisitions } = useApp()
   const { toast } = useToast()
 
   const canCreateRequisition = hasPermission(userRoles, PERMISSIONS.REQUISITIONS_CREATE)
@@ -53,7 +53,6 @@ export default function StockIssuing() {
   const [warehouseStock, setWarehouseStock] = useState<StockCard[]>([])
   const [loadingWarehouseStock, setLoadingWarehouseStock] = useState(false)
 
-  const [requisitions, setRequisitions] = useState<Requisition[]>([])
   const [loadingReqs, setLoadingReqs] = useState(false)
   const [sivs, setSivs] = useState<SIV[]>([])
   const [loadingSivs, setLoadingSivs] = useState(false)
@@ -241,6 +240,7 @@ export default function StockIssuing() {
       setReqLines([])
       setWarehouseStock([])
       loadRequisitions()
+      refreshData().catch(() => {})
     } catch (err: any) {
       toast.error(err.message || 'Failed to create requisition')
     } finally {
@@ -264,6 +264,7 @@ export default function StockIssuing() {
         toast.success('Requisition approved by PAO')
       }
       loadRequisitions()
+      refreshData().catch(() => {})
     } catch (err: any) {
       toast.error(err.message || 'Failed to approve requisition')
     } finally {
@@ -279,6 +280,7 @@ export default function StockIssuing() {
       await requisitionsApi.reject(id, reason, level)
       toast.success(`Requisition rejected at ${level === 'DEPARTMENT' ? 'Department' : 'PAO'} level`)
       loadRequisitions()
+      refreshData().catch(() => {})
     } catch (err: any) {
       toast.error(err.message || 'Failed to reject requisition')
     } finally {
@@ -325,6 +327,7 @@ export default function StockIssuing() {
       setShowCreateSiv(false)
       setSelectedReq(null)
       loadSivs()
+      refreshData().catch(() => {})
     } catch (err: any) {
       toast.error(err.message || 'Failed to create SIV')
     } finally {
@@ -338,6 +341,7 @@ export default function StockIssuing() {
       await sivApi.approve(id)
       toast.success('SIV approved')
       loadSivs()
+      refreshData().catch(() => {})
     } catch (err: any) {
       toast.error(err.message || 'Failed to approve SIV')
     } finally {
@@ -352,6 +356,7 @@ export default function StockIssuing() {
       await sivApi.finalize(id)
       toast.success('SIV finalized — stock deducted from inventory')
       loadSivs()
+      refreshData().catch(() => {})
     } catch (err: any) {
       toast.error(err.message || 'Failed to finalize SIV')
     } finally {
