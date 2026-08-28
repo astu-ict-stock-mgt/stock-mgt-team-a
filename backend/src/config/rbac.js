@@ -2,6 +2,8 @@
  * Stock Management System (SMS) - RBAC Configuration & Permission Matrix
  * Task: BE-002 (Define Backend Role and Permission Matrix)
  * SRS Traceability: Appendix C (Permission Matrix), FR-02, BR-20, Clarification C-01
+ * Note on security levels: security levels range from 30 (REQUESTER) to 100 (ADMIN).
+ * Middleware validates if the user's role satisfies the required level before authorization.
  */
 
 // ============================================================================

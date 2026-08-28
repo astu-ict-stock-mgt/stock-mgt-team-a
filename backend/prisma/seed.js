@@ -167,6 +167,7 @@ async function main() {
       status: 'ACTIVE',
       roleCode: ROLES.PROPERTY_REGISTRATION_OFFICER.code,
     },
+
   ]
 
   console.log('👤 Seeding Baseline Users (BE-021)...')

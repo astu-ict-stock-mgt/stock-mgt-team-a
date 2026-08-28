@@ -9,15 +9,15 @@ class ApiClient {
 
   constructor(baseUrl: string) {
     this.baseUrl = baseUrl
-    this.token = localStorage.getItem('sms_token')
+    this.token = sessionStorage.getItem('sms_token')
   }
 
   setToken(token: string | null) {
     this.token = token
     if (token) {
-      localStorage.setItem('sms_token', token)
+      sessionStorage.setItem('sms_token', token)
     } else {
-      localStorage.removeItem('sms_token')
+      sessionStorage.removeItem('sms_token')
     }
   }
 
@@ -95,6 +95,8 @@ export const authApi = {
     api.post<ApiResponse<{ user: User; token: string }>>('/auth/login', { email, password }),
   logout: () => api.post<ApiResponse<{ message: string }>>('/auth/logout'),
   me: () => api.get<ApiResponse<{ userId: string; email: string; fullName: string; status: string }>>('/auth/me'),
+  changePassword: (data: { currentPassword: string; newPassword: string }) =>
+    api.post<ApiResponse<{ message: string }>>('/auth/change-password', data),
 }
 
 export const usersApi = {
