@@ -333,6 +333,8 @@ export const sivApi = {
   getById: (id: string) => api.get<ApiResponse<unknown>>(`/sivs/${id}`),
   approve: (id: string) => api.patch<ApiResponse<unknown>>(`/sivs/${id}/approve`),
   finalize: (id: string) => api.patch<ApiResponse<unknown>>(`/sivs/${id}/finalize`),
+  verifyDispatch: (id: string, data: { vehicleNumber?: string; driverName?: string; gateNumber?: string; remarks?: string }) =>
+    api.post<ApiResponse<unknown>>(`/sivs/${id}/verify-dispatch`, data),
 }
 
 export const auditApi = {
@@ -371,37 +373,25 @@ export const reportsApi = {
   },
 }
 
-// Evaluations API (TEC — Technical Evaluation Committee)
 export const evaluationsApi = {
-  getAll: (params?: { status?: string; evaluatorId?: string; goodsReceiptId?: string }) => {
+  getAll: (params?: { status?: string }) => {
     const q = new URLSearchParams()
     if (params?.status) q.set('status', params.status)
-    if (params?.evaluatorId) q.set('evaluatorId', params.evaluatorId)
-    if (params?.goodsReceiptId) q.set('goodsReceiptId', params.goodsReceiptId)
     return api.get<ApiResponse<any[]>>(`/evaluations?${q.toString()}`)
   },
   getById: (id: string) => api.get<ApiResponse<any>>(`/evaluations/${id}`),
   create: (data: { goodsReceiptId: string; notes?: string }) =>
     api.post<ApiResponse<any>>('/evaluations', data),
-  startEvaluation: (id: string, _userId?: string) =>
+  startEvaluation: (id: string, userId?: string) =>
     api.patch<ApiResponse<any>>(`/evaluations/${id}/start`),
   updateDecision: (id: string, decision: 'APPROVED' | 'REJECTED', notes?: string) =>
     api.patch<ApiResponse<any>>(`/evaluations/${id}/decision`, { decision, notes }),
 }
 
-// Assets API (Accountant — Fixed Asset Registration)
 export const assetsApi = {
-  getAll: (params?: { status?: string; search?: string }) => {
-    const q = new URLSearchParams()
-    if (params?.status) q.set('status', params.status)
-    if (params?.search) q.set('search', params.search)
-    return api.get<ApiResponse<any[]>>(`/assets?${q.toString()}`)
-  },
+  getAll: (params?: any) => api.get<ApiResponse<any[]>>('/assets'),
   getById: (id: string) => api.get<ApiResponse<any>>(`/assets/${id}`),
   register: (data: { name: string; itemId?: string; serialNumber?: string; assetTag?: string; category?: string; purchaseCost?: number; location?: string }) =>
     api.post<ApiResponse<any>>('/assets', data),
-  updateStatus: (id: string, status: string, notes?: string) =>
-    api.patch<ApiResponse<any>>(`/assets/${id}/status`, { status, notes }),
-  updateCustody: (id: string, custodianId: string) =>
-    api.patch<ApiResponse<any>>(`/assets/${id}/custody`, { custodianId }),
 }
+

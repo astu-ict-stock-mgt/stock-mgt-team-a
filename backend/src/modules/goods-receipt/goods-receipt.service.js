@@ -19,7 +19,7 @@ class GoodsReceiptService {
         notes: receiptData.notes,
         totalAmount: receiptData.lines?.reduce((sum, l) => sum + (l.quantity * l.unitCost), 0) || 0,
         currency: receiptData.currency || 'ETB',
-        status: 'APPROVED',
+        status: 'PENDING_EVALUATION',
         lines: {
           create: receiptData.lines?.map(line => ({
             itemId: line.itemId,

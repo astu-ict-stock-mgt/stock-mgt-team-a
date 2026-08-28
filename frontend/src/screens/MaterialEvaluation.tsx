@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react"
+﻿import { useState, useEffect, useCallback } from "react"
 import { SectionHeader, Card, Badge, Button, Modal, Input, Tabs, useToast } from "../components/ui"
 import { goodsReceiptApi, evaluationsApi } from "../services/api"
 import { useApp } from "../context/AppContext"
@@ -156,7 +156,7 @@ export default function MaterialEvaluation() {
                         {statusBadge(receipt.status)}
                       </div>
                       <p className="text-xs text-[#94A3B8] mt-0.5">
-                        Supplier: {receipt.supplier?.name || "N/A"} � Store: {receipt.store?.name || "N/A"} � {new Date(receipt.createdAt).toLocaleDateString()}
+                        Supplier: {receipt.supplier?.name || "N/A"} ï¿½ Store: {receipt.store?.name || "N/A"} ï¿½ {new Date(receipt.createdAt).toLocaleDateString()}
                       </p>
                       {receipt.purchaseOrderNumber && (
                         <p className="text-xs text-[#64748B] mt-0.5">PO: {receipt.purchaseOrderNumber}</p>
@@ -217,7 +217,7 @@ export default function MaterialEvaluation() {
                 <div key={ev.id} className="flex items-center justify-between px-5 py-4 hover:bg-[#F8FAFC]">
                   <div>
                     <p className="text-sm font-semibold text-[#1E293B]">{ev.goodsReceipt.receiptNumber}</p>
-                    <p className="text-xs text-[#94A3B8]">Evaluated by {ev.evaluator.fullName} � {new Date(ev.createdAt).toLocaleDateString()}</p>
+                    <p className="text-xs text-[#94A3B8]">Evaluated by {ev.evaluator.fullName} ï¿½ {new Date(ev.createdAt).toLocaleDateString()}</p>
                     {ev.notes && <p className="text-xs text-[#64748B] mt-0.5 italic">"{ev.notes}"</p>}
                   </div>
                   <Badge variant={ev.decision === "APPROVED" ? "success" : "danger"}>{ev.decision}</Badge>
@@ -230,7 +230,7 @@ export default function MaterialEvaluation() {
 
       {/* RECEIPT DETAIL MODAL */}
       {showReceiptModal && selectedReceipt && (
-        <Modal open={showReceiptModal} title={`Receipt Details � ${selectedReceipt.receiptNumber}`} onClose={() => setShowReceiptModal(false)}>
+        <Modal open={showReceiptModal} title={`Receipt Details ï¿½ ${selectedReceipt.receiptNumber}`} onClose={() => setShowReceiptModal(false)}>
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-4 p-4 bg-[#F8FAFC] rounded-xl">
               <div>
@@ -295,7 +295,7 @@ export default function MaterialEvaluation() {
 
       {/* DECISION MODAL */}
       {showDecisionModal && selectedEval && (
-        <Modal open={showDecisionModal} title={`Submit Decision � ${selectedEval.goodsReceipt.receiptNumber}`} onClose={() => setShowDecisionModal(false)}>
+        <Modal open={showDecisionModal} title={`Submit Decision ï¿½ ${selectedEval.goodsReceipt.receiptNumber}`} onClose={() => setShowDecisionModal(false)}>
           <div className="space-y-5">
             <p className="text-sm text-[#64748B]">
               Record your technical inspection decision for this goods receipt. This action is final and will update the receipt status.

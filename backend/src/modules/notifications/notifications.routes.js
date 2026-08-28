@@ -60,18 +60,18 @@ router.post('/trigger-disposal-check', authorize(PERMISSIONS.INVENTORY_UPDATE), 
 // ─────────────────────────────────────────────────────────────────
 
 // GET /api/notifications — list own notifications
-router.get('/', authorize(PERMISSIONS.INVENTORY_READ), controller.list)
+router.get('/', controller.list)
 
 // GET /api/notifications/:id — single notification
-router.get('/:id', authorize(PERMISSIONS.INVENTORY_READ), controller.getById)
+router.get('/:id', controller.getById)
 
 // PATCH /api/notifications/:id/read — mark single notification read
-router.patch('/:id/read', authorize(PERMISSIONS.INVENTORY_READ), controller.markRead)
+router.patch('/:id/read', controller.markRead)
 
 // POST /api/notifications/:id/read — backward-compatible alias
-router.post('/:id/read', authorize(PERMISSIONS.INVENTORY_READ), controller.markRead)
+router.post('/:id/read', controller.markRead)
 
 // DELETE /api/notifications/:id — delete own notification
-router.delete('/:id', authorize(PERMISSIONS.INVENTORY_READ), controller.remove)
+router.delete('/:id', controller.remove)
 
-export default router
+export default router;

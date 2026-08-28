@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+﻿import { useState, useMemo } from "react";
 import { ToastContainer, useToast, Icons, SearchBar } from "./components/ui";
 import { useApp } from "./context/AppContext";
 import { api } from "./services/api";
@@ -20,18 +20,21 @@ import Reports from "./screens/Reports";
 import AuditLog from "./screens/AuditLog";
 import Notifications from "./screens/Notifications";
 import Settings from "./screens/Settings";
+import AssetRegister from "./screens/AssetRegister";
 import GateControl from "./screens/GateControl";
 import MaterialEvaluation from "./screens/MaterialEvaluation";
-import AssetRegister from "./screens/AssetRegister";
 
 type Screen =
   | "dashboard"
   | "inventory"
+  | "asset-register"
   | "categories"
   | "units"
   | "stores"
   | "stock-receiving"
+  | "material-evaluation"
   | "stock-issuing"
+  | "gate-control"
   | "stock-transfer"
   | "stock-tracking"
   | "stock-taking"
@@ -41,10 +44,7 @@ type Screen =
   | "reports"
   | "audit"
   | "notifications"
-  | "settings"
-  | "gate-control"
-  | "evaluations"
-  | "asset-register";
+  | "settings";
 
 interface NavItem {
   id: Screen;
@@ -67,6 +67,7 @@ const navGroups: NavGroup[] = [
     label: "Inventory",
     items: [
       { id: "inventory", label: "Inventory", icon: Icons.inventory },
+      { id: "asset-register", label: "Asset Register", icon: Icons.dashboard },
       { id: "categories", label: "Categories", icon: Icons.dashboard },
       { id: "units", label: "Units", icon: Icons.dashboard },
       { id: "stores", label: "Stores", icon: Icons.dashboard },
@@ -77,18 +78,12 @@ const navGroups: NavGroup[] = [
     label: "Stock Operations",
     items: [
       { id: "stock-receiving", label: "Receiving", icon: Icons.receive },
+      { id: "material-evaluation", label: "Material Evaluation", icon: Icons.dashboard },
       { id: "stock-issuing", label: "Issuing", icon: Icons.issue },
+      { id: "gate-control", label: "Gate Control", icon: Icons.tracking },
       { id: "stock-transfer", label: "Transfer", icon: Icons.transfer },
       { id: "stock-tracking", label: "Tracking", icon: Icons.tracking },
       { id: "stock-taking", label: "Stock Taking", icon: Icons.stocktake },
-    ],
-  },
-  {
-    label: "Specialized",
-    items: [
-      { id: "gate-control", label: "Gate Control", icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg> },
-      { id: "evaluations", label: "Evaluations", icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg> },
-      { id: "asset-register", label: "Asset Register", icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M9 21V9"/></svg> },
     ],
   },
   {
@@ -110,12 +105,15 @@ const navGroups: NavGroup[] = [
 const screenTitles: Record<Screen, string> = {
   dashboard: "Dashboard",
   inventory: "Inventory Management",
+  "asset-register": "Fixed Asset Register",
   categories: "Category Management",
   units: "Unit of Measure",
   stores: "Store Management",
   suppliers: "Supplier Management",
   "stock-receiving": "Stock Receiving",
+  "material-evaluation": "Material Evaluation",
   "stock-issuing": "Stock Issuing",
+  "gate-control": "Gate Control",
   "stock-transfer": "Stock Transfer",
   "stock-tracking": "Stock Tracking",
   "stock-taking": "Stock Taking",
@@ -125,9 +123,6 @@ const screenTitles: Record<Screen, string> = {
   audit: "Audit Log",
   notifications: "Notifications",
   settings: "Settings",
-  "gate-control": "Gate Control",
-  evaluations: "Material Evaluation",
-  "asset-register": "Fixed Asset Register",
 };
 
 function LoginScreen({ onLogin }: { onLogin: (email: string, password: string) => Promise<void> }) {
@@ -207,6 +202,8 @@ export default function App() {
         switch (item.id) {
           case 'inventory':
             return hasPermission(userRoles, PERMISSIONS.STOCK_CARDS_READ)
+          case 'asset-register':
+            return hasPermission(userRoles, PERMISSIONS.ASSETS_REGISTER) || hasPermission(userRoles, PERMISSIONS.ASSETS_READ)
           case 'categories':
             return hasPermission(userRoles, PERMISSIONS.CATEGORIES_READ) || hasPermission(userRoles, PERMISSIONS.CATEGORIES_MANAGE)
           case 'units':
@@ -217,20 +214,18 @@ export default function App() {
             return hasPermission(userRoles, PERMISSIONS.SUPPLIERS_MANAGE)
           case 'stock-receiving':
             return hasPermission(userRoles, PERMISSIONS.RECEIPTS_CREATE) || hasPermission(userRoles, PERMISSIONS.GOODS_RECEIPT_CREATE)
+          case 'material-evaluation':
+            return hasPermission(userRoles, PERMISSIONS.EVALUATIONS_DECIDE) || hasPermission(userRoles, PERMISSIONS.EVALUATIONS_CREATE)
           case 'stock-issuing':
             return hasPermission(userRoles, PERMISSIONS.REQUISITIONS_CREATE) || hasPermission(userRoles, PERMISSIONS.REQUISITIONS_APPROVE) || hasPermission(userRoles, PERMISSIONS.SIV_PREPARE)
+          case 'gate-control':
+            return hasPermission(userRoles, PERMISSIONS.DISPATCH_VERIFY)
           case 'stock-transfer':
             return hasPermission(userRoles, PERMISSIONS.TRANSFERS_CREATE) || hasPermission(userRoles, PERMISSIONS.TRANSFERS_APPROVE)
           case 'stock-tracking':
             return hasPermission(userRoles, PERMISSIONS.STOCK_CARDS_READ)
           case 'stock-taking':
             return hasPermission(userRoles, PERMISSIONS.RECONCILIATION_CREATE) || hasPermission(userRoles, PERMISSIONS.RECONCILIATION_APPROVE)
-          case 'gate-control':
-            return hasPermission(userRoles, PERMISSIONS.DISPATCH_VERIFY)
-          case 'evaluations':
-            return hasPermission(userRoles, PERMISSIONS.EVALUATIONS_READ) || hasPermission(userRoles, PERMISSIONS.EVALUATIONS_CREATE)
-          case 'asset-register':
-            return hasPermission(userRoles, PERMISSIONS.ASSETS_REGISTER) || hasPermission(userRoles, PERMISSIONS.ASSETS_READ)
           case 'users':
             // User management is ADMIN-only
             return hasPermission(userRoles, PERMISSIONS.USERS_MANAGE)
@@ -504,16 +499,16 @@ export default function App() {
                 <div className="max-h-72 overflow-y-auto">
                   {notifications.length === 0 ? (
                     <div className="flex flex-col items-center py-10 text-center">
-                      <span className="text-2xl mb-2">🔔</span>
+                      <span className="text-2xl mb-2">ðŸ””</span>
                       <p className="text-xs text-[#94A3B8]">No notifications yet</p>
                     </div>
                   ) : (
                     notifications.slice(0, 8).map(n => {
                       const iconMap: Record<string, string> = {
-                        APPROVAL_REQUIRED: '📋', APPROVED: '✅', REJECTED: '❌',
-                        STATUS_UPDATE: '🔄', GRN_READY: '📦',
-                        LOW_STOCK: '📉', EXPIRY_WARNING: '⚠', DISPOSAL_CANDIDATE: '🗑',
-                        SECURITY_EVENT: '🔒', INFO: 'ℹ',
+                        APPROVAL_REQUIRED: 'ðŸ“‹', APPROVED: 'âœ…', REJECTED: 'âŒ',
+                        STATUS_UPDATE: 'ðŸ”„', GRN_READY: 'ðŸ“¦',
+                        LOW_STOCK: 'ðŸ“‰', EXPIRY_WARNING: 'âš ', DISPOSAL_CANDIDATE: 'ðŸ—‘',
+                        SECURITY_EVENT: 'ðŸ”’', INFO: 'â„¹',
                       };
                       const priorityDot: Record<string, string> = {
                         HIGH: 'bg-[#DC2626]', MEDIUM: 'bg-[#D97706]', LOW: 'bg-[#94A3B8]',
@@ -527,7 +522,7 @@ export default function App() {
                             !n.isRead ? 'bg-[#FAFBFF]' : 'bg-white'
                           }`}
                         >
-                          <span className="text-base shrink-0 mt-0.5">{iconMap[n.type] || 'ℹ'}</span>
+                          <span className="text-base shrink-0 mt-0.5">{iconMap[n.type] || 'â„¹'}</span>
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-1.5 mb-0.5">
                               <p className={`text-xs font-semibold truncate ${
@@ -551,7 +546,7 @@ export default function App() {
                     onClick={() => navigate('notifications')}
                     className="w-full text-center text-xs text-[#4F46E5] hover:text-[#4338CA] font-medium transition-colors py-0.5"
                   >
-                    View all notifications →
+                    View all notifications â†’
                   </button>
                 </div>
               </div>
@@ -651,24 +646,24 @@ export default function App() {
           <div className="p-6 max-w-[1400px] mx-auto min-h-full print:p-0 print:max-w-none">
             {screen === "dashboard" && <Dashboard />}
             {screen === "inventory" && hasPermission(userRoles, PERMISSIONS.STOCK_CARDS_READ) && <Inventory />}
+            {screen === "asset-register" && (hasPermission(userRoles, PERMISSIONS.ASSETS_REGISTER) || hasPermission(userRoles, PERMISSIONS.ASSETS_READ)) && <AssetRegister />}
             {screen === "categories" && (hasPermission(userRoles, PERMISSIONS.CATEGORIES_READ) || hasPermission(userRoles, PERMISSIONS.CATEGORIES_MANAGE)) && <Categories />}
             {screen === "units" && (hasPermission(userRoles, PERMISSIONS.UNITS_READ) || hasPermission(userRoles, PERMISSIONS.UNITS_MANAGE)) && <Units />}
             {screen === "stores" && (hasPermission(userRoles, PERMISSIONS.STORES_READ) || hasPermission(userRoles, PERMISSIONS.STORES_MANAGE)) && <Stores />}
             {screen === "suppliers" && hasPermission(userRoles, PERMISSIONS.SUPPLIERS_MANAGE) && <Suppliers />}
             {screen === "stock-receiving" && (hasPermission(userRoles, PERMISSIONS.RECEIPTS_CREATE) || hasPermission(userRoles, PERMISSIONS.GOODS_RECEIPT_CREATE)) && <StockReceiving />}
+            {screen === "material-evaluation" && (hasPermission(userRoles, PERMISSIONS.EVALUATIONS_DECIDE) || hasPermission(userRoles, PERMISSIONS.EVALUATIONS_CREATE)) && <MaterialEvaluation />}
             {screen === "stock-issuing" && (hasPermission(userRoles, PERMISSIONS.REQUISITIONS_CREATE) || hasPermission(userRoles, PERMISSIONS.REQUISITIONS_APPROVE) || hasPermission(userRoles, PERMISSIONS.SIV_PREPARE)) && <StockIssuing />}
+            {screen === "gate-control" && hasPermission(userRoles, PERMISSIONS.DISPATCH_VERIFY) && <GateControl />}
             {screen === "stock-transfer" && (hasPermission(userRoles, PERMISSIONS.TRANSFERS_CREATE) || hasPermission(userRoles, PERMISSIONS.TRANSFERS_APPROVE)) && <StockTransfer />}
             {screen === "stock-tracking" && hasPermission(userRoles, PERMISSIONS.STOCK_CARDS_READ) && <StockTracking />}
             {screen === "stock-taking" && (hasPermission(userRoles, PERMISSIONS.RECONCILIATION_CREATE) || hasPermission(userRoles, PERMISSIONS.RECONCILIATION_APPROVE)) && <StockTaking />}
-            {screen === "users" && hasPermission(userRoles, PERMISSIONS.USERS_READ) && <Users />}
+            {screen === "users" && hasPermission(userRoles, PERMISSIONS.USERS_MANAGE) && <Users />}
             {screen === "roles" && hasPermission(userRoles, PERMISSIONS.ROLES_READ) && <RolesPermissions />}
             {screen === "reports" && hasPermission(userRoles, PERMISSIONS.REPORTS_VIEW) && <Reports />}
             {screen === "audit" && hasPermission(userRoles, PERMISSIONS.AUDIT_READ) && <AuditLog />}
             {screen === "notifications" && <Notifications />}
             {screen === "settings" && <Settings />}
-            {screen === "gate-control" && hasPermission(userRoles, PERMISSIONS.DISPATCH_VERIFY) && <GateControl />}
-            {screen === "evaluations" && (hasPermission(userRoles, PERMISSIONS.EVALUATIONS_READ) || hasPermission(userRoles, PERMISSIONS.EVALUATIONS_CREATE)) && <MaterialEvaluation />}
-            {screen === "asset-register" && (hasPermission(userRoles, PERMISSIONS.ASSETS_READ) || hasPermission(userRoles, PERMISSIONS.ASSETS_REGISTER)) && <AssetRegister />}
           </div>
         </main>
       </div>

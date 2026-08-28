@@ -4,6 +4,7 @@
  * SRS Traceability: Appendix C (Permission Matrix), FR-02, BR-20, Clarification C-01
  * Note on security levels: security levels range from 30 (REQUESTER) to 100 (ADMIN).
  * Middleware validates if the user's role satisfies the required level before authorization.
+ * Trigger reload: 2026-08-28 16:39.
  */
 
 // ============================================================================
@@ -545,6 +546,8 @@ const MATRIX = {
     PERMISSIONS.MASTER_DATA_READ.key,
     PERMISSIONS.DISPATCH_VERIFY.key,
     PERMISSIONS.REPORTS_VIEW.key,
+    PERMISSIONS.REQUISITIONS_READ.key,
+    PERMISSIONS.ISSUES_READ.key,
   ],
 
   // PROPERTY_REGISTRATION_OFFICER: Fixed asset registration per SRS Appendix C

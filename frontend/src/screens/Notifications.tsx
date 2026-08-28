@@ -1,27 +1,27 @@
-import { useState, useEffect } from 'react'
+﻿import { useState, useEffect } from 'react'
 import { Button, Badge, SectionHeader, Tabs } from '../components/ui'
 import { useApp } from '../context/AppContext'
 
-// ─── Icon map: type → emoji ─────────────────────────────────────
+// â”€â”€â”€ Icon map: type â†’ emoji â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const typeIcon: Record<string, string> = {
-  APPROVAL_REQUIRED: '📋',
-  APPROVED: '✅',
-  REJECTED: '❌',
-  STATUS_UPDATE: '🔄',
-  RECEIPT_EVALUATION: '🔬',
-  MATERIAL_ACCEPTED: '✅',
-  MATERIAL_REJECTED: '❌',
-  GRN_READY: '📦',
-  EXPIRY_WARNING: '⚠',
-  LOW_STOCK: '📉',
-  DISPOSAL_CANDIDATE: '🗑',
-  PROPERTY_REGISTRATION_REQUIRED: '🏷',
-  SECURITY_EVENT: '🔒',
-  INFO: 'ℹ',
-  WARNING: '⚠',
+  APPROVAL_REQUIRED: 'ðŸ“‹',
+  APPROVED: 'âœ…',
+  REJECTED: 'âŒ',
+  STATUS_UPDATE: 'ðŸ”„',
+  RECEIPT_EVALUATION: 'ðŸ”¬',
+  MATERIAL_ACCEPTED: 'âœ…',
+  MATERIAL_REJECTED: 'âŒ',
+  GRN_READY: 'ðŸ“¦',
+  EXPIRY_WARNING: 'âš ',
+  LOW_STOCK: 'ðŸ“‰',
+  DISPOSAL_CANDIDATE: 'ðŸ—‘',
+  PROPERTY_REGISTRATION_REQUIRED: 'ðŸ·',
+  SECURITY_EVENT: 'ðŸ”’',
+  INFO: 'â„¹',
+  WARNING: 'âš ',
 }
 
-// ─── Badge color per type ───────────────────────────────────────
+// â”€â”€â”€ Badge color per type â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const typeBadge: Record<string, 'warning' | 'primary' | 'success' | 'danger'> = {
   APPROVAL_REQUIRED: 'primary',
   APPROVED: 'success',
@@ -40,7 +40,7 @@ const typeBadge: Record<string, 'warning' | 'primary' | 'success' | 'danger'> = 
   WARNING: 'warning',
 }
 
-// ─── Background color per type ──────────────────────────────────
+// â”€â”€â”€ Background color per type â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const typeBg: Record<string, string> = {
   APPROVAL_REQUIRED: 'bg-[#EEF2FF] border-[#C7D2FE] text-[#4F46E5]',
   APPROVED: 'bg-[#F0FDF4] border-[#BBF7D0] text-[#16A34A]',
@@ -59,7 +59,7 @@ const typeBg: Record<string, string> = {
   WARNING: 'bg-[#FFFBEB] border-[#FDE68A] text-[#D97706]',
 }
 
-// ─── Priority pill colors ────────────────────────────────────────
+// â”€â”€â”€ Priority pill colors â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const priorityStyle: Record<string, string> = {
   HIGH: 'bg-[#FEE2E2] text-[#DC2626] border-[#FECACA]',
   MEDIUM: 'bg-[#FEF3C7] text-[#D97706] border-[#FDE68A]',
@@ -128,7 +128,7 @@ export default function Notifications() {
               onClick={handleMarkAllRead}
               disabled={markingAll || unreadCount === 0}
             >
-              {markingAll ? 'Marking…' : 'Mark all read'}
+              {markingAll ? 'Markingâ€¦' : 'Mark all read'}
             </Button>
           </div>
         }
@@ -150,7 +150,7 @@ export default function Notifications() {
           <div className="divide-y divide-[#F8FAFC]">
             {filtered.length === 0 ? (
               <div className="flex flex-col items-center py-16 text-center">
-                <div className="w-12 h-12 rounded-2xl bg-[#F1F5F9] flex items-center justify-center text-[#CBD5E1] mb-3 text-xl">🔔</div>
+                <div className="w-12 h-12 rounded-2xl bg-[#F1F5F9] flex items-center justify-center text-[#CBD5E1] mb-3 text-xl">ðŸ””</div>
                 <p className="text-sm font-semibold text-[#334155]">All caught up</p>
                 <p className="text-xs text-[#94A3B8] mt-0.5">
                   No {activeTab === 'unread' ? 'unread ' : ''}notifications at the moment.
@@ -164,7 +164,7 @@ export default function Notifications() {
                 >
                   {/* Type icon */}
                   <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 text-sm border ${typeBg[n.type] || typeBg.INFO}`}>
-                    {typeIcon[n.type] || 'ℹ'}
+                    {typeIcon[n.type] || 'â„¹'}
                   </div>
 
                   <div className="flex-1 min-w-0">
@@ -185,7 +185,7 @@ export default function Notifications() {
                     <p className="text-xs text-[#94A3B8] mt-2">
                       <RelativeTime date={n.createdAt} />
                       {n.referenceType && (
-                        <span className="ml-2 text-[#CBD5E1]">• {n.referenceType}</span>
+                        <span className="ml-2 text-[#CBD5E1]">â€¢ {n.referenceType}</span>
                       )}
                     </p>
                   </div>
@@ -197,7 +197,7 @@ export default function Notifications() {
                         disabled={loadingIds.has(n.id)}
                         className="h-7 px-2.5 rounded-lg text-xs text-[#4F46E5] hover:bg-[#EEF2FF] font-medium transition-colors disabled:opacity-50"
                       >
-                        {loadingIds.has(n.id) ? '…' : 'Mark read'}
+                        {loadingIds.has(n.id) ? 'â€¦' : 'Mark read'}
                       </button>
                     )}
                   </div>

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react"
+ï»¿import { useState, useEffect, useCallback } from "react"
 import { SectionHeader, Card, Badge, Button, Modal, Input, Tabs, useToast } from "../components/ui"
 import { goodsReceiptApi, assetsApi } from "../services/api"
 
@@ -183,7 +183,7 @@ export default function AssetRegister() {
                         <Badge variant="success">Evaluated</Badge>
                       </div>
                       <p className="text-xs text-[#94A3B8] mt-0.5">
-                        {receipt.supplier?.name} · {receipt.store?.name} · {new Date(receipt.createdAt).toLocaleDateString()}
+                        {receipt.supplier?.name} Â· {receipt.store?.name} Â· {new Date(receipt.createdAt).toLocaleDateString()}
                       </p>
                     </div>
                     <Badge variant="warning">{receipt.lines?.length || 0} items to register</Badge>
@@ -194,7 +194,7 @@ export default function AssetRegister() {
                     <div key={i} className="px-5 py-3 flex items-center justify-between hover:bg-[#F8FAFC]">
                       <div>
                         <p className="text-sm font-medium text-[#1E293B]">{line.item?.name || "Unknown Item"}</p>
-                        <p className="text-xs text-[#94A3B8] font-mono">{line.item?.code} · Qty: {line.quantity} · Unit Cost: ${line.unitCost?.toFixed(2)}</p>
+                        <p className="text-xs text-[#94A3B8] font-mono">{line.item?.code} Â· Qty: {line.quantity} Â· Unit Cost: ${line.unitCost?.toFixed(2)}</p>
                       </div>
                       <Button
                         variant="primary"

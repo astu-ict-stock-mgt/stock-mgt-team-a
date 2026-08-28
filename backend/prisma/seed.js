@@ -311,7 +311,7 @@ async function main() {
           storeId: store.id,
           issuedToUserId: requesterUser.id,
           preparedBy: requesterUser.id,
-          status: 'PREPARED',
+          status: 'FINALIZED',
           notes: 'Prepared store issue voucher for approved laptops',
           lines: {
             create: [
@@ -326,10 +326,57 @@ async function main() {
           },
         },
       })
-      console.log('   - Seeded SIV: SIV-2026-00001 (PREPARED)')
+      console.log('   - Seeded SIV: SIV-2026-00001 (FINALIZED)')
     } catch (_err) {
       console.log('   ℹ️ SIV fixture SIV-2026-00001 ready')
     }
+  }
+
+  // 7b. Seed Supplier & Goods Receipt Fixtures (BE-063) for evaluation and registration flow
+  console.log('📦 Seeding Goods Receipt Fixtures for evaluation workflow...')
+  try {
+    const supplier = await prisma.supplier.upsert({
+      where: { code: 'SUPPLIER-DEFAULT-01' },
+      update: {},
+      create: {
+        code: 'SUPPLIER-DEFAULT-01',
+        name: 'Apex Tech Supplier Ltd',
+        status: 'ACTIVE',
+      },
+    })
+
+    if (supplier && store && requesterUser && item && unit) {
+      await prisma.goodsReceipt.upsert({
+        where: { receiptNumber: 'GR-20260828-0001' },
+        update: {},
+        create: {
+          receiptNumber: 'GR-20260828-0001',
+          supplierId: supplier.id,
+          storeId: store.id,
+          receivedBy: requesterUser.id,
+          status: 'PENDING_EVALUATION',
+          notes: 'Seed goods receipt for technical evaluation committee demo',
+          totalAmount: 4500.0,
+          lines: {
+            create: [
+              {
+                itemId: item.id,
+                unitId: unit.id,
+                quantity: 3,
+                unitCost: 1500.0,
+                totalCost: 4500.0,
+                condition: 'good',
+                batchNumber: 'BATCH-2026-001',
+                notes: 'Inspect seal carefully',
+              }
+            ]
+          }
+        }
+      })
+      console.log('   - Seeded Goods Receipt: GR-20260828-0001 (PENDING_EVALUATION)')
+    }
+  } catch (err) {
+    console.log('   ℹ️ Goods Receipt fixture ready or failed:', err.message)
   }
 
   // 8. Seed Stock Transfer Request & Lines Fixtures (BE-121, BE-122)

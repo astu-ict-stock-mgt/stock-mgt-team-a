@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react"
+﻿import { useState, useEffect, useCallback } from "react"
 import { SectionHeader, Card, Badge, Button, Modal, Input, Select, Tabs, useToast } from "../components/ui"
 import { sivApi, requisitionsApi, goodsReceiptApi } from "../services/api"
 import { useApp } from "../context/AppContext"
@@ -18,32 +18,59 @@ interface DispatchItem {
 }
 
 export default function GateControl() {
-  const { requisitions, currentUser } = useApp()
+  const { currentUser } = useApp()
   const { toast } = useToast()
 
   const [activeTab, setActiveTab] = useState("queue")
   const [verifyModal, setVerifyModal] = useState(false)
   const [selected, setSelected] = useState<DispatchItem | null>(null)
   const [gateNotes, setGateNotes] = useState("")
+  const [vehicleNumber, setVehicleNumber] = useState("")
+  const [driverName, setDriverName] = useState("")
+  const [gateNumber, setGateNumber] = useState("GATE_01")
   const [movementType, setMovementType] = useState("OUTBOUND")
   const [verifiedItems, setVerifiedItems] = useState<DispatchItem[]>([])
   const [submitting, setSubmitting] = useState(false)
+  const [sivList, setSivList] = useState<any[]>([])
+  const [loading, setLoading] = useState(false)
 
-  // Build dispatch queue from PAO-approved requisitions
-  const dispatchQueue: DispatchItem[] = (requisitions as any[])
-    .filter((r: any) => r.status === "PAO_APPROVED" || r.status === "SIV_PREPARED" || r.status === "SIV_FINALIZED")
-    .map(r => ({
-      id: r.id,
-      type: "REQUISITION",
-      refNumber: r.requisitionNumber,
-      status: r.status,
-      requestedBy: r.requester?.fullName || "Unknown",
-      destination: r.department?.name || r.departmentId || "Unknown Department",
-      items: r.lines?.length || 0,
-      createdAt: r.createdAt,
+  const loadSivs = useCallback(async () => {
+    setLoading(true)
+    try {
+      const res = await sivApi.getAll()
+      // Filter for APPROVED or FINALIZED SIVs
+      const activeSivs = (res.data || []).filter((siv: any) =>
+        ['APPROVED', 'FINALIZED'].includes(siv.status)
+      )
+      setSivList(activeSivs)
+    } catch (err: any) {
+      console.error("Failed to load SIVs:", err)
+      toast.error("Failed to load SIV dispatch queue")
+    } finally {
+      setLoading(false)
+    }
+  }, [toast])
+
+  useEffect(() => {
+    loadSivs()
+  }, [loadSivs, activeTab])
+
+  // Build dispatch queue from finalized/approved SIVs, excluding those already cleared in session log
+  const verifiedIds = new Set(verifiedItems.map(v => v.id))
+  const dispatchQueue: DispatchItem[] = sivList
+    .filter(siv => !verifiedIds.has(siv.id))
+    .map(siv => ({
+      id: siv.id,
+      type: "SIV",
+      refNumber: siv.sivNumber,
+      status: siv.status,
+      requestedBy: siv.issuedToUser?.fullName || "Unknown",
+      destination: siv.store?.name || "Unknown Store",
+      items: siv.lines?.length || 0,
+      createdAt: siv.createdAt,
     }))
 
-  // Load verified items from localStorage (gate log � persisted locally)
+  // Load verified items from localStorage (gate log ï¿½ persisted locally)
   useEffect(() => {
     const saved = sessionStorage.getItem("gate_verified_items")
     if (saved) {
@@ -51,10 +78,18 @@ export default function GateControl() {
     }
   }, [])
 
-  const handleVerify = () => {
+  const handleVerify = async () => {
     if (!selected) return
     setSubmitting(true)
     try {
+      // Call SIV verify dispatch API
+      await sivApi.verifyDispatch(selected.id, {
+        vehicleNumber: vehicleNumber.trim() || undefined,
+        driverName: driverName.trim() || undefined,
+        gateNumber: gateNumber.trim() || undefined,
+        remarks: gateNotes.trim() || undefined,
+      })
+
       const verifiedEntry: DispatchItem = {
         ...selected,
         status: "GATE_CLEARED",
@@ -65,12 +100,16 @@ export default function GateControl() {
       const updated = [verifiedEntry, ...verifiedItems].slice(0, 100)
       setVerifiedItems(updated)
       sessionStorage.setItem("gate_verified_items", JSON.stringify(updated))
-      toast.success(`Gate clearance recorded for ${selected.refNumber}`)
+      toast.success(`Gate clearance recorded for SIV ${selected.refNumber}`)
       setVerifyModal(false)
       setGateNotes("")
+      setVehicleNumber("")
+      setDriverName("")
+      setGateNumber("GATE_01")
       setSelected(null)
-    } catch {
-      toast.error("Failed to record gate verification")
+      loadSivs() // Reload queue list
+    } catch (err: any) {
+      toast.error("Failed to record gate clearance: " + (err.message || err))
     } finally {
       setSubmitting(false)
     }
@@ -172,8 +211,8 @@ export default function GateControl() {
                       </div>
                       <p className="text-xs text-[#94A3B8] mt-0.5">
                         {item.requestedBy && `Requested by: ${item.requestedBy}`}
-                        {item.destination && ` � To: ${item.destination}`}
-                        {item.items !== undefined && ` � ${item.items} item(s)`}
+                        {item.destination && ` ï¿½ To: ${item.destination}`}
+                        {item.items !== undefined && ` ï¿½ ${item.items} item(s)`}
                       </p>
                       <p className="text-xs text-[#94A3B8]">{new Date(item.createdAt).toLocaleDateString()}</p>
                     </div>
@@ -181,9 +220,17 @@ export default function GateControl() {
                   <Button
                     variant="primary"
                     size="sm"
-                    onClick={() => { setSelected(item); setGateNotes(""); setMovementType("OUTBOUND"); setVerifyModal(true) }}
+                    onClick={() => {
+                      setSelected(item)
+                      setGateNotes("")
+                      setVehicleNumber("")
+                      setDriverName("")
+                      setGateNumber("GATE_01")
+                      setMovementType("OUTBOUND")
+                      setVerifyModal(true)
+                    }}
                   >
-                    ?? Verify & Clear
+                    Verify & Clear
                   </Button>
                 </div>
               </Card>
@@ -214,7 +261,7 @@ export default function GateControl() {
                         <Badge variant="success">Gate Cleared</Badge>
                       </div>
                       <p className="text-xs text-[#94A3B8] mt-0.5">
-                        Cleared by {v.verifiedBy || "Unknown"} � {v.verifiedAt ? new Date(v.verifiedAt).toLocaleString() : "N/A"}
+                        Cleared by {v.verifiedBy || "Unknown"} ï¿½ {v.verifiedAt ? new Date(v.verifiedAt).toLocaleString() : "N/A"}
                       </p>
                       {v.gateNotes && <p className="text-xs text-[#64748B] italic mt-0.5">"{v.gateNotes}"</p>}
                     </div>
@@ -255,11 +302,33 @@ export default function GateControl() {
             <Select
               label="Movement Type"
               options={[
-                { value: "OUTBOUND", label: "Outbound � Materials leaving facility" },
-                { value: "INBOUND", label: "Inbound � Materials entering facility" },
+                { value: "OUTBOUND", label: "Outbound ï¿½ Materials leaving facility" },
+                { value: "INBOUND", label: "Inbound ï¿½ Materials entering facility" },
               ]}
               value={movementType}
               onChange={e => setMovementType(e.target.value)}
+            />
+
+            <div className="grid grid-cols-2 gap-3">
+              <Input
+                label="Driver Name"
+                placeholder="e.g. Abebe Kebede"
+                value={driverName}
+                onChange={e => setDriverName(e.target.value)}
+              />
+              <Input
+                label="Vehicle Plate Number"
+                placeholder="e.g. AA 3 A 12345"
+                value={vehicleNumber}
+                onChange={e => setVehicleNumber(e.target.value)}
+              />
+            </div>
+
+            <Input
+              label="Gate Number"
+              placeholder="e.g. GATE_01"
+              value={gateNumber}
+              onChange={e => setGateNumber(e.target.value)}
             />
 
             <Input
