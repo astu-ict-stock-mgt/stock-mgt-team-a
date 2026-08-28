@@ -1,12 +1,13 @@
 import { useState, useMemo } from 'react'
 import { Table, Button, Badge, Modal, Input, Select, SearchBar, SectionHeader, Icons, Tabs, Pagination, Card, Breadcrumb, useToast } from '../components/ui'
 import { useApp } from '../context/AppContext'
+import { inventoryApi } from '../services/api'
 
 type StateMode = 'default' | 'empty' | 'loading'
 type View = 'list' | 'detail' | 'add'
 
 export default function Inventory() {
-  const { inventoryItems, stockCards, categories, units, stores, suppliers, stockMovements, addInventoryItem, updateInventoryItem } = useApp()
+  const { inventoryItems, stockCards, categories, units, stores, suppliers, stockMovements, addInventoryItem, updateInventoryItem, refreshData } = useApp()
   const { toast } = useToast()
 
   const [view, setView] = useState<View>('list')
@@ -22,6 +23,68 @@ export default function Inventory() {
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [form, setForm] = useState({ name: '', code: '', categoryId: '', unitId: '', minimumStock: '', maximumStock: '', unitCost: '', supplierId: '' })
   const [editForm, setEditForm] = useState({ name: '', code: '', categoryId: '', unitId: '', minimumStock: '', maximumStock: '', unitCost: '', supplierId: '' })
+
+  const [showRelocateModal, setShowRelocateModal] = useState(false)
+  const [relocateForm, setRelocateForm] = useState({ sourceStoreId: '', destStoreId: '', quantity: '', notes: '' })
+  const [isRelocating, setIsRelocating] = useState(false)
+
+  const handleRelocate = async () => {
+    if (!selectedItem) return
+    if (!relocateForm.sourceStoreId || !relocateForm.destStoreId) {
+      toast.error('Source and Destination stores are required')
+      return
+    }
+    if (relocateForm.sourceStoreId === relocateForm.destStoreId) {
+      toast.error('Source and Destination stores must be different')
+      return
+    }
+    const qty = Number(relocateForm.quantity)
+    if (isNaN(qty) || qty <= 0) {
+      toast.error('Please enter a valid quantity greater than 0')
+      return
+    }
+
+    const sourceCard = stockCards.find(sc => sc.itemId === selectedItem.id && sc.storeId === relocateForm.sourceStoreId)
+    if (!sourceCard || sourceCard.availableQty < qty) {
+      toast.error(`Insufficient available stock in selected source store. Max available: ${sourceCard?.availableQty || 0}`)
+      return
+    }
+
+    setIsRelocating(true)
+    try {
+      const sourceStoreName = stores.find(st => st.id === relocateForm.sourceStoreId)?.name || 'Source Store'
+      const destStoreName = stores.find(st => st.id === relocateForm.destStoreId)?.name || 'Destination Store'
+
+      // Post SIV / issue (outbound) transaction
+      await inventoryApi.postTransaction({
+        itemId: selectedItem.id,
+        storeId: relocateForm.sourceStoreId,
+        transactionType: 'TRANSFER_OUT',
+        quantity: qty,
+        notes: `Relocated to ${destStoreName}. ${relocateForm.notes || ''}`
+      })
+
+      // Post GRN / receive (inbound) transaction
+      await inventoryApi.postTransaction({
+        itemId: selectedItem.id,
+        storeId: relocateForm.destStoreId,
+        transactionType: 'TRANSFER_IN',
+        quantity: qty,
+        notes: `Relocated from ${sourceStoreName}. ${relocateForm.notes || ''}`
+      })
+
+      toast.success('Stock relocated successfully')
+      setShowRelocateModal(false)
+      setRelocateForm({ sourceStoreId: '', destStoreId: '', quantity: '', notes: '' })
+      await refreshData()
+      setView('list')
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to relocate stock')
+    } finally {
+      setIsRelocating(false)
+    }
+  }
+
 
   const enrichedItems = useMemo(() => inventoryItems.map(item => {
     const totalQty = stockCards.filter(sc => sc.itemId === item.id).reduce((s, sc) => s + sc.quantity, 0)
@@ -146,6 +209,52 @@ export default function Inventory() {
             </Card>
 
             <Card padding={false}>
+              <div className="p-5 border-b border-[#E2E8F0] flex items-center justify-between">
+                <div>
+                  <h3 className="text-sm font-semibold text-[#0F172A]">Warehouse Balances & Storage Bins</h3>
+                  <p className="text-xs text-[#94A3B8] mt-0.5">Physical quantities on hand and available safety stock per store</p>
+                </div>
+                {itemStock.some(sc => sc.quantity > 0) && (
+                  <Button variant="primary" size="sm" onClick={() => {
+                    const firstStock = itemStock.find(sc => sc.quantity > 0);
+                    setRelocateForm({
+                      sourceStoreId: firstStock?.storeId || '',
+                      destStoreId: '',
+                      quantity: '',
+                      notes: ''
+                    });
+                    setShowRelocateModal(true);
+                  }}>Relocate Stock</Button>
+                )}
+              </div>
+              <div className="divide-y divide-[#F8FAFC]">
+                {itemStock.length === 0 ? (
+                  <div className="px-5 py-8 text-center text-sm text-[#94A3B8]">Not currently stocked in any warehouse.</div>
+                ) : itemStock.map(sc => {
+                  const store = stores.find(st => st.id === sc.storeId)
+                  return (
+                    <div key={sc.id} className="px-5 py-4 flex items-center justify-between hover:bg-[#F8FAFC] transition-colors">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <p className="text-sm font-medium text-[#1E293B]">{store?.name || 'Unknown Store'}</p>
+                          <Badge variant="default">{store?.code || 'N/A'}</Badge>
+                        </div>
+                        <p className="text-xs text-[#94A3B8] mt-0.5">
+                          Type: {store?.type === 'MAIN_STORE' ? 'Central Main Store' : 'Sub-Store'}
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-sm font-semibold font-mono text-[#1E293B]">{sc.quantity} {s.unitSymbol}</p>
+                        <p className="text-xs text-[#94A3B8]">Available: {sc.availableQty} (Reserved: {sc.reservedQty})</p>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </Card>
+
+
+            <Card padding={false}>
               <div className="p-5 border-b border-[#E2E8F0]">
                 <h3 className="text-sm font-semibold text-[#0F172A]">Stock Movement History</h3>
               </div>
@@ -250,6 +359,45 @@ export default function Inventory() {
               <Input label="Minimum stock" type="number" placeholder="0" value={editForm.minimumStock} onChange={e => setEditForm(f => ({ ...f, minimumStock: e.target.value }))} />
               <Input label="Maximum stock" type="number" placeholder="0" value={editForm.maximumStock} onChange={e => setEditForm(f => ({ ...f, maximumStock: e.target.value }))} />
               <Input label="Unit cost ($)" type="number" placeholder="0.00" value={editForm.unitCost} onChange={e => setEditForm(f => ({ ...f, unitCost: e.target.value }))} />
+            </div>
+          </div>
+        </Modal>
+
+        <Modal open={showRelocateModal} onClose={() => setShowRelocateModal(false)} title="Relocate Inventory Stock" width="max-w-lg"
+          footer={<>
+            <Button variant="ghost" onClick={() => setShowRelocateModal(false)}>Cancel</Button>
+            <Button variant="primary" disabled={isRelocating} onClick={handleRelocate}>
+              {isRelocating ? 'Relocating...' : 'Relocate Stock'}
+            </Button>
+          </>}>
+          <div className="space-y-4">
+            <p className="text-xs text-[#64748B]">Relocate stock items between stores. This registers negative and positive transaction logs in the inventory ledger to ensure correct valuations.</p>
+            <div className="grid grid-cols-2 gap-3">
+              <Select label="Source Store" 
+                options={itemStock.filter(sc => sc.quantity > 0).map(sc => ({
+                  value: sc.storeId,
+                  label: `${stores.find(st => st.id === sc.storeId)?.name || 'Store'} (Avail: ${sc.availableQty})`
+                }))}
+                value={relocateForm.sourceStoreId}
+                onChange={e => setRelocateForm(f => ({ ...f, sourceStoreId: e.target.value }))}
+              />
+              <Select label="Destination Store"
+                options={[{ value: '', label: 'Select Destination...' }, ...stores.map(st => ({
+                  value: st.id,
+                  label: st.name
+                }))]}
+                value={relocateForm.destStoreId}
+                onChange={e => setRelocateForm(f => ({ ...f, destStoreId: e.target.value }))}
+              />
+            </div>
+            <Input label={`Quantity to Relocate (${s.unitSymbol})`} type="number" placeholder="0" 
+              value={relocateForm.quantity} 
+              onChange={e => setRelocateForm(f => ({ ...f, quantity: e.target.value }))} 
+            />
+            <div>
+              <label className="block text-xs font-semibold text-[#64748B] uppercase tracking-wider mb-1.5">Reason / Notes</label>
+              <textarea value={relocateForm.notes} onChange={e => setRelocateForm(f => ({ ...f, notes: e.target.value }))} placeholder="e.g. Relocating surplus parts to main sub-warehouse"
+                className="w-full min-h-[80px] p-3 rounded-lg border border-[#E2E8F0] text-sm focus:border-[#4F46E5] outline-none" />
             </div>
           </div>
         </Modal>

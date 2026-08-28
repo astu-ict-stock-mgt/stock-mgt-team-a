@@ -315,8 +315,8 @@ const MATRIX = {
   ],
 
   // PAO: Property Administration Officer — supervision, approvals, master data per SRS Appendix C
+  // Note: PAO does NOT have USERS_READ — user management is ADMIN-only
   [ROLES.PAO.code]: [
-    PERMISSIONS.USERS_READ.key,
     PERMISSIONS.STORES_MANAGE.key,
     PERMISSIONS.STORES_READ.key,
     PERMISSIONS.DEPARTMENTS_MANAGE.key,
@@ -382,9 +382,8 @@ const MATRIX = {
     PERMISSIONS.AUDIT_READ.key,
   ],
 
-  // STOREKEEPER: Store operations, receipts, issuing, movements per SRS Appendix C
+  // STOREKEEPER: Can READ stores but cannot create/delete them — store management is ADMIN/PAO only
   [ROLES.STOREKEEPER.code]: [
-    PERMISSIONS.STORES_MANAGE.key,
     PERMISSIONS.STORES_READ.key,
     PERMISSIONS.DEPARTMENTS_MANAGE.key,
     PERMISSIONS.DEPARTMENTS_READ.key,

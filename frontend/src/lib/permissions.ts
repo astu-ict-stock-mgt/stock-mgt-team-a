@@ -210,8 +210,8 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
   ],
 
   // PAO: Property Administration Officer — supervision, approvals, master data per SRS Appendix C
+  // PAO does NOT manage users — user management is ADMIN-only
   PAO: [
-    PERMISSIONS.USERS_READ,
     PERMISSIONS.STORES_MANAGE,
     PERMISSIONS.STORES_READ,
     PERMISSIONS.DEPARTMENTS_MANAGE,
@@ -273,9 +273,8 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
     PERMISSIONS.AUDIT_READ,
   ],
 
-  // STOREKEEPER: Store operations, receipts, issuing, movements per SRS Appendix C
+  // STOREKEEPER: Store operations. Can READ stores but cannot create/delete them (ADMIN/PAO only).
   STOREKEEPER: [
-    PERMISSIONS.STORES_MANAGE,
     PERMISSIONS.STORES_READ,
     PERMISSIONS.DEPARTMENTS_MANAGE,
     PERMISSIONS.DEPARTMENTS_READ,

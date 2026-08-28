@@ -54,7 +54,7 @@ export interface Store {
   id: string
   code: string
   name: string
-  type: 'MAIN_STORE' | 'DEPARTMENT_STORE' | 'WAREHOUSE' | 'TRANSIT_STORE' | 'QUARANTINE_STORE'
+  type: 'MAIN_STORE' | 'DEPARTMENT_STORE' | 'WAREHOUSE' | 'TRANSIT_STORE' | 'QUARANTINE_STORE' | 'CAFE_STORE'
   status: 'ACTIVE' | 'INACTIVE'
   description: string | null
   address: string | null

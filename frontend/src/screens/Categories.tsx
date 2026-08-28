@@ -4,6 +4,15 @@ import { useApp } from '../context/AppContext'
 
 type View = 'list' | 'detail' | 'add'
 
+const parseDescription = (desc: string | null) => {
+  if (!desc) return { targetStore: 'MAIN_STORE', text: '' }
+  const match = desc.match(/^\[Store:\s*([^\]]+)\]\s*(.*)$/)
+  if (match) {
+    return { targetStore: match[1], text: match[2] }
+  }
+  return { targetStore: 'MAIN_STORE', text: desc }
+}
+
 export default function Categories() {
   const { categories, addCategory, updateCategory, deleteCategory } = useApp()
   const { toast } = useToast()
@@ -16,8 +25,8 @@ export default function Categories() {
   const [showModal, setShowModal] = useState(false)
   const [showEditModal, setShowEditModal] = useState(false)
   const [errors, setErrors] = useState<Record<string, string>>({})
-  const [form, setForm] = useState({ name: '', code: '', description: '' })
-  const [editForm, setEditForm] = useState({ name: '', code: '', description: '' })
+  const [form, setForm] = useState({ name: '', code: '', description: '', targetStore: 'MAIN_STORE' })
+  const [editForm, setEditForm] = useState({ name: '', code: '', description: '', targetStore: 'MAIN_STORE' })
 
   const filtered = categories.filter(c =>
     (activeTab === 'all' || c.status === activeTab) &&
@@ -50,7 +59,21 @@ export default function Categories() {
         </div>
       )
     },
-    { key: 'description', header: 'Description', render: (c: typeof categories[0]) => <span className="text-xs text-[#64748B]">{c.description || '—'}</span> },
+    { 
+      key: 'description', 
+      header: 'Description', 
+      render: (c: typeof categories[0]) => {
+        const { targetStore, text } = parseDescription(c.description)
+        return (
+          <div className="flex items-center gap-2">
+            <Badge variant={targetStore === 'MAIN_STORE' ? 'primary' : targetStore === 'DEPARTMENT_STORE' ? 'success' : 'warning'}>
+              {targetStore === 'MAIN_STORE' ? 'Main' : targetStore === 'DEPARTMENT_STORE' ? 'Dept' : 'Cafe'}
+            </Badge>
+            <span className="text-xs text-[#64748B]">{text || '—'}</span>
+          </div>
+        )
+      }
+    },
     { key: 'status', header: 'Status', render: (c: typeof categories[0]) => <Badge variant={c.status === 'ACTIVE' ? 'success' : 'default'} dot>{c.status === 'ACTIVE' ? 'Active' : c.status}</Badge> },
     {
       key: 'actions', header: '', width: 'w-8',
@@ -82,8 +105,22 @@ export default function Categories() {
               </div>
               <div className="grid grid-cols-2 gap-5">
                 <div>
-                  <p className="text-xs font-medium text-[#94A3B8] uppercase tracking-wide mb-1">Description</p>
-                  <p className="text-sm text-[#1E293B]">{c.description || 'No description'}</p>
+                  <p className="text-xs font-medium text-[#94A3B8] uppercase tracking-wide mb-1">Description & Store Assignment</p>
+                  <div className="flex flex-col gap-2 mt-1">
+                    {(() => {
+                      const { targetStore, text } = parseDescription(c.description)
+                      return (
+                        <>
+                          <div className="flex gap-2">
+                            <Badge variant={targetStore === 'MAIN_STORE' ? 'primary' : targetStore === 'DEPARTMENT_STORE' ? 'success' : 'warning'}>
+                              {targetStore === 'MAIN_STORE' ? 'Central Main Store Item' : targetStore === 'DEPARTMENT_STORE' ? 'Departmental Store Item' : 'Cafe Store Item'}
+                            </Badge>
+                          </div>
+                          <p className="text-sm text-[#1E293B]">{text || 'No description'}</p>
+                        </>
+                      )
+                    })()}
+                  </div>
                 </div>
                 <div>
                   <p className="text-xs font-medium text-[#94A3B8] uppercase tracking-wide mb-1">Parent</p>
@@ -97,7 +134,8 @@ export default function Categories() {
               <h3 className="text-xs font-semibold text-[#94A3B8] uppercase tracking-wide mb-4">Quick Actions</h3>
               <div className="flex flex-col gap-2">
                 <Button variant="primary" className="w-full" icon={Icons.edit} onClick={() => {
-                  setEditForm({ name: c.name, code: c.code, description: c.description || '' })
+                  const { targetStore, text } = parseDescription(c.description)
+                  setEditForm({ name: c.name, code: c.code, description: text, targetStore })
                   setShowEditModal(true)
                 }}>Edit Category</Button>
                 <Button variant="ghost" className="w-full text-[#DC2626] hover:bg-[#FEF2F2]" onClick={() => {
@@ -118,15 +156,17 @@ export default function Categories() {
             <Button variant="ghost" onClick={() => setShowEditModal(false)}>Cancel</Button>
             <Button variant="primary" onClick={() => {
               const e = validateEdit(); if (Object.keys(e).length > 0) { setErrors(e); return }
-              updateCategory(selected.id, { name: editForm.name.trim(), code: editForm.code.trim().toUpperCase(), description: editForm.description.trim() || null })
+              const combinedDesc = `[Store: ${editForm.targetStore}] ${editForm.description.trim()}`
+              updateCategory(selected.id, { name: editForm.name.trim(), code: editForm.code.trim().toUpperCase(), description: combinedDesc })
               toast.success('Category updated')
               setShowEditModal(false)
-              setSelected({ ...selected, name: editForm.name.trim(), code: editForm.code.trim().toUpperCase(), description: editForm.description.trim() || null })
+              setSelected({ ...selected, name: editForm.name.trim(), code: editForm.code.trim().toUpperCase(), description: combinedDesc })
             }}>Save Changes</Button>
           </>}>
           <div className="space-y-4">
             <Input label="Category name" placeholder="e.g. IT Equipment" value={editForm.name} onChange={e => setEditForm(f => ({ ...f, name: e.target.value }))} error={errors.name} />
             <Input label="Code" placeholder="e.g. IT-EQUIP" value={editForm.code} onChange={e => setEditForm(f => ({ ...f, code: e.target.value.toUpperCase() }))} error={errors.code} />
+            <Select label="Belongs to Store" options={[{ value: 'MAIN_STORE', label: 'Central Main Store' }, { value: 'DEPARTMENT_STORE', label: 'Departments Store' }, { value: 'CAFE_STORE', label: 'Cafe Store' }]} value={editForm.targetStore} onChange={e => setEditForm(f => ({ ...f, targetStore: e.target.value }))} />
             <Input label="Description" placeholder="Optional description" value={editForm.description} onChange={e => setEditForm(f => ({ ...f, description: e.target.value }))} />
           </div>
         </Modal>
@@ -170,19 +210,21 @@ export default function Categories() {
           <Button variant="ghost" onClick={() => setShowModal(false)}>Cancel</Button>
           <Button variant="primary" onClick={() => {
             const e = validate(); if (Object.keys(e).length > 0) { setErrors(e); return }
+            const combinedDesc = `[Store: ${form.targetStore}] ${form.description.trim()}`
             addCategory({
               id: crypto.randomUUID(), code: form.code.trim().toUpperCase(), name: form.name.trim(),
-              description: form.description.trim() || null, status: 'ACTIVE', parentId: null,
+              description: combinedDesc, status: 'ACTIVE', parentId: null,
               createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
             })
             toast.success('Category created successfully')
             setShowModal(false)
-            setForm({ name: '', code: '', description: '' })
+            setForm({ name: '', code: '', description: '', targetStore: 'MAIN_STORE' })
           }}>Create Category</Button>
         </>}>
         <div className="space-y-4">
           <Input label="Category name" placeholder="e.g. IT Equipment" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} error={errors.name} />
           <Input label="Code" placeholder="e.g. IT-EQUIP" value={form.code} onChange={e => setForm(f => ({ ...f, code: e.target.value.toUpperCase() }))} error={errors.code} />
+          <Select label="Belongs to Store" options={[{ value: 'MAIN_STORE', label: 'Central Main Store' }, { value: 'DEPARTMENT_STORE', label: 'Departments Store' }, { value: 'CAFE_STORE', label: 'Cafe Store' }]} value={form.targetStore} onChange={e => setForm(f => ({ ...f, targetStore: e.target.value }))} />
           <Input label="Description" placeholder="Optional description" value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} />
         </div>
       </Modal>

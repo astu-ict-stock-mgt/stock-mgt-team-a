@@ -6,6 +6,7 @@ import PAODashboard from './dashboards/PAODashboard'
 import DepartmentHeadDashboard from './dashboards/DepartmentHeadDashboard'
 import SecurityDashboard from './dashboards/SecurityDashboard'
 import AccountantDashboard from './dashboards/AccountantDashboard'
+import TECDashboard from './dashboards/TECDashboard'
 
 interface DashboardProps {
   loading?: boolean
@@ -19,6 +20,8 @@ const ROLE_DASHBOARD_MAP: Record<string, React.ComponentType<DashboardProps>> = 
   REQUESTER: RequesterDashboard,
   SECURITY_OFFICER: SecurityDashboard,
   ACCOUNTANT: AccountantDashboard,
+  TEC: TECDashboard,
+  PROPERTY_REGISTRATION_OFFICER: AccountantDashboard,
 }
 
 const FALLBACK_DASHBOARD = AdminDashboard

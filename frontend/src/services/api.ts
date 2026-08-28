@@ -370,3 +370,38 @@ export const reportsApi = {
     return api.get<ApiResponse<unknown>>(`/inventory/valuation?${q.toString()}`)
   },
 }
+
+// Evaluations API (TEC — Technical Evaluation Committee)
+export const evaluationsApi = {
+  getAll: (params?: { status?: string; evaluatorId?: string; goodsReceiptId?: string }) => {
+    const q = new URLSearchParams()
+    if (params?.status) q.set('status', params.status)
+    if (params?.evaluatorId) q.set('evaluatorId', params.evaluatorId)
+    if (params?.goodsReceiptId) q.set('goodsReceiptId', params.goodsReceiptId)
+    return api.get<ApiResponse<any[]>>(`/evaluations?${q.toString()}`)
+  },
+  getById: (id: string) => api.get<ApiResponse<any>>(`/evaluations/${id}`),
+  create: (data: { goodsReceiptId: string; notes?: string }) =>
+    api.post<ApiResponse<any>>('/evaluations', data),
+  startEvaluation: (id: string, _userId?: string) =>
+    api.patch<ApiResponse<any>>(`/evaluations/${id}/start`),
+  updateDecision: (id: string, decision: 'APPROVED' | 'REJECTED', notes?: string) =>
+    api.patch<ApiResponse<any>>(`/evaluations/${id}/decision`, { decision, notes }),
+}
+
+// Assets API (Accountant — Fixed Asset Registration)
+export const assetsApi = {
+  getAll: (params?: { status?: string; search?: string }) => {
+    const q = new URLSearchParams()
+    if (params?.status) q.set('status', params.status)
+    if (params?.search) q.set('search', params.search)
+    return api.get<ApiResponse<any[]>>(`/assets?${q.toString()}`)
+  },
+  getById: (id: string) => api.get<ApiResponse<any>>(`/assets/${id}`),
+  register: (data: { name: string; itemId?: string; serialNumber?: string; assetTag?: string; category?: string; purchaseCost?: number; location?: string }) =>
+    api.post<ApiResponse<any>>('/assets', data),
+  updateStatus: (id: string, status: string, notes?: string) =>
+    api.patch<ApiResponse<any>>(`/assets/${id}/status`, { status, notes }),
+  updateCustody: (id: string, custodianId: string) =>
+    api.patch<ApiResponse<any>>(`/assets/${id}/custody`, { custodianId }),
+}

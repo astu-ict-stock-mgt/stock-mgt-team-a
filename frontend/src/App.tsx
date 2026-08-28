@@ -20,6 +20,9 @@ import Reports from "./screens/Reports";
 import AuditLog from "./screens/AuditLog";
 import Notifications from "./screens/Notifications";
 import Settings from "./screens/Settings";
+import GateControl from "./screens/GateControl";
+import MaterialEvaluation from "./screens/MaterialEvaluation";
+import AssetRegister from "./screens/AssetRegister";
 
 type Screen =
   | "dashboard"
@@ -38,7 +41,10 @@ type Screen =
   | "reports"
   | "audit"
   | "notifications"
-  | "settings";
+  | "settings"
+  | "gate-control"
+  | "evaluations"
+  | "asset-register";
 
 interface NavItem {
   id: Screen;
@@ -78,6 +84,14 @@ const navGroups: NavGroup[] = [
     ],
   },
   {
+    label: "Specialized",
+    items: [
+      { id: "gate-control", label: "Gate Control", icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg> },
+      { id: "evaluations", label: "Evaluations", icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg> },
+      { id: "asset-register", label: "Asset Register", icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M9 21V9"/></svg> },
+    ],
+  },
+  {
     label: "People",
     items: [
       { id: "users", label: "Users", icon: Icons.users },
@@ -111,6 +125,9 @@ const screenTitles: Record<Screen, string> = {
   audit: "Audit Log",
   notifications: "Notifications",
   settings: "Settings",
+  "gate-control": "Gate Control",
+  evaluations: "Material Evaluation",
+  "asset-register": "Fixed Asset Register",
 };
 
 function LoginScreen({ onLogin }: { onLogin: (email: string, password: string) => Promise<void> }) {
@@ -208,8 +225,15 @@ export default function App() {
             return hasPermission(userRoles, PERMISSIONS.STOCK_CARDS_READ)
           case 'stock-taking':
             return hasPermission(userRoles, PERMISSIONS.RECONCILIATION_CREATE) || hasPermission(userRoles, PERMISSIONS.RECONCILIATION_APPROVE)
+          case 'gate-control':
+            return hasPermission(userRoles, PERMISSIONS.DISPATCH_VERIFY)
+          case 'evaluations':
+            return hasPermission(userRoles, PERMISSIONS.EVALUATIONS_READ) || hasPermission(userRoles, PERMISSIONS.EVALUATIONS_CREATE)
+          case 'asset-register':
+            return hasPermission(userRoles, PERMISSIONS.ASSETS_REGISTER) || hasPermission(userRoles, PERMISSIONS.ASSETS_READ)
           case 'users':
-            return hasPermission(userRoles, PERMISSIONS.USERS_READ)
+            // User management is ADMIN-only
+            return hasPermission(userRoles, PERMISSIONS.USERS_MANAGE)
           case 'roles':
             return hasPermission(userRoles, PERMISSIONS.ROLES_READ)
           case 'reports':
@@ -642,6 +666,9 @@ export default function App() {
             {screen === "audit" && hasPermission(userRoles, PERMISSIONS.AUDIT_READ) && <AuditLog />}
             {screen === "notifications" && <Notifications />}
             {screen === "settings" && <Settings />}
+            {screen === "gate-control" && hasPermission(userRoles, PERMISSIONS.DISPATCH_VERIFY) && <GateControl />}
+            {screen === "evaluations" && (hasPermission(userRoles, PERMISSIONS.EVALUATIONS_READ) || hasPermission(userRoles, PERMISSIONS.EVALUATIONS_CREATE)) && <MaterialEvaluation />}
+            {screen === "asset-register" && (hasPermission(userRoles, PERMISSIONS.ASSETS_READ) || hasPermission(userRoles, PERMISSIONS.ASSETS_REGISTER)) && <AssetRegister />}
           </div>
         </main>
       </div>

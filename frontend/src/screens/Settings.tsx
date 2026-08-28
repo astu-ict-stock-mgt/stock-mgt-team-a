@@ -5,10 +5,10 @@ import { authApi, storesApi } from '../services/api'
 import { hasPermission, PERMISSIONS, ROLE_NAMES } from '../lib/permissions'
 import type { Store } from '../types'
 
-type StoreType = "MAIN_STORE" | "DEPARTMENT_STORE" | "WAREHOUSE" | "TRANSIT_STORE" | "QUARANTINE_STORE";
+type StoreType = "MAIN_STORE" | "DEPARTMENT_STORE" | "WAREHOUSE" | "TRANSIT_STORE" | "QUARANTINE_STORE" | "CAFE_STORE";
 
 export default function Settings() {
-  const { currentUser, userRoles, refreshData } = useApp()
+  const { currentUser, userRoles, refreshData, stores: contextStores } = useApp()
   const { toast } = useToast()
 
   const [activeTab, setActiveTab] = useState('profile')
@@ -64,9 +64,7 @@ export default function Settings() {
     autoApproveBelow: '1000'
   })
 
-  // Real Database Warehouses State (Stores Manager only)
-  const [warehouses, setWarehouses] = useState<Store[]>([])
-  const [loadingWarehouses, setLoadingWarehouses] = useState(false)
+  // Warehouse modal state
   const [showWarehouseModal, setShowWarehouseModal] = useState(false)
   const [editingWarehouse, setEditingWarehouse] = useState<Store | null>(null)
   const [warehouseForm, setWarehouseForm] = useState({
@@ -80,7 +78,8 @@ export default function Settings() {
 
   // Permissions checks
   const isAdmin = userRoles.includes('ADMIN')
-  const canManageWarehouses = hasPermission(userRoles, PERMISSIONS.STORES_MANAGE)
+  // Only ADMIN can manage warehouses from Settings — PAO uses Stores screen directly
+  const canManageWarehouses = isAdmin
   const canApprove = hasPermission(userRoles, PERMISSIONS.REQUISITIONS_APPROVE) || hasPermission(userRoles, PERMISSIONS.TRANSFERS_APPROVE)
 
   // Tabs configured dynamically by role/permissions
@@ -167,24 +166,16 @@ export default function Settings() {
     }
   }
 
-  // Load Real Warehouses from DB
-  const loadWarehouses = useCallback(async () => {
-    setLoadingWarehouses(true)
-    try {
-      const res = await storesApi.getAll()
-      setWarehouses(res.data || [])
-    } catch {
-      toast.error('Failed to load warehouses')
-    } finally {
-      setLoadingWarehouses(false)
-    }
-  }, [toast])
+  // Use stores from AppContext instead of a separate API call
+  // This avoids the "Loading warehouses..." stuck state when API call fails
+  const warehouses = contextStores
+  const loadingWarehouses = false
 
-  useEffect(() => {
-    if (activeTab === 'warehouses' && canManageWarehouses) {
-      loadWarehouses()
-    }
-  }, [activeTab, loadWarehouses, canManageWarehouses])
+  // Warehouse data is already in AppContext — no separate fetch needed
+  const loadWarehouses = useCallback(async () => {
+    // Refresh global data to reload stores
+    await refreshData().catch(() => {})
+  }, [refreshData])
 
   // Warehouse Modal Openers
   const openAddWarehouse = () => {
@@ -531,7 +522,14 @@ export default function Settings() {
             <Input label="Warehouse Code" value={warehouseForm.code} onChange={e => setWarehouseForm(p => ({ ...p, code: e.target.value }))} placeholder="e.g. CMS-01" />
           </FormGroup>
           <FormGroup columns={2}>
-            <Select label="Type" options={[{ value: 'MAIN_STORE', label: 'Central Main Store' }, { value: 'WAREHOUSE', label: 'Sub-Store' }]} value={warehouseForm.type} onChange={e => setWarehouseForm(p => ({ ...p, type: e.target.value as any }))} />
+            <Select label="Type" options={[
+            { value: 'MAIN_STORE', label: 'Main Store' },
+            { value: 'DEPARTMENT_STORE', label: 'Department Store' },
+            { value: 'WAREHOUSE', label: 'Warehouse' },
+            { value: 'TRANSIT_STORE', label: 'Transit Store' },
+            { value: 'QUARANTINE_STORE', label: 'Quarantine Store' },
+            { value: 'CAFE_STORE', label: 'Cafe Store' },
+          ]} value={warehouseForm.type} onChange={e => setWarehouseForm(p => ({ ...p, type: e.target.value as any }))} />
             <Select label="Status" options={[{ value: 'ACTIVE', label: 'Active' }, { value: 'INACTIVE', label: 'Inactive' }]} value={warehouseForm.status} onChange={e => setWarehouseForm(p => ({ ...p, status: e.target.value as any }))} />
           </FormGroup>
           <Input label="Location Address" value={warehouseForm.address} onChange={e => setWarehouseForm(p => ({ ...p, address: e.target.value }))} placeholder="e.g. Block A, Ground Floor" />

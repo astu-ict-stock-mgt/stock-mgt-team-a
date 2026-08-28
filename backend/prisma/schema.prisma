@@ -419,6 +419,7 @@ enum StoreType {
   WAREHOUSE
   TRANSIT_STORE
   QUARANTINE_STORE
+  CAFE_STORE
 }
 
 enum StoreStatus {

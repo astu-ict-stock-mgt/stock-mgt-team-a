@@ -155,7 +155,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         fetchIf(hasAnyPermission(perms, [PERMISSIONS.CATEGORIES_READ, PERMISSIONS.CATEGORIES_MANAGE]), categoriesApi.getAll),
         fetchIf(hasAnyPermission(perms, [PERMISSIONS.UNITS_READ, PERMISSIONS.UNITS_MANAGE]), unitsApi.getAll),
         fetchIf(hasAnyPermission(perms, [PERMISSIONS.AUDIT_READ]), () => auditApi.getRecent(50)),
-        fetchIf(isAuthenticated, () => notificationsApi.getAll({ limit: 50 })),
+        fetchIf(true, () => notificationsApi.getAll({ limit: 50 })), // always fetch for authenticated calls
         fetchIf(hasAnyPermission(perms, [PERMISSIONS.TRANSFERS_READ, PERMISSIONS.TRANSFERS_CREATE, PERMISSIONS.TRANSFERS_APPROVE, PERMISSIONS.TRANSFERS_EXECUTE]), () => transfersApi.getAll({ limit: 50 })),
         fetchIf(hasAnyPermission(perms, [PERMISSIONS.RECONCILIATION_READ, PERMISSIONS.RECONCILIATION_CREATE, PERMISSIONS.RECONCILIATION_APPROVE, PERMISSIONS.RECONCILIATION_POST]), () => stockTakesApi.getAll({ limit: 50 })),
         fetchIf(hasAnyPermission(perms, [PERMISSIONS.REQUISITIONS_READ, PERMISSIONS.REQUISITIONS_CREATE, PERMISSIONS.REQUISITIONS_APPROVE]), () => requisitionsApi.getAll({ limit: 50 })),
