@@ -157,14 +157,14 @@ export default function StockIssuing() {
     if (inStock.length > 0) {
       options.push(...inStock.map(sc => ({
         value: sc.itemId,
-        label: `✓ ${sc.item.name} (${sc.item.code}) — Avail: ${sc.availableQty} ${sc.item.unit?.symbol || ''} (On Hand: ${sc.balance})`
+        label: `✓ ${sc.item?.name || 'Unknown'} (${sc.item?.code || ''}) — Avail: ${sc.availableQty} ${sc.item?.unit?.symbol || ''} (On Hand: ${sc.quantity})`
       })))
     }
 
     if (zeroStock.length > 0) {
       options.push(...zeroStock.map(sc => ({
         value: sc.itemId,
-        label: `⚠️ ${sc.item.name} (${sc.item.code}) — 0 Available (Out of stock)`
+        label: `⚠️ ${sc.item?.name || 'Unknown'} (${sc.item?.code || ''}) — 0 Available (Out of stock)`
       })))
     }
 
@@ -649,7 +649,7 @@ export default function StockIssuing() {
                         {selectedStock ? (
                           <span className={`px-2 py-0.5 rounded font-medium ${selectedStock.availableQty > 0 ? 'bg-[#ECFDF5] text-[#059669]' : 'bg-[#FEF2F2] text-[#DC2626]'}`}>
                             {selectedStock.availableQty > 0
-                              ? `✓ Available Stock: ${selectedStock.availableQty} ${selectedStock.item?.unit?.symbol || ''} (Total On Hand: ${selectedStock.balance})`
+                              ? `✓ Available Stock: ${selectedStock.availableQty} ${selectedStock.item?.unit?.symbol || ''} (Total On Hand: ${selectedStock.quantity})`
                               : '⚠️ 0 Available in this warehouse'}
                           </span>
                         ) : (
