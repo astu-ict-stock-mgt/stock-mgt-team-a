@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react'
 import { Button, Badge, SectionHeader, Card, Select, Icons, useToast } from '../components/ui'
 import { useApp } from '../context/AppContext'
+import { hasPermission, PERMISSIONS } from '../lib/permissions'
 
 interface CountEntry {
   itemId: string
@@ -15,8 +16,9 @@ interface CountEntry {
 }
 
 export default function StockTaking() {
-  const { inventoryItems, stockCards, stores, units, categories, addStockMovement } = useApp()
+  const { inventoryItems, stockCards, stores, units, categories, addStockMovement, userRoles } = useApp()
   const { toast } = useToast()
+  const canCreateReconciliation = hasPermission(userRoles, PERMISSIONS.RECONCILIATION_CREATE)
 
   const [phase, setPhase] = useState<'setup' | 'count' | 'variance'>('setup')
   const [storeId, setStoreId] = useState('')
@@ -200,34 +202,48 @@ export default function StockTaking() {
     <div>
       <SectionHeader title="Stock Taking & Reconciliation" subtitle="Conduct a physical inventory count" />
       <div className="max-w-xl mx-auto">
-        <Card>
-          <h3 className="text-base font-semibold text-[#0F172A] mb-5">New Stock Count Setup</h3>
-          <div className="space-y-4">
-            <Select label="Store" options={stores.map(s => ({ value: s.id, label: s.name }))}
-              value={storeId} onChange={e => setStoreId(e.target.value)} />
-            <div className="p-4 bg-[#F8FAFC] rounded-xl">
-              <p className="text-sm font-medium text-[#334155] mb-2">Count summary</p>
-              <div className="grid grid-cols-2 gap-3">
-                <div><p className="text-xs text-[#94A3B8]">Items to count</p><p className="text-lg font-bold font-mono text-[#0F172A]">{storeItems.length}</p></div>
-                <div><p className="text-xs text-[#94A3B8]">System total value</p><p className="text-lg font-bold font-mono text-[#0F172A]">${storeItems.reduce((s, si) => s + si.quantity * (Number(si.averageCost) || 0), 0).toFixed(2)}</p></div>
+        {canCreateReconciliation ? (
+          <Card>
+            <h3 className="text-base font-semibold text-[#0F172A] mb-5">New Stock Count Setup</h3>
+            <div className="space-y-4">
+              <Select label="Store" options={stores.map(s => ({ value: s.id, label: s.name }))}
+                value={storeId} onChange={e => setStoreId(e.target.value)} />
+              <div className="p-4 bg-[#F8FAFC] rounded-xl">
+                <p className="text-sm font-medium text-[#334155] mb-2">Count summary</p>
+                <div className="grid grid-cols-2 gap-3">
+                  <div><p className="text-xs text-[#94A3B8]">Items to count</p><p className="text-lg font-bold font-mono text-[#0F172A]">{storeItems.length}</p></div>
+                  <div><p className="text-xs text-[#94A3B8]">System total value</p><p className="text-lg font-bold font-mono text-[#0F172A]">${storeItems.reduce((s, si) => s + si.quantity * (Number(si.averageCost) || 0), 0).toFixed(2)}</p></div>
+                </div>
+              </div>
+              <div className="p-3 bg-[#FFFBEB] border border-[#FDE68A] rounded-lg text-xs text-[#92400E]">
+                Freeze stock movements before starting the count to ensure accuracy.
               </div>
             </div>
-            <div className="p-3 bg-[#FFFBEB] border border-[#FDE68A] rounded-lg text-xs text-[#92400E]">
-              Freeze stock movements before starting the count to ensure accuracy.
+            <div className="flex justify-end mt-5 pt-5 border-t border-[#E2E8F0]">
+              <Button variant="primary" onClick={() => {
+                setEntries(storeItems.map(si => ({
+                  itemId: si.itemId, name: si.item?.name || '', code: si.item?.code || '',
+                  systemCount: si.quantity, physicalCount: null,
+                  unitSymbol: si.unit?.symbol || '', unitCost: Number(si.averageCost) || 0,
+                  notes: '', counted: false,
+                })))
+                setPhase('count')
+              }}>Start counting →</Button>
             </div>
-          </div>
-          <div className="flex justify-end mt-5 pt-5 border-t border-[#E2E8F0]">
-            <Button variant="primary" onClick={() => {
-              setEntries(storeItems.map(si => ({
-                itemId: si.itemId, name: si.item?.name || '', code: si.item?.code || '',
-                systemCount: si.quantity, physicalCount: null,
-                unitSymbol: si.unit?.symbol || '', unitCost: Number(si.averageCost) || 0,
-                notes: '', counted: false,
-              })))
-              setPhase('count')
-            }}>Start counting →</Button>
-          </div>
-        </Card>
+          </Card>
+        ) : (
+          <Card>
+            <div className="py-12 text-center">
+              <div className="w-12 h-12 rounded-full bg-[#F1F5F9] flex items-center justify-center mx-auto mb-3 text-xl">
+                📋
+              </div>
+              <p className="text-sm font-medium text-[#1E293B]">Verification Only Mode</p>
+              <p className="text-xs text-[#64748B] mt-1.5 max-w-sm mx-auto leading-relaxed">
+                Only Storekeepers are authorized to start and perform physical stock takes. Property Administration Officers and Administrators can review variance reports once submitted.
+              </p>
+            </div>
+          </Card>
+        )}
       </div>
     </div>
   )
