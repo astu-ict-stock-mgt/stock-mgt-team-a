@@ -1,4 +1,4 @@
-﻿import { useState, useMemo } from "react";
+import { useState, useMemo } from "react";
 import { ToastContainer, useToast, Icons, SearchBar } from "./components/ui";
 import { useApp } from "./context/AppContext";
 import { api } from "./services/api";
@@ -129,12 +129,16 @@ function LoginScreen({ onLogin }: { onLogin: (email: string, password: string) =
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+    setError(null);
     try {
       await onLogin(email, password);
+    } catch (err: any) {
+      setError(err.message || "Invalid email or password");
     } finally {
       setLoading(false);
     }
@@ -148,6 +152,12 @@ function LoginScreen({ onLogin }: { onLogin: (email: string, password: string) =
           <h1 className="text-2xl font-bold text-[#0F172A]">StockManager</h1>
           <p className="text-sm text-[#64748B] mt-1">Sign in to your account</p>
         </div>
+        {error && (
+          <div className="mb-5 p-3.5 bg-red-50 border border-red-200 text-red-600 rounded-xl text-xs font-medium flex items-center gap-2.5">
+            <span className="text-base shrink-0">⚠️</span>
+            <span>{error}</span>
+          </div>
+        )}
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="text-sm font-medium text-[#334155]">Email</label>
