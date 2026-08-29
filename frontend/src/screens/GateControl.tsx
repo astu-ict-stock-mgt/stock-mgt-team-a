@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { SectionHeader, Card, Badge, Button, Modal, Input, Select, Tabs, useToast } from "../components/ui"
 import { sivApi, requisitionsApi, goodsReceiptApi } from "../services/api"
 import { useApp } from "../context/AppContext"
@@ -49,7 +49,7 @@ export default function GateControl() {
     } finally {
       setLoading(false)
     }
-  }, [toast])
+  }, [])
 
   useEffect(() => {
     loadSivs()

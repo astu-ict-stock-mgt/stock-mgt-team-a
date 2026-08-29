@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { SectionHeader, Card, Badge, Button, Modal, Input, Tabs, useToast } from "../components/ui"
 import { goodsReceiptApi, evaluationsApi } from "../services/api"
 import { useApp } from "../context/AppContext"
@@ -54,7 +54,7 @@ export default function MaterialEvaluation() {
     } finally {
       setLoading(false)
     }
-  }, [toast])
+  }, [])
 
   useEffect(() => { loadData() }, [loadData])
 

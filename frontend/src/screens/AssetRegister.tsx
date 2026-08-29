@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { SectionHeader, Card, Badge, Button, Modal, Input, Tabs, useToast } from "../components/ui"
 import { goodsReceiptApi, assetsApi } from "../services/api"
 
@@ -62,7 +62,7 @@ export default function AssetRegister() {
     } finally {
       setLoading(false)
     }
-  }, [toast])
+  }, [])
 
   useEffect(() => { loadData() }, [loadData])
 
