@@ -6,14 +6,14 @@ import { hasPermission, PERMISSIONS } from '../lib/permissions'
 
 const statusColors: Record<string, 'default' | 'warning' | 'primary' | 'success' | 'danger'> = {
   SUBMITTED: 'warning',
-  EVALUATED: 'primary',
+  UNDER_EVALUATION: 'primary',
   APPROVED: 'success',
   REJECTED: 'danger',
 }
 
 const statusLabels: Record<string, string> = {
   SUBMITTED: 'Submitted',
-  EVALUATED: 'Evaluated',
+  UNDER_EVALUATION: 'Evaluated',
   APPROVED: 'Approved',
   REJECTED: 'Rejected',
 }
@@ -431,7 +431,7 @@ export default function ReturnsManagement() {
               )}
 
               {/* 2. PAO Approval/Rejection Panel */}
-              {['SUBMITTED', 'EVALUATED'].includes(selectedReturn.status) && canApprove && (
+              {['SUBMITTED', 'UNDER_EVALUATION'].includes(selectedReturn.status) && canApprove && (
                 <div className="space-y-4 p-4 bg-[#F0F9FF] border border-[#BAE6FD] rounded-xl">
                   <h4 className="text-sm font-semibold text-[#0369A1]">Final Approval & Disposition Decision (PAO / Admin)</h4>
                   <FormGroup columns={2}>
@@ -542,7 +542,7 @@ export default function ReturnsManagement() {
             tabs={[
               { id: 'all', label: 'All Requests' },
               { id: 'SUBMITTED', label: 'Submitted' },
-              { id: 'EVALUATED', label: 'Evaluated' },
+              { id: 'UNDER_EVALUATION', label: 'Evaluated' },
               { id: 'APPROVED', label: 'Approved' },
               { id: 'REJECTED', label: 'Rejected' },
             ]}

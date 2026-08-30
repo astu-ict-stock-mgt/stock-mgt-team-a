@@ -172,7 +172,7 @@ export async function evaluateReturn({ id, evaluatorId, remarks }) {
   const updated = await prisma.return.update({
     where: { id },
     data: {
-      status: 'EVALUATED',
+      status: 'UNDER_EVALUATION',
       evaluatedBy: evaluatorId,
       evaluatedAt: new Date(),
       ...(remarks && { notes: remarks }),
@@ -187,7 +187,7 @@ export async function evaluateReturn({ id, evaluatorId, remarks }) {
     entityId: returnRecord.id,
     entityNumber: returnRecord.returnNumber,
     oldStatus: returnRecord.status,
-    newStatus: 'EVALUATED',
+    newStatus: 'UNDER_EVALUATION',
   }).catch(() => {})
 
   return updated
@@ -202,7 +202,7 @@ export async function evaluateReturn({ id, evaluatorId, remarks }) {
 export async function approveReturn({ id, approverId, disposition = 'RESTOCK', remarks, isApproved = true }) {
   const returnRecord = await getReturnById(id)
 
-  if (!['SUBMITTED', 'EVALUATED'].includes(returnRecord.status)) {
+  if (!['SUBMITTED', 'UNDER_EVALUATION'].includes(returnRecord.status)) {
     throw new ConflictError(`Return request cannot be approved from current status '${returnRecord.status}'`)
   }
 
