@@ -206,7 +206,7 @@ export async function approveReturn({ id, approverId, disposition = 'RESTOCK', r
     throw new ConflictError(`Return request cannot be approved from current status '${returnRecord.status}'`)
   }
 
-  const validDispositions = ['RESTOCK', 'QUARANTINE', 'REPAIR', 'DISPOSAL', 'REPLACE']
+  const validDispositions = ['RESTOCK', 'QUARANTINE', 'REPAIR', 'DISPOSAL', 'REPLACEMENT']
   if (!validDispositions.includes(disposition)) {
     throw new ValidationError(`Invalid return disposition '${disposition}'. Allowed: ${validDispositions.join(', ')}`)
   }

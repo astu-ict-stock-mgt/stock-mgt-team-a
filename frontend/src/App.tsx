@@ -527,10 +527,10 @@ export default function App() {
                   ) : (
                     notifications.slice(0, 8).map(n => {
                       const iconMap: Record<string, string> = {
-                        APPROVAL_REQUIRED: 'ðŸ“‹', APPROVED: 'âœ…', REJECTED: 'âŒ',
-                        STATUS_UPDATE: 'ðŸ”„', GRN_READY: 'ðŸ“¦',
-                        LOW_STOCK: 'ðŸ“‰', EXPIRY_WARNING: 'âš ', DISPOSAL_CANDIDATE: 'ðŸ—‘',
-                        SECURITY_EVENT: 'ðŸ”’', INFO: 'â„¹',
+                        APPROVAL_REQUIRED: '📋', APPROVED: '✅', REJECTED: '❌',
+                        STATUS_UPDATE: '🔄', GRN_READY: '📦',
+                        LOW_STOCK: '📉', EXPIRY_WARNING: '⚠️', DISPOSAL_CANDIDATE: '🗑️',
+                        SECURITY_EVENT: '🔒', INFO: 'ℹ️',
                       };
                       const priorityDot: Record<string, string> = {
                         HIGH: 'bg-[#DC2626]', MEDIUM: 'bg-[#D97706]', LOW: 'bg-[#94A3B8]',
@@ -544,7 +544,7 @@ export default function App() {
                             !n.isRead ? 'bg-[#FAFBFF]' : 'bg-white'
                           }`}
                         >
-                          <span className="text-base shrink-0 mt-0.5">{iconMap[n.type] || 'â„¹'}</span>
+                          <span className="text-base shrink-0 mt-0.5">{iconMap[n.type] || 'ℹ️'}</span>
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-1.5 mb-0.5">
                               <p className={`text-xs font-semibold truncate ${
@@ -568,7 +568,7 @@ export default function App() {
                     onClick={() => navigate('notifications')}
                     className="w-full text-center text-xs text-[#4F46E5] hover:text-[#4338CA] font-medium transition-colors py-0.5"
                   >
-                    View all notifications â†’
+                    View all notifications →
                   </button>
                 </div>
               </div>

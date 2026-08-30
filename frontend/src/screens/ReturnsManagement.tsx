@@ -31,7 +31,7 @@ const dispositionLabels: Record<string, string> = {
   QUARANTINE: 'Quarantine',
   REPAIR: 'Send to Repair',
   DISPOSAL: 'Flag for Disposal',
-  REPLACE: 'Awaiting Replacement',
+  REPLACEMENT: 'Awaiting Replacement',
 }
 
 export default function ReturnsManagement() {
@@ -431,7 +431,17 @@ export default function ReturnsManagement() {
               )}
 
               {/* 2. PAO Approval/Rejection Panel */}
-              {['SUBMITTED', 'UNDER_EVALUATION'].includes(selectedReturn.status) && canApprove && (
+              {selectedReturn.status === 'SUBMITTED' && canApprove && (
+                <div className="p-4 bg-[#FFFBEB] border border-[#FDE68A] rounded-xl text-[#92400E] text-sm flex items-center gap-3">
+                  <span className="text-xl">⏳</span>
+                  <div>
+                    <p className="font-semibold text-[#92400E]">Awaiting Technical Evaluation</p>
+                    <p className="text-xs text-[#92400E] mt-0.5">This return request must be evaluated by the Technical Evaluation Committee (TEC) before the PAO can register final approval decisions.</p>
+                  </div>
+                </div>
+              )}
+
+              {selectedReturn.status === 'UNDER_EVALUATION' && canApprove && (
                 <div className="space-y-4 p-4 bg-[#F0F9FF] border border-[#BAE6FD] rounded-xl">
                   <h4 className="text-sm font-semibold text-[#0369A1]">Final Approval & Disposition Decision (PAO / Admin)</h4>
                   <FormGroup columns={2}>
@@ -441,7 +451,7 @@ export default function ReturnsManagement() {
                         { value: 'QUARANTINE', label: 'Quarantine' },
                         { value: 'REPAIR', label: 'Send to Repair' },
                         { value: 'DISPOSAL', label: 'Flag for Disposal' },
-                        { value: 'REPLACE', label: 'Awaiting Replacement' },
+                        { value: 'REPLACEMENT', label: 'Awaiting Replacement' },
                       ]}
                       value={disposition} onChange={e => setDisposition(e.target.value)} />
                     <Input label="Disposition Remarks" placeholder="Log details for the disposition choice" value={approveRemarks} onChange={e => setApproveRemarks(e.target.value)} />
