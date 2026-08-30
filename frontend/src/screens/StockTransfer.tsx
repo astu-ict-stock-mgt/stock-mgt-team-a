@@ -1,7 +1,7 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { Button, Badge, SectionHeader, Card, Select, Input, Tabs, Modal, FormGroup, Icons, useToast } from '../components/ui'
 import { useApp } from '../context/AppContext'
-import { transfersApi } from '../services/api'
+import { transfersApi, inventoryApi } from '../services/api'
 import { hasPermission, PERMISSIONS } from '../lib/permissions'
 
 const statusColors: Record<string, 'default' | 'warning' | 'primary' | 'success' | 'danger'> = {
@@ -28,6 +28,34 @@ export default function StockTransfer() {
   const [notes, setNotes] = useState('')
   const [newItems, setNewItems] = useState<{ itemId: string; qty: number; remarks: string }[]>([])
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [localStockCards, setLocalStockCards] = useState<any[]>([])
+  const [loadingCards, setLoadingCards] = useState(false)
+
+  useEffect(() => {
+    if (!sourceStoreId) {
+      setLocalStockCards([])
+      return
+    }
+    let active = true
+    const fetchCards = async () => {
+      setLoadingCards(true)
+      try {
+        const res = await inventoryApi.getStockByStore(sourceStoreId)
+        if (active) {
+          setLocalStockCards(res.data || [])
+        }
+      } catch {
+        if (active) {
+          setLocalStockCards([])
+          toast.error('Failed to load stock cards for the selected store')
+        }
+      } finally {
+        if (active) setLoadingCards(false)
+      }
+    }
+    fetchCards()
+    return () => { active = false }
+  }, [sourceStoreId])
 
   const filteredTransfers = activeTab === 'all' ? transfers : transfers.filter(t => t.status === activeTab)
 
@@ -47,14 +75,18 @@ export default function StockTransfer() {
 
   const sourceItems = useMemo(() => {
     if (!sourceStoreId) return []
-    return stockCards.filter(sc => sc.storeId === sourceStoreId && sc.availableQty > 0).map(sc => {
+    return localStockCards.filter(sc => sc.availableQty > 0).map(sc => {
       const item = inventoryItems.find(i => i.id === sc.itemId)
       const unit = item ? units.find(u => u.id === item.unitId) : null
       return { ...sc, itemName: item?.name || '', itemCode: item?.code || '', unitSymbol: unit?.symbol || '' }
     })
-  }, [sourceStoreId, stockCards, inventoryItems, units])
+  }, [sourceStoreId, localStockCards, inventoryItems, units])
 
   const addItem = () => {
+    if (sourceItems.length === 0) {
+      toast.error('No items available in the source store to transfer')
+      return
+    }
     setNewItems(prev => [...prev, { itemId: sourceItems[0]?.itemId || '', qty: 1, remarks: '' }])
   }
 

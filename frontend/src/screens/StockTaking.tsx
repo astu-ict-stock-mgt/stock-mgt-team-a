@@ -109,27 +109,39 @@ export default function StockTaking() {
                 </tr>
               </thead>
               <tbody>
-                {entries.filter(e => e.counted).map(e => {
-                  const variance = (e.physicalCount ?? 0) - e.systemCount
-                  const varianceValue = variance * e.unitCost
-                  const hasVariance = variance !== 0
+                {entries.map(e => {
+                  const variance = e.physicalCount !== null ? e.physicalCount - e.systemCount : null
+                  const varianceValue = variance !== null ? variance * e.unitCost : 0
+                  const hasVariance = variance !== null && variance !== 0
                   return (
                     <tr key={e.itemId} className={`border-b border-[#F8FAFC] hover:bg-[#F8FAFC] ${hasVariance ? 'bg-[#FFFBEB]' : ''}`}>
                       <td className="px-4 py-3"><div className="text-sm font-medium text-[#1E293B]">{e.name}</div></td>
                       <td className="px-4 py-3 font-mono text-xs text-[#64748B]">{e.code}</td>
                       <td className="px-4 py-3 font-mono text-sm font-semibold text-[#334155]">{e.systemCount} {e.unitSymbol}</td>
-                      <td className="px-4 py-3 font-mono text-sm font-semibold text-[#1E293B]">{e.physicalCount ?? '—'} {e.unitSymbol}</td>
+                      <td className="px-4 py-3 font-mono text-sm font-semibold text-[#1E293B]">{e.physicalCount !== null ? `${e.physicalCount} ${e.unitSymbol}` : '—'}</td>
                       <td className="px-4 py-3">
-                        <span className={`font-mono text-sm font-bold ${variance > 0 ? 'text-[#16A34A]' : variance < 0 ? 'text-[#DC2626]' : 'text-[#94A3B8]'}`}>
-                          {variance > 0 ? '+' : ''}{variance} {e.unitSymbol}
-                        </span>
+                        {variance !== null ? (
+                          <span className={`font-mono text-sm font-bold ${variance > 0 ? 'text-[#16A34A]' : variance < 0 ? 'text-[#DC2626]' : 'text-[#94A3B8]'}`}>
+                            {variance > 0 ? '+' : ''}{variance} {e.unitSymbol}
+                          </span>
+                        ) : <span className="text-[#94A3B8]">—</span>}
                       </td>
                       <td className="px-4 py-3">
-                        <span className={`font-mono text-sm font-semibold ${varianceValue > 0 ? 'text-[#16A34A]' : varianceValue < 0 ? 'text-[#DC2626]' : 'text-[#94A3B8]'}`}>
-                          {varianceValue > 0 ? '+' : ''}${varianceValue.toFixed(2)}
-                        </span>
+                        {variance !== null ? (
+                          <span className={`font-mono text-sm font-semibold ${varianceValue > 0 ? 'text-[#16A34A]' : varianceValue < 0 ? 'text-[#DC2626]' : 'text-[#94A3B8]'}`}>
+                            {varianceValue > 0 ? '+' : ''}${varianceValue.toFixed(2)}
+                          </span>
+                        ) : <span className="text-[#94A3B8]">—</span>}
                       </td>
-                      <td className="px-4 py-3">{hasVariance ? <Badge variant="warning" dot>Variance</Badge> : <Badge variant="success" dot>Match</Badge>}</td>
+                      <td className="px-4 py-3">
+                        {e.physicalCount === null ? (
+                          <Badge variant="default">Pending</Badge>
+                        ) : hasVariance ? (
+                          <Badge variant="warning" dot>Variance</Badge>
+                        ) : (
+                          <Badge variant="success" dot>Match</Badge>
+                        )}
+                      </td>
                     </tr>
                   )
                 })}
@@ -253,7 +265,7 @@ export default function StockTaking() {
               </div>
             </div>
             <div className="flex justify-end mt-5 pt-5 border-t border-[#E2E8F0]">
-              <Button variant="primary" onClick={() => {
+              <Button variant="primary" disabled={storeItems.length === 0 || loadingCards} onClick={() => {
                 setEntries(storeItems.map(si => ({
                   itemId: si.itemId, name: si.item?.name || '', code: si.item?.code || '',
                   systemCount: si.quantity, physicalCount: null,
