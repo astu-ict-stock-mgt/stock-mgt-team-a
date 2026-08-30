@@ -65,6 +65,7 @@ export default function ReturnsManagement() {
   const [approveRemarks, setApproveRemarks] = useState('')
   const [disposition, setDisposition] = useState('RESTOCK')
   const [actionLoading, setActionLoading] = useState(false)
+  const [isEditingDecision, setIsEditingDecision] = useState(false)
 
   // Fetch Returns
   const fetchReturns = async () => {
@@ -158,6 +159,7 @@ export default function ReturnsManagement() {
       setEvalRemarks('')
       setApproveRemarks('')
       setDisposition('RESTOCK')
+      setIsEditingDecision(false)
     } catch {
       toast.error('Failed to load return details')
     }
@@ -232,6 +234,7 @@ export default function ReturnsManagement() {
       const res = await returnsApi.getById(selectedReturn.id)
       setSelectedReturn(res.data)
       fetchReturns()
+      setIsEditingDecision(false)
     } catch (err: any) {
       toast.error(err.message || 'Failed to submit approval choice')
     } finally {
@@ -441,9 +444,11 @@ export default function ReturnsManagement() {
                 </div>
               )}
 
-              {selectedReturn.status === 'UNDER_EVALUATION' && canApprove && (
+              {(selectedReturn.status === 'UNDER_EVALUATION' || isEditingDecision) && canApprove && (
                 <div className="space-y-4 p-4 bg-[#F0F9FF] border border-[#BAE6FD] rounded-xl">
-                  <h4 className="text-sm font-semibold text-[#0369A1]">Final Approval & Disposition Decision (PAO / Admin)</h4>
+                  <h4 className="text-sm font-semibold text-[#0369A1]">
+                    {isEditingDecision ? 'Modify Approval & Disposition Decision' : 'Final Approval & Disposition Decision'} (PAO / Admin)
+                  </h4>
                   <FormGroup columns={2}>
                     <Select label="Stock Disposition Action"
                       options={[
@@ -459,6 +464,9 @@ export default function ReturnsManagement() {
                   <div className="flex gap-2">
                     <Button variant="primary" size="sm" onClick={() => handleDecide(true)} loading={actionLoading}>Approve Request</Button>
                     <Button variant="destructive" size="sm" onClick={() => handleDecide(false)} loading={actionLoading}>Reject Request</Button>
+                    {isEditingDecision && (
+                      <Button variant="secondary" size="sm" onClick={() => setIsEditingDecision(false)}>Cancel</Button>
+                    )}
                   </div>
                 </div>
               )}
@@ -474,16 +482,48 @@ export default function ReturnsManagement() {
                 </div>
               )}
 
+              {selectedReturn.status === 'APPROVED' && selectedReturn.disposition === 'RESTOCK' && !isPosted && canApprove && !isEditingDecision && (
+                <div className="flex justify-end p-2 bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl">
+                  <Button variant="ghost" size="sm" onClick={() => {
+                    setDisposition(selectedReturn.disposition || 'RESTOCK')
+                    setApproveRemarks(selectedReturn.notes || '')
+                    setIsEditingDecision(true)
+                  }}>Modify Approval Decision</Button>
+                </div>
+              )}
+
               {/* Status information */}
               {selectedReturn.status === 'APPROVED' && selectedReturn.disposition !== 'RESTOCK' && (
-                <p className="text-sm text-[#059669] font-medium text-center py-4 bg-emerald-50 border border-emerald-100 rounded-lg">
-                  Approved. Disposition action set to: **{dispositionLabels[selectedReturn.disposition] || selectedReturn.disposition}**. No stock updates required.
-                </p>
+                <div className="space-y-3">
+                  <p className="text-sm text-[#059669] font-medium text-center py-4 bg-emerald-50 border border-emerald-100 rounded-lg">
+                    Approved. Disposition action set to: **{dispositionLabels[selectedReturn.disposition] || selectedReturn.disposition}**. No stock updates required.
+                  </p>
+                  {canApprove && !isEditingDecision && (
+                    <div className="flex justify-end">
+                      <Button variant="secondary" size="sm" onClick={() => {
+                        setDisposition(selectedReturn.disposition || 'RESTOCK')
+                        setApproveRemarks(selectedReturn.notes || '')
+                        setIsEditingDecision(true)
+                      }}>Modify Decision</Button>
+                    </div>
+                  )}
+                </div>
               )}
               {selectedReturn.status === 'REJECTED' && (
-                <p className="text-sm text-red-600 font-medium text-center py-4 bg-red-50 border border-red-100 rounded-lg">
-                  This return request has been rejected.
-                </p>
+                <div className="space-y-3">
+                  <p className="text-sm text-red-600 font-medium text-center py-4 bg-red-50 border border-red-100 rounded-lg">
+                    This return request has been rejected.
+                  </p>
+                  {canApprove && !isEditingDecision && (
+                    <div className="flex justify-end">
+                      <Button variant="secondary" size="sm" onClick={() => {
+                        setDisposition(selectedReturn.disposition || 'RESTOCK')
+                        setApproveRemarks(selectedReturn.notes || '')
+                        setIsEditingDecision(true)
+                      }}>Modify Decision</Button>
+                    </div>
+                  )}
+                </div>
               )}
               {isPosted && (
                 <p className="text-sm text-emerald-600 font-medium text-center py-4 bg-emerald-50 border border-emerald-100 rounded-lg">
