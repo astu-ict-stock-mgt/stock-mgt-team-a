@@ -496,15 +496,48 @@ export function ToastContainer({ toasts, onRemove }: ToastContainerProps) {
   )
 }
 
+// Global shared toast state for useToast hook
+let globalToasts: Toast[] = []
+const toastListeners = new Set<(toasts: Toast[]) => void>()
+
+const notifyToastListeners = () => {
+  toastListeners.forEach(l => l([...globalToasts]))
+}
+
+const addGlobalToast = (type: ToastType, message: string) => {
+  const id = Math.random().toString(36).slice(2)
+  globalToasts = [...globalToasts, { id, type, message }]
+  notifyToastListeners()
+  setTimeout(() => {
+    removeGlobalToast(id)
+  }, 4000)
+}
+
+const removeGlobalToast = (id: string) => {
+  globalToasts = globalToasts.filter(x => x.id !== id)
+  notifyToastListeners()
+}
+
 export function useToast() {
-  const [toasts, setToasts] = useState<Toast[]>([])
-  const add = (type: ToastType, message: string) => {
-    const id = Math.random().toString(36).slice(2)
-    setToasts(t => [...t, { id, type, message }])
-    setTimeout(() => setToasts(t => t.filter(x => x.id !== id)), 4000)
+  const [toasts, setToasts] = useState<Toast[]>(globalToasts)
+
+  useEffect(() => {
+    toastListeners.add(setToasts)
+    return () => {
+      toastListeners.delete(setToasts)
+    }
+  }, [])
+
+  return {
+    toasts,
+    toast: {
+      success: (m: string) => addGlobalToast('success', m),
+      error: (m: string) => addGlobalToast('error', m),
+      warning: (m: string) => addGlobalToast('warning', m),
+      info: (m: string) => addGlobalToast('info', m),
+    },
+    remove: removeGlobalToast,
   }
-  const remove = (id: string) => setToasts(t => t.filter(x => x.id !== id))
-  return { toasts, toast: { success: (m: string) => add('success', m), error: (m: string) => add('error', m), warning: (m: string) => add('warning', m), info: (m: string) => add('info', m) }, remove }
 }
 
 // ─── TABS ─────────────────────────────────────────────────────────────────────

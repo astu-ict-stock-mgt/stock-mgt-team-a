@@ -30,6 +30,7 @@ export async function createDisposalRequest({
   disposalMethod = 'WRITE_OFF',
   reason,
   notes,
+  lines,
 }) {
   if (!requestedBy) {
     throw new ValidationError('requestedBy user ID is required')
@@ -45,6 +46,46 @@ export async function createDisposalRequest({
 
   const disposalNumber = await generateDisposalNumber()
 
+  const populatedLines = []
+  if (Array.isArray(lines) && lines.length > 0) {
+    for (const line of lines) {
+      if (!line.itemId) {
+        throw new ValidationError('itemId is required for each disposal request line')
+      }
+      if (!line.quantity || line.quantity <= 0) {
+        throw new ValidationError('quantity must be greater than 0 for each line')
+      }
+      const item = await prisma.item.findUnique({ where: { id: line.itemId } })
+      if (!item) {
+        throw new ValidationError(`Item with ID '${line.itemId}' not found`)
+      }
+      let stockCard = null
+      if (storeId) {
+        stockCard = await prisma.stockCard.findUnique({
+          where: {
+            uq_stock_card_item_store: {
+              itemId: line.itemId,
+              storeId: storeId,
+            }
+          }
+        })
+      }
+      const unitCost = stockCard?.averageCost ? Number(stockCard.averageCost) : (item.unitCost ? Number(item.unitCost) : 0)
+      const totalCost = unitCost * line.quantity
+      populatedLines.push({
+        itemId: line.itemId,
+        quantity: line.quantity,
+        locationId: line.locationId || null,
+        unitCost,
+        totalCost,
+        remarks: line.remarks || null,
+        condition: line.condition || null,
+        batchNumber: line.batchNumber || null,
+        expiryDate: line.expiryDate ? new Date(line.expiryDate) : null,
+      })
+    }
+  }
+
   const record = await prisma.disposalRequest.create({
     data: {
       disposalNumber,
@@ -54,10 +95,19 @@ export async function createDisposalRequest({
       requestedBy,
       reason: reason || null,
       notes: notes || null,
+      lines: {
+        create: populatedLines
+      }
     },
     include: {
       store: { select: { id: true, name: true, code: true } },
       requestedByUser: { select: { id: true, fullName: true, email: true } },
+      lines: {
+        include: {
+          item: { select: { id: true, name: true, code: true } },
+          location: { select: { id: true, name: true, code: true } },
+        }
+      }
     },
   })
 

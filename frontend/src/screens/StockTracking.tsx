@@ -36,7 +36,9 @@ export default function StockTracking() {
     const itemName = m.item?.name || ''
     const matchesSearch = itemName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (m.referenceNumber || '').toLowerCase().includes(searchTerm.toLowerCase())
-    const matchesType = typeFilter === 'all' || m.transactionType === typeFilter
+    const matchesType = typeFilter === 'all' || 
+      m.transactionType === typeFilter ||
+      (typeFilter === 'TRANSFER' && m.transactionType.startsWith('TRANSFER'))
     return matchesSearch && matchesType
   })
 

@@ -395,3 +395,50 @@ export const assetsApi = {
     api.post<ApiResponse<any>>('/assets', data),
 }
 
+export const disposalsApi = {
+  getAll: (params?: { status?: string; disposalMethod?: string; storeId?: string; page?: number; limit?: number }) => {
+    const q = new URLSearchParams()
+    if (params?.status) q.set('status', params.status)
+    if (params?.disposalMethod) q.set('disposalMethod', params.disposalMethod)
+    if (params?.storeId) q.set('storeId', params.storeId)
+    if (params?.page) q.set('page', String(params.page))
+    if (params?.limit) q.set('limit', String(params.limit))
+    return api.get<ApiResponse<any[]>>(`/disposals?${q.toString()}`)
+  },
+  getById: (id: string) => api.get<ApiResponse<any>>(`/disposals/${id}`),
+  create: (data: { storeId: string; disposalMethod: string; reason?: string; notes?: string; lines?: Array<{ itemId: string; quantity: number; locationId?: string | null; remarks?: string | null; condition?: string | null; batchNumber?: string | null; expiryDate?: string | null }> }) =>
+    api.post<ApiResponse<any>>('/disposals', data),
+  evaluate: (id: string, data: { notes: string }) =>
+    api.patch<ApiResponse<any>>(`/disposals/${id}/evaluate`, data),
+  approve: (id: string, data: { notes?: string; disposalMethod?: string }) =>
+    api.patch<ApiResponse<any>>(`/disposals/${id}/approve`, data),
+  reject: (id: string, data: { reason: string }) =>
+    api.patch<ApiResponse<any>>(`/disposals/${id}/reject`, data),
+  execute: (id: string, data: { executionNotes?: string; witnessName?: string; certificateNumber?: string; disposalLocation?: string }) =>
+    api.post<ApiResponse<any>>(`/disposals/${id}/execute`, data),
+  getHistory: (id: string) => api.get<ApiResponse<any>>(`/disposals/${id}/history`),
+}
+
+export const returnsApi = {
+  getAll: (params?: { status?: string; storeId?: string; requestedById?: string; page?: number; limit?: number }) => {
+    const q = new URLSearchParams()
+    if (params?.status) q.set('status', params.status)
+    if (params?.storeId) q.set('storeId', params.storeId)
+    if (params?.requestedById) q.set('requestedById', params.requestedById)
+    if (params?.page) q.set('page', String(params.page))
+    if (params?.limit) q.set('limit', String(params.limit))
+    return api.get<ApiResponse<any[]>>(`/returns?${q.toString()}`)
+  },
+  getById: (id: string) => api.get<ApiResponse<any>>(`/returns/${id}`),
+  create: (data: { sivId: string; storeId: string; reason: string; notes?: string; lines: Array<{ itemId: string; quantityReturned: number; remarks?: string | null }> }) =>
+    api.post<ApiResponse<any>>('/returns', data),
+  evaluate: (id: string, data: { remarks: string }) =>
+    api.patch<ApiResponse<any>>(`/returns/${id}/evaluate`, data),
+  approve: (id: string, data: { disposition: string; remarks?: string; isApproved: boolean }) =>
+    api.patch<ApiResponse<any>>(`/returns/${id}/approve`, data),
+  postStock: (id: string) =>
+    api.post<ApiResponse<any>>(`/returns/${id}/post`),
+}
+
+
+

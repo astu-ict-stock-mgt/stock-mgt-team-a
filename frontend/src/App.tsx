@@ -23,6 +23,8 @@ import Settings from "./screens/Settings";
 import AssetRegister from "./screens/AssetRegister";
 import GateControl from "./screens/GateControl";
 import MaterialEvaluation from "./screens/MaterialEvaluation";
+import DisposalManagement from "./screens/DisposalManagement";
+import ReturnsManagement from "./screens/ReturnsManagement";
 
 type Screen =
   | "dashboard"
@@ -38,6 +40,8 @@ type Screen =
   | "stock-transfer"
   | "stock-tracking"
   | "stock-taking"
+  | "disposal-requests"
+  | "returns"
   | "suppliers"
   | "users"
   | "roles"
@@ -84,6 +88,8 @@ const navGroups: NavGroup[] = [
       { id: "stock-transfer", label: "Transfer", icon: Icons.transfer },
       { id: "stock-tracking", label: "Tracking", icon: Icons.tracking },
       { id: "stock-taking", label: "Stock Taking", icon: Icons.stocktake },
+      { id: "disposal-requests", label: "Disposal", icon: Icons.dashboard },
+      { id: "returns", label: "Returns", icon: Icons.receive },
     ],
   },
   {
@@ -117,6 +123,8 @@ const screenTitles: Record<Screen, string> = {
   "stock-transfer": "Stock Transfer",
   "stock-tracking": "Stock Tracking",
   "stock-taking": "Stock Taking",
+  "disposal-requests": "Material Disposal",
+  returns: "Material Returns",
   users: "User Management",
   roles: "Roles & Permissions",
   reports: "Reports",
@@ -236,6 +244,10 @@ export default function App() {
             return hasPermission(userRoles, PERMISSIONS.STOCK_CARDS_READ)
           case 'stock-taking':
             return hasPermission(userRoles, PERMISSIONS.RECONCILIATION_CREATE) || hasPermission(userRoles, PERMISSIONS.RECONCILIATION_APPROVE)
+          case 'disposal-requests':
+            return hasPermission(userRoles, PERMISSIONS.SHELFLIFE_READ) || hasPermission(userRoles, PERMISSIONS.DISPOSAL_REQUEST)
+          case 'returns':
+            return hasPermission(userRoles, PERMISSIONS.RETURNS_READ) || hasPermission(userRoles, PERMISSIONS.RETURNS_CREATE)
           case 'users':
             // User management is ADMIN-only
             return hasPermission(userRoles, PERMISSIONS.USERS_MANAGE)
@@ -668,6 +680,8 @@ export default function App() {
             {screen === "stock-transfer" && (hasPermission(userRoles, PERMISSIONS.TRANSFERS_CREATE) || hasPermission(userRoles, PERMISSIONS.TRANSFERS_APPROVE)) && <StockTransfer />}
             {screen === "stock-tracking" && hasPermission(userRoles, PERMISSIONS.STOCK_CARDS_READ) && <StockTracking />}
             {screen === "stock-taking" && (hasPermission(userRoles, PERMISSIONS.RECONCILIATION_CREATE) || hasPermission(userRoles, PERMISSIONS.RECONCILIATION_APPROVE)) && <StockTaking />}
+            {screen === "disposal-requests" && (hasPermission(userRoles, PERMISSIONS.SHELFLIFE_READ) || hasPermission(userRoles, PERMISSIONS.DISPOSAL_REQUEST)) && <DisposalManagement />}
+            {screen === "returns" && (hasPermission(userRoles, PERMISSIONS.RETURNS_READ) || hasPermission(userRoles, PERMISSIONS.RETURNS_CREATE)) && <ReturnsManagement />}
             {screen === "users" && hasPermission(userRoles, PERMISSIONS.USERS_MANAGE) && <Users />}
             {screen === "roles" && hasPermission(userRoles, PERMISSIONS.ROLES_READ) && <RolesPermissions />}
             {screen === "reports" && hasPermission(userRoles, PERMISSIONS.REPORTS_VIEW) && <Reports />}
