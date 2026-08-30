@@ -145,7 +145,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     try {
       const [
         itemsData, suppliersData, usersData, rolesData, storesData,
-        categoriesData, unitsData, logsData, notifsData, transfersData, stockTakesData, requisitionsData,
+        categoriesData, unitsData, logsData, notifsData, transfersData, stockTakesData, requisitionsData, stockMovementsData,
       ] = await Promise.all([
         fetchIf(hasAnyPermission(perms, [PERMISSIONS.ITEMS_READ, PERMISSIONS.ITEMS_MANAGE]), itemsApi.getAll),
         fetchIf(hasAnyPermission(perms, [PERMISSIONS.SUPPLIERS_READ, PERMISSIONS.SUPPLIERS_MANAGE]), suppliersApi.getAll),
@@ -159,6 +159,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         fetchIf(hasAnyPermission(perms, [PERMISSIONS.TRANSFERS_READ, PERMISSIONS.TRANSFERS_CREATE, PERMISSIONS.TRANSFERS_APPROVE, PERMISSIONS.TRANSFERS_EXECUTE]), () => transfersApi.getAll({ limit: 50 })),
         fetchIf(hasAnyPermission(perms, [PERMISSIONS.RECONCILIATION_READ, PERMISSIONS.RECONCILIATION_CREATE, PERMISSIONS.RECONCILIATION_APPROVE, PERMISSIONS.RECONCILIATION_POST]), () => stockTakesApi.getAll({ limit: 50 })),
         fetchIf(hasAnyPermission(perms, [PERMISSIONS.REQUISITIONS_READ, PERMISSIONS.REQUISITIONS_CREATE, PERMISSIONS.REQUISITIONS_APPROVE]), () => requisitionsApi.getAll({ limit: 50 })),
+        fetchIf(hasAnyPermission(perms, [PERMISSIONS.STOCK_CARDS_READ, PERMISSIONS.INVENTORY_READ]), () => inventoryApi.getTransactions({ limit: 100 })),
       ]);
 
       if (itemsData) setInventoryItems(itemsData);
@@ -176,6 +177,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       if (transfersData) setTransfers(transfersData);
       if (stockTakesData) setStockTakes(stockTakesData);
       if (requisitionsData) setRequisitions(requisitionsData);
+      if (stockMovementsData) setStockMovements(stockMovementsData);
 
       if (hasAnyPermission(perms, [PERMISSIONS.INVENTORY_READ]) && storesData && storesData.length > 0) {
         const firstStore = storesData[0];

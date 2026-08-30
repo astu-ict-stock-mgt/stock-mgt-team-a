@@ -17,7 +17,7 @@ export default function StockTracking() {
   const [activeTab, setActiveTab] = useState('movements')
   const [searchTerm, setSearchTerm] = useState('')
   const [typeFilter, setTypeFilter] = useState<string>('all')
-  const [selectedMovement, setSelectedMovement] = useState<typeof stockMovements[0] | null>(stockMovements[0] || null)
+  const [selectedMovement, setSelectedMovement] = useState<any | null>(null)
 
   const getMovementInfo = (m: typeof stockMovements[0]) => {
     const card = stockCards.find(sc => sc.id === m.stockCardId)
