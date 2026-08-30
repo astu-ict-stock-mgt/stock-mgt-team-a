@@ -262,9 +262,10 @@ interface TableProps<T> {
   selectable?: boolean
   onRowClick?: (row: T) => void
   rowKey: (row: T) => string
+  onDeleteSelected?: (keys: string[]) => void
 }
 
-export function Table<T>({ columns, data, loading, empty, emptyMessage = 'No records found', selectable, onRowClick, rowKey }: TableProps<T>) {
+export function Table<T>({ columns, data, loading, empty, emptyMessage = 'No records found', selectable, onRowClick, rowKey, onDeleteSelected }: TableProps<T>) {
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [sortKey, setSortKey] = useState<string | null>(null)
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
@@ -290,7 +291,11 @@ export function Table<T>({ columns, data, loading, empty, emptyMessage = 'No rec
           <span className="text-sm font-semibold text-[#4F46E5]">{selected.size} item(s) selected</span>
           <div className="flex gap-2">
             <Button variant="secondary" size="sm">Export Selected</Button>
-            <Button variant="destructive" size="sm">Delete</Button>
+            {onDeleteSelected && (
+              <Button variant="destructive" size="sm" onClick={() => onDeleteSelected(Array.from(selected))}>
+                Delete
+              </Button>
+            )}
             <Button variant="ghost" size="sm" onClick={() => setSelected(new Set())}>Clear Selection</Button>
           </div>
         </div>

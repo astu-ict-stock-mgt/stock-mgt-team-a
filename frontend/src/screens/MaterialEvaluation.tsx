@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react"
-import { SectionHeader, Card, Badge, Button, Modal, Input, Tabs, useToast } from "../components/ui"
+import { SectionHeader, Card, Badge, Button, Modal, Input, Tabs, useToast, ToastContainer } from "../components/ui"
 import { goodsReceiptApi, evaluationsApi } from "../services/api"
 import { useApp } from "../context/AppContext"
 
@@ -27,7 +27,7 @@ interface TechnicalEvaluation {
 
 export default function MaterialEvaluation() {
   const { currentUser } = useApp()
-  const { toast } = useToast()
+  const { toasts, toast, remove } = useToast()
 
   const [activeTab, setActiveTab] = useState("pending")
   const [pendingReceipts, setPendingReceipts] = useState<GoodsReceipt[]>([])
@@ -58,6 +58,12 @@ export default function MaterialEvaluation() {
 
   useEffect(() => { loadData() }, [loadData])
 
+  // Filter out GRs that already have an active (IN_PROGRESS) evaluation
+  const activeEvalGrIds = new Set(
+    myEvaluations.filter(e => e.status === "IN_PROGRESS").map(e => e.goodsReceipt.id)
+  )
+  const filteredPending = pendingReceipts.filter(r => !activeEvalGrIds.has(r.id))
+
   const handleStartEvaluation = async (receipt: GoodsReceipt) => {
     setSubmitting(true)
     try {
@@ -65,9 +71,10 @@ export default function MaterialEvaluation() {
       const evalRes = await evaluationsApi.create({ goodsReceiptId: receipt.id, notes: "" })
       // Start it immediately
       await evaluationsApi.startEvaluation(evalRes.data.id, currentUser!.userId)
-      toast.success(`Evaluation started for ${receipt.receiptNumber}`)
+      toast.success(`Evaluation started for ${receipt.receiptNumber} — switch to the "In Progress" tab to submit your decision.`)
       setShowReceiptModal(false)
       loadData()
+      setActiveTab("inprogress")
     } catch (err: any) {
       toast.error(err.message || "Failed to start evaluation")
     } finally {
@@ -77,14 +84,19 @@ export default function MaterialEvaluation() {
 
   const handleSubmitDecision = async (decision: "APPROVED" | "REJECTED") => {
     if (!selectedEval) return
+    if (!decisionNotes.trim()) {
+      toast.error("Please enter your evaluation notes before submitting a decision.")
+      return
+    }
     setSubmitting(true)
     try {
       await evaluationsApi.updateDecision(selectedEval.id, decision, decisionNotes)
-      toast.success(`Receipt ${selectedEval.goodsReceipt.receiptNumber} ${decision.toLowerCase()}`)
+      toast.success(`Receipt ${selectedEval.goodsReceipt.receiptNumber} has been ${decision.toLowerCase()}. GRN can now be generated.`)
       setShowDecisionModal(false)
       setDecisionNotes("")
       setSelectedEval(null)
       loadData()
+      setActiveTab("history")
     } catch (err: any) {
       toast.error(err.message || "Failed to submit decision")
     } finally {
@@ -109,6 +121,8 @@ export default function MaterialEvaluation() {
 
   return (
     <div>
+      <ToastContainer toasts={toasts} onRemove={remove} />
+
       <SectionHeader
         title="Material Evaluation"
         subtitle="Technical inspection and acceptance decision for received goods"
@@ -116,7 +130,7 @@ export default function MaterialEvaluation() {
 
       <Tabs
         tabs={[
-          { id: "pending", label: "Pending Evaluation", count: pendingReceipts.length },
+          { id: "pending", label: "Pending Evaluation", count: filteredPending.length },
           { id: "inprogress", label: "In Progress", count: inProgress.length },
           { id: "history", label: "Completed", count: completed.length },
         ]}
@@ -126,13 +140,19 @@ export default function MaterialEvaluation() {
 
       <div className="mt-4">
         {loading && (
-          <div className="py-16 text-center text-sm text-[#94A3B8]">Loading evaluations...</div>
+          <div className="py-16 text-center">
+            <svg className="animate-spin h-6 w-6 text-[#4F46E5] mx-auto mb-3" viewBox="0 0 24 24" fill="none">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+            </svg>
+            <p className="text-sm text-[#94A3B8]">Loading evaluations...</p>
+          </div>
         )}
 
         {/* PENDING TAB */}
         {!loading && activeTab === "pending" && (
           <div className="space-y-3">
-            {pendingReceipts.length === 0 && (
+            {filteredPending.length === 0 && (
               <Card>
                 <div className="py-12 text-center">
                   <div className="w-12 h-12 rounded-full bg-[#F0FDF4] flex items-center justify-center mx-auto mb-3">
@@ -143,7 +163,7 @@ export default function MaterialEvaluation() {
                 </div>
               </Card>
             )}
-            {pendingReceipts.map(receipt => (
+            {filteredPending.map(receipt => (
               <Card key={receipt.id}>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-4">
@@ -156,7 +176,7 @@ export default function MaterialEvaluation() {
                         {statusBadge(receipt.status)}
                       </div>
                       <p className="text-xs text-[#94A3B8] mt-0.5">
-                        Supplier: {receipt.supplier?.name || "N/A"} ï¿½ Store: {receipt.store?.name || "N/A"} ï¿½ {new Date(receipt.createdAt).toLocaleDateString()}
+                        Supplier: {receipt.supplier?.name || "N/A"} · Store: {receipt.store?.name || "N/A"} · {new Date(receipt.createdAt).toLocaleDateString()}
                       </p>
                       {receipt.purchaseOrderNumber && (
                         <p className="text-xs text-[#64748B] mt-0.5">PO: {receipt.purchaseOrderNumber}</p>
@@ -167,7 +187,13 @@ export default function MaterialEvaluation() {
                     <Button variant="outline" size="sm" onClick={() => { setSelectedReceipt(receipt); setShowReceiptModal(true) }}>
                       View Details
                     </Button>
-                    <Button variant="primary" size="sm" onClick={() => handleStartEvaluation(receipt)} disabled={submitting}>
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      loading={submitting}
+                      onClick={() => handleStartEvaluation(receipt)}
+                      disabled={submitting}
+                    >
                       Start Evaluation
                     </Button>
                   </div>
@@ -193,10 +219,17 @@ export default function MaterialEvaluation() {
                       <p className="text-sm font-semibold text-[#1E293B]">{ev.goodsReceipt.receiptNumber}</p>
                       <Badge variant="primary">In Progress</Badge>
                     </div>
-                    <p className="text-xs text-[#94A3B8] mt-0.5">Started {new Date(ev.createdAt).toLocaleDateString()}</p>
+                    <p className="text-xs text-[#94A3B8] mt-0.5">
+                      Evaluator: {ev.evaluator.fullName} · Started {new Date(ev.createdAt).toLocaleDateString()}
+                    </p>
+                    <p className="text-xs text-[#64748B] mt-0.5">Physically inspect the items, then submit your decision below.</p>
                   </div>
                   <div className="flex items-center gap-2">
-                    <Button variant="primary" className="bg-[#DC2626] hover:bg-[#B91C1C] border-[#DC2626]" size="sm" onClick={() => { setSelectedEval(ev); setDecisionNotes(""); setShowDecisionModal(true) }}>
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      onClick={() => { setSelectedEval(ev); setDecisionNotes(""); setShowDecisionModal(true) }}
+                    >
                       Submit Decision
                     </Button>
                   </div>
@@ -217,7 +250,7 @@ export default function MaterialEvaluation() {
                 <div key={ev.id} className="flex items-center justify-between px-5 py-4 hover:bg-[#F8FAFC]">
                   <div>
                     <p className="text-sm font-semibold text-[#1E293B]">{ev.goodsReceipt.receiptNumber}</p>
-                    <p className="text-xs text-[#94A3B8]">Evaluated by {ev.evaluator.fullName} ï¿½ {new Date(ev.createdAt).toLocaleDateString()}</p>
+                    <p className="text-xs text-[#94A3B8]">Evaluated by {ev.evaluator.fullName} · {new Date(ev.createdAt).toLocaleDateString()}</p>
                     {ev.notes && <p className="text-xs text-[#64748B] mt-0.5 italic">"{ev.notes}"</p>}
                   </div>
                   <Badge variant={ev.decision === "APPROVED" ? "success" : "danger"}>{ev.decision}</Badge>
@@ -230,7 +263,7 @@ export default function MaterialEvaluation() {
 
       {/* RECEIPT DETAIL MODAL */}
       {showReceiptModal && selectedReceipt && (
-        <Modal open={showReceiptModal} title={`Receipt Details ï¿½ ${selectedReceipt.receiptNumber}`} onClose={() => setShowReceiptModal(false)}>
+        <Modal open={showReceiptModal} title={`Receipt Details — ${selectedReceipt.receiptNumber}`} onClose={() => setShowReceiptModal(false)}>
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-4 p-4 bg-[#F8FAFC] rounded-xl">
               <div>
@@ -285,7 +318,12 @@ export default function MaterialEvaluation() {
 
             <div className="flex justify-end gap-2 pt-2">
               <Button variant="secondary" onClick={() => setShowReceiptModal(false)}>Close</Button>
-              <Button variant="primary" disabled={submitting} onClick={() => { setShowReceiptModal(false); handleStartEvaluation(selectedReceipt) }}>
+              <Button
+                variant="primary"
+                loading={submitting}
+                disabled={submitting}
+                onClick={() => { setShowReceiptModal(false); handleStartEvaluation(selectedReceipt) }}
+              >
                 Start Evaluation
               </Button>
             </div>
@@ -295,7 +333,7 @@ export default function MaterialEvaluation() {
 
       {/* DECISION MODAL */}
       {showDecisionModal && selectedEval && (
-        <Modal open={showDecisionModal} title={`Submit Decision ï¿½ ${selectedEval.goodsReceipt.receiptNumber}`} onClose={() => setShowDecisionModal(false)}>
+        <Modal open={showDecisionModal} title={`Submit Decision — ${selectedEval.goodsReceipt.receiptNumber}`} onClose={() => setShowDecisionModal(false)}>
           <div className="space-y-5">
             <p className="text-sm text-[#64748B]">
               Record your technical inspection decision for this goods receipt. This action is final and will update the receipt status.
@@ -332,7 +370,7 @@ export default function MaterialEvaluation() {
             </div>
 
             <Input
-              label="Evaluation Notes"
+              label="Evaluation Notes *"
               placeholder="Describe your inspection findings, defects observed, or approval basis..."
               value={decisionNotes}
               onChange={e => setDecisionNotes(e.target.value)}

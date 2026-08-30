@@ -131,6 +131,17 @@ export async function listAssets(filters = {}) {
         custodian: { select: { id: true, fullName: true } },
         department: { select: { id: true, name: true, code: true } },
         location: { select: { id: true, name: true } },
+        item: { select: { id: true, name: true, code: true } },
+        grn: {
+          include: {
+            goodsReceipt: {
+              select: {
+                id: true,
+                receiptNumber: true,
+              },
+            },
+          },
+        },
       },
     }),
     prisma.fixedAsset.count({ where }),

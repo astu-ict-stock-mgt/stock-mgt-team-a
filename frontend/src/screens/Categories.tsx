@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Table, Button, Badge, Modal, Input, Select, SearchBar, SectionHeader, Icons, Tabs, Pagination, Card, Breadcrumb, useToast } from '../components/ui'
 import { useApp } from '../context/AppContext'
+import { hasPermission, PERMISSIONS } from '../lib/permissions'
 
 type View = 'list' | 'detail' | 'add'
 
@@ -14,8 +15,9 @@ const parseDescription = (desc: string | null) => {
 }
 
 export default function Categories() {
-  const { categories, addCategory, updateCategory, deleteCategory } = useApp()
+  const { categories, addCategory, updateCategory, deleteCategory, userRoles } = useApp()
   const { toast } = useToast()
+  const canManageCategories = hasPermission(userRoles, PERMISSIONS.CATEGORIES_MANAGE)
 
   const [view, setView] = useState<View>('list')
   const [selected, setSelected] = useState<typeof categories[0] | null>(null)
@@ -133,18 +135,25 @@ export default function Categories() {
             <Card>
               <h3 className="text-xs font-semibold text-[#94A3B8] uppercase tracking-wide mb-4">Quick Actions</h3>
               <div className="flex flex-col gap-2">
-                <Button variant="primary" className="w-full" icon={Icons.edit} onClick={() => {
-                  const { targetStore, text } = parseDescription(c.description)
-                  setEditForm({ name: c.name, code: c.code, description: text, targetStore })
-                  setShowEditModal(true)
-                }}>Edit Category</Button>
-                <Button variant="ghost" className="w-full text-[#DC2626] hover:bg-[#FEF2F2]" onClick={() => {
-                  if (confirm('Delete this category?')) {
-                    deleteCategory(c.id)
-                    toast.success('Category deleted')
-                    setView('list')
-                  }
-                }}>Delete</Button>
+                {canManageCategories && (
+                  <Button variant="primary" className="w-full" icon={Icons.edit} onClick={() => {
+                    const { targetStore, text } = parseDescription(c.description)
+                    setEditForm({ name: c.name, code: c.code, description: text, targetStore })
+                    setShowEditModal(true)
+                  }}>Edit Category</Button>
+                )}
+                {canManageCategories && (
+                  <Button variant="ghost" className="w-full text-[#DC2626] hover:bg-[#FEF2F2]" onClick={() => {
+                    if (confirm('Delete this category?')) {
+                      deleteCategory(c.id)
+                      toast.success('Category deleted')
+                      setView('list')
+                    }
+                  }}>Delete</Button>
+                )}
+                {!canManageCategories && (
+                  <p className="text-xs text-[#94A3B8] italic">No actions available (Read-only)</p>
+                )}
               </div>
             </Card>
             <Button variant="ghost" className="w-full" onClick={() => setView('list')}>← Back to list</Button>
@@ -181,7 +190,9 @@ export default function Categories() {
         subtitle="Organize items into categories for better tracking"
         actions={
           <div className="flex items-center gap-2">
-            <Button variant="primary" size="md" icon={Icons.plus} onClick={() => setShowModal(true)}>Add category</Button>
+            {canManageCategories && (
+              <Button variant="primary" size="md" icon={Icons.plus} onClick={() => setShowModal(true)}>Add category</Button>
+            )}
           </div>
         }
       />

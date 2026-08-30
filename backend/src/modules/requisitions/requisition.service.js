@@ -29,6 +29,12 @@ export async function generateRequisitionNumber() {
  * @returns {Promise<Object>} Created Requisition record
  */
 export async function createRequisition({ requesterId, departmentId, storeId, purpose, lines }) {
+  // Validate requester exists (prevents FK constraint crash from stale JWT)
+  const requesterUser = await prisma.user.findUnique({ where: { id: requesterId }, select: { id: true } })
+  if (!requesterUser) {
+    throw new ConflictError('Your session user no longer exists in the system. Please log out and log back in.')
+  }
+
   let finalDeptId = departmentId
   if (departmentId === '00000000-0000-0000-0000-000000000000' || !departmentId) {
     const firstDept = await prisma.department.findFirst({
@@ -164,6 +170,12 @@ export async function listRequisitions(filters = {}) {
  * @param {Object} params - { id, approverId, lineApprovals }
  */
 export async function approveDepartmentRequisition({ id, approverId, lineApprovals }) {
+  // Validate approver exists (prevents FK constraint crash from stale JWT)
+  const approverUser = await prisma.user.findUnique({ where: { id: approverId }, select: { id: true } })
+  if (!approverUser) {
+    throw new ConflictError('Your session user no longer exists in the system. Please log out and log back in.')
+  }
+
   const requisition = await getRequisitionById(id)
 
   if (requisition.status !== 'SUBMITTED') {
@@ -213,6 +225,12 @@ export async function approveDepartmentRequisition({ id, approverId, lineApprova
  * @param {Object} params - { id, paoUserId, lineApprovals }
  */
 export async function approvePAORequisition({ id, paoUserId, lineApprovals }) {
+  // Validate PAO user exists (prevents FK constraint crash from stale JWT)
+  const paoUser = await prisma.user.findUnique({ where: { id: paoUserId }, select: { id: true } })
+  if (!paoUser) {
+    throw new ConflictError('Your session user no longer exists in the system. Please log out and log back in.')
+  }
+
   const requisition = await getRequisitionById(id)
 
   if (requisition.status !== 'DEPARTMENT_APPROVED') {

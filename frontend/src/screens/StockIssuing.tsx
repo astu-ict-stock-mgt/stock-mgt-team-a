@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
-import { Button, Input, Select, SectionHeader, Card, Badge, Tabs, Modal, Textarea, useToast } from '../components/ui'
+import { Button, Input, Select, SectionHeader, Card, Badge, Tabs, Modal, Textarea, useToast, ToastContainer } from '../components/ui'
 import { useApp } from '../context/AppContext'
 import { requisitionsApi, sivApi, storesApi, itemsApi, departmentsApi, inventoryApi } from '../services/api'
 import { hasPermission, PERMISSIONS } from '../lib/permissions'
@@ -37,7 +37,7 @@ const statusLabels: Record<string, string> = {
 
 export default function StockIssuing() {
   const { currentUser, userRoles, refreshData, requisitions, setRequisitions } = useApp()
-  const { toast } = useToast()
+  const { toasts, toast, remove } = useToast()
 
   const canCreateRequisition = hasPermission(userRoles, PERMISSIONS.REQUISITIONS_CREATE)
   const canApproveRequisition = hasPermission(userRoles, PERMISSIONS.REQUISITIONS_APPROVE)
@@ -46,6 +46,12 @@ export default function StockIssuing() {
   const canFinalizeSiv = hasPermission(userRoles, PERMISSIONS.SIV_FINALIZE)
 
   const [activeTab, setActiveTab] = useState('requisitions')
+
+  // Reject modal state
+  const [showRejectModal, setShowRejectModal] = useState(false)
+  const [rejectTarget, setRejectTarget] = useState<{ id: string; level: 'DEPARTMENT' | 'PAO' } | null>(null)
+  const [rejectReason, setRejectReason] = useState('')
+  const [submittingReject, setSubmittingReject] = useState(false)
 
   const [allStores, setAllStores] = useState<Store[]>([])
   const [allItems, setAllItems] = useState<Item[]>([])
@@ -273,18 +279,30 @@ export default function StockIssuing() {
   }
 
   const handleRejectRequisition = async (id: string, level: 'DEPARTMENT' | 'PAO' = 'DEPARTMENT') => {
-    const reason = prompt(`Rejection reason (${level === 'DEPARTMENT' ? 'Department Level' : 'PAO Level'}):`)
-    if (!reason) return
-    setProcessingId(id)
+    setRejectTarget({ id, level })
+    setRejectReason('')
+    setShowRejectModal(true)
+  }
+
+  const confirmReject = async () => {
+    if (!rejectTarget) return
+    if (!rejectReason.trim() || rejectReason.trim().length < 3) {
+      toast.error('Please provide a rejection reason (at least 3 characters)')
+      return
+    }
+    setSubmittingReject(true)
     try {
-      await requisitionsApi.reject(id, reason, level)
-      toast.success(`Requisition rejected at ${level === 'DEPARTMENT' ? 'Department' : 'PAO'} level`)
+      await requisitionsApi.reject(rejectTarget.id, rejectReason.trim(), rejectTarget.level)
+      toast.success(`Requisition rejected at ${rejectTarget.level === 'DEPARTMENT' ? 'Department' : 'PAO'} level`)
+      setShowRejectModal(false)
+      setRejectTarget(null)
+      setRejectReason('')
       loadRequisitions()
       refreshData().catch(() => {})
     } catch (err: any) {
       toast.error(err.message || 'Failed to reject requisition')
     } finally {
-      setProcessingId(null)
+      setSubmittingReject(false)
     }
   }
 
@@ -375,6 +393,7 @@ export default function StockIssuing() {
 
   return (
     <div>
+      <ToastContainer toasts={toasts} onRemove={remove} />
       <SectionHeader title="Stock Issuing" subtitle="Manage requisitions and store issue vouchers (SIV)" />
 
       <div className="mb-6">
@@ -787,6 +806,31 @@ export default function StockIssuing() {
             )}
           </div>
         )}
+      </Modal>
+      {/* Reject Requisition Modal */}
+      <Modal open={showRejectModal} onClose={() => setShowRejectModal(false)} title="Reject Requisition">
+        <div className="space-y-4">
+          <p className="text-sm text-[#64748B]">
+            Provide a clear reason for rejecting this requisition. The requester will be notified.
+          </p>
+          <Textarea
+            label="Rejection Reason *"
+            placeholder="e.g. Budget exceeded, items not in approved list, duplicate request..."
+            value={rejectReason}
+            onChange={e => setRejectReason(e.target.value)}
+          />
+          <div className="flex justify-end gap-2 pt-1">
+            <Button variant="ghost" onClick={() => setShowRejectModal(false)}>Cancel</Button>
+            <Button
+              variant="destructive"
+              loading={submittingReject}
+              disabled={submittingReject || !rejectReason.trim()}
+              onClick={confirmReject}
+            >
+              Confirm Rejection
+            </Button>
+          </div>
+        </div>
       </Modal>
     </div>
   )

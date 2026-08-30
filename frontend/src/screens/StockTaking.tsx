@@ -1,7 +1,8 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { Button, Badge, SectionHeader, Card, Select, Icons, useToast } from '../components/ui'
 import { useApp } from '../context/AppContext'
 import { hasPermission, PERMISSIONS } from '../lib/permissions'
+import { inventoryApi } from '../services/api'
 
 interface CountEntry {
   itemId: string
@@ -23,15 +24,43 @@ export default function StockTaking() {
   const [phase, setPhase] = useState<'setup' | 'count' | 'variance'>('setup')
   const [storeId, setStoreId] = useState('')
   const [entries, setEntries] = useState<CountEntry[]>([])
+  const [localStockCards, setLocalStockCards] = useState<any[]>([])
+  const [loadingCards, setLoadingCards] = useState(false)
+
+  useEffect(() => {
+    if (!storeId) {
+      setLocalStockCards([])
+      return
+    }
+    let active = true
+    const fetchCards = async () => {
+      setLoadingCards(true)
+      try {
+        const res = await inventoryApi.getStockByStore(storeId)
+        if (active) {
+          setLocalStockCards(res.data || [])
+        }
+      } catch {
+        if (active) {
+          setLocalStockCards([])
+          toast.error('Failed to load stock cards for the selected store')
+        }
+      } finally {
+        if (active) setLoadingCards(false)
+      }
+    }
+    fetchCards()
+    return () => { active = false }
+  }, [storeId])
 
   const storeItems = useMemo(() => {
     if (!storeId) return []
-    return stockCards.filter(sc => sc.storeId === storeId).map(sc => {
+    return localStockCards.map(sc => {
       const item = inventoryItems.find(i => i.id === sc.itemId)
       const unit = item ? units.find(u => u.id === item.unitId) : null
       return { ...sc, item, unit }
     }).filter(si => si.item)
-  }, [storeId, stockCards, inventoryItems, units])
+  }, [storeId, localStockCards, inventoryItems, units])
 
   const countedItems = entries.filter(e => e.counted).length
   const totalItems = entries.length
@@ -210,10 +239,14 @@ export default function StockTaking() {
                 value={storeId} onChange={e => setStoreId(e.target.value)} />
               <div className="p-4 bg-[#F8FAFC] rounded-xl">
                 <p className="text-sm font-medium text-[#334155] mb-2">Count summary</p>
-                <div className="grid grid-cols-2 gap-3">
-                  <div><p className="text-xs text-[#94A3B8]">Items to count</p><p className="text-lg font-bold font-mono text-[#0F172A]">{storeItems.length}</p></div>
-                  <div><p className="text-xs text-[#94A3B8]">System total value</p><p className="text-lg font-bold font-mono text-[#0F172A]">${storeItems.reduce((s, si) => s + si.quantity * (Number(si.averageCost) || 0), 0).toFixed(2)}</p></div>
-                </div>
+                {loadingCards ? (
+                  <p className="text-xs text-[#94A3B8] py-2">Loading store items...</p>
+                ) : (
+                  <div className="grid grid-cols-2 gap-3">
+                    <div><p className="text-xs text-[#94A3B8]">Items to count</p><p className="text-lg font-bold font-mono text-[#0F172A]">{storeItems.length}</p></div>
+                    <div><p className="text-xs text-[#94A3B8]">System total value</p><p className="text-lg font-bold font-mono text-[#0F172A]">${storeItems.reduce((s, si) => s + si.quantity * (Number(si.averageCost) || 0), 0).toFixed(2)}</p></div>
+                  </div>
+                )}
               </div>
               <div className="p-3 bg-[#FFFBEB] border border-[#FDE68A] rounded-lg text-xs text-[#92400E]">
                 Freeze stock movements before starting the count to ensure accuracy.

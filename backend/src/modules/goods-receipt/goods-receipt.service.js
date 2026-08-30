@@ -153,6 +153,18 @@ class GoodsReceiptService {
       include: {
         supplier: { select: { id: true, code: true, name: true } },
         store: { select: { id: true, code: true, name: true } },
+        lines: {
+          include: {
+            item: { select: { id: true, code: true, name: true } },
+            unit: { select: { id: true, code: true, name: true, symbol: true } },
+          },
+        },
+        evaluations: {
+          include: {
+            evaluator: { select: { id: true, fullName: true } },
+          },
+        },
+        grn: { select: { id: true, grnNumber: true } },
         _count: { select: { lines: true } },
       },
       orderBy: { receivedDate: 'desc' },

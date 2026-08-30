@@ -391,7 +391,7 @@ export const evaluationsApi = {
 export const assetsApi = {
   getAll: (params?: any) => api.get<ApiResponse<any[]>>('/assets'),
   getById: (id: string) => api.get<ApiResponse<any>>(`/assets/${id}`),
-  register: (data: { name: string; itemId?: string; serialNumber?: string; assetTag?: string; category?: string; purchaseCost?: number; location?: string }) =>
+  register: (data: { name: string; itemId?: string; serialNumber?: string; assetTag?: string; category?: string; purchaseCost?: number; location?: string; grnId?: string; notes?: string }) =>
     api.post<ApiResponse<any>>('/assets', data),
 }
 

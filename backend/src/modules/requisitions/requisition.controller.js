@@ -21,7 +21,10 @@ import { ForbiddenError } from '../../utils/errors.js'
  */
 export const create = async (req, res, next) => {
   try {
-    const requesterId = req.user?.userId || req.user?.id || 'usr-uuid-requester'
+    const requesterId = req.user?.userId || req.user?.id
+    if (!requesterId) {
+      throw new ForbiddenError('Session expired or invalid. Please log out and log back in.')
+    }
     const requisition = await createRequisition({
       ...req.body,
       requesterId,
@@ -71,7 +74,10 @@ export const approveDepartment = async (req, res, next) => {
     if (roles.length > 0 && !roles.includes('DEPARTMENT_HEAD') && !roles.includes('ADMIN')) {
       throw new ForbiddenError('Only Department Head or Administrator can approve requisitions at department level')
     }
-    const approverId = req.user?.userId || req.user?.id || 'usr-dept-head'
+    const approverId = req.user?.userId || req.user?.id
+    if (!approverId) {
+      throw new ForbiddenError('Session expired or invalid. Please log out and log back in.')
+    }
     const result = await approveDepartmentRequisition({
       id: req.params.id,
       approverId,
@@ -94,7 +100,10 @@ export const approvePAO = async (req, res, next) => {
     if (roles.length > 0 && !roles.includes('PAO') && !roles.includes('ADMIN')) {
       throw new ForbiddenError('Only Property Administration Officer (PAO) or Administrator can approve requisitions at administrative level')
     }
-    const paoUserId = req.user?.userId || req.user?.id || 'usr-pao-officer'
+    const paoUserId = req.user?.userId || req.user?.id
+    if (!paoUserId) {
+      throw new ForbiddenError('Session expired or invalid. Please log out and log back in.')
+    }
     const result = await approvePAORequisition({
       id: req.params.id,
       paoUserId,
@@ -121,7 +130,10 @@ export const reject = async (req, res, next) => {
     if (level === 'DEPARTMENT' && roles.length > 0 && !roles.includes('DEPARTMENT_HEAD') && !roles.includes('ADMIN')) {
       throw new ForbiddenError('Only Department Head or Administrator can reject requisitions at Department level')
     }
-    const rejectedByUserId = req.user?.userId || req.user?.id || 'usr-approver'
+    const rejectedByUserId = req.user?.userId || req.user?.id
+    if (!rejectedByUserId) {
+      throw new ForbiddenError('Session expired or invalid. Please log out and log back in.')
+    }
     const result = await rejectRequisition({
       id: req.params.id,
       rejectedByUserId,

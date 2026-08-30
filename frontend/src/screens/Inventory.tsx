@@ -2,13 +2,19 @@ import { useState, useMemo } from 'react'
 import { Table, Button, Badge, Modal, Input, Select, SearchBar, SectionHeader, Icons, Tabs, Pagination, Card, Breadcrumb, useToast } from '../components/ui'
 import { useApp } from '../context/AppContext'
 import { inventoryApi } from '../services/api'
+import { hasPermission, PERMISSIONS } from '../lib/permissions'
 
 type StateMode = 'default' | 'empty' | 'loading'
 type View = 'list' | 'detail' | 'add'
 
 export default function Inventory() {
-  const { inventoryItems, stockCards, categories, units, stores, suppliers, stockMovements, addInventoryItem, updateInventoryItem, refreshData } = useApp()
+  const { inventoryItems, stockCards, categories, units, stores, suppliers, stockMovements, addInventoryItem, updateInventoryItem, refreshData, userRoles } = useApp()
   const { toast } = useToast()
+  const canManageItems = hasPermission(userRoles, PERMISSIONS.ITEMS_MANAGE)
+  const canReceive = hasPermission(userRoles, PERMISSIONS.RECEIPTS_CREATE) || hasPermission(userRoles, PERMISSIONS.GOODS_RECEIPT_CREATE)
+  const canIssue = hasPermission(userRoles, PERMISSIONS.REQUISITIONS_CREATE)
+  const canTransfer = hasPermission(userRoles, PERMISSIONS.TRANSFERS_CREATE)
+  const canRelocate = hasPermission(userRoles, PERMISSIONS.BINS_TRANSFER)
 
   const [view, setView] = useState<View>('list')
   const [stateMode, setStateMode] = useState<StateMode>('default')
@@ -177,15 +183,17 @@ export default function Inventory() {
                 </div>
                 <div className="flex items-center gap-2">
                   {statusBadge(s.status)}
-                  <Button variant="secondary" size="sm" icon={Icons.edit} onClick={() => {
-                    setEditForm({
-                      name: s.name, code: s.code, categoryId: s.categoryId,
-                      unitId: s.unitId || '', supplierId: s.supplierId || '',
-                      minimumStock: String(s.minimumStock || ''), maximumStock: String(s.maximumStock || ''),
-                      unitCost: String(s.unitCost || ''),
-                    })
-                    setShowEditModal(true)
-                  }}>Edit</Button>
+                  {canManageItems && (
+                    <Button variant="secondary" size="sm" icon={Icons.edit} onClick={() => {
+                      setEditForm({
+                        name: s.name, code: s.code, categoryId: s.categoryId,
+                        unitId: s.unitId || '', supplierId: s.supplierId || '',
+                        minimumStock: String(s.minimumStock || ''), maximumStock: String(s.maximumStock || ''),
+                        unitCost: String(s.unitCost || ''),
+                      })
+                      setShowEditModal(true)
+                    }}>Edit</Button>
+                  )}
                 </div>
               </div>
               <div className="grid grid-cols-3 gap-5">
@@ -214,18 +222,18 @@ export default function Inventory() {
                   <h3 className="text-sm font-semibold text-[#0F172A]">Warehouse Balances & Storage Bins</h3>
                   <p className="text-xs text-[#94A3B8] mt-0.5">Physical quantities on hand and available safety stock per store</p>
                 </div>
-                {itemStock.some(sc => sc.quantity > 0) && (
-                  <Button variant="primary" size="sm" onClick={() => {
-                    const firstStock = itemStock.find(sc => sc.quantity > 0);
-                    setRelocateForm({
-                      sourceStoreId: firstStock?.storeId || '',
-                      destStoreId: '',
-                      quantity: '',
-                      notes: ''
-                    });
-                    setShowRelocateModal(true);
-                  }}>Relocate Stock</Button>
-                )}
+                 {canRelocate && itemStock.some(sc => sc.quantity > 0) && (
+                   <Button variant="primary" size="sm" onClick={() => {
+                     const firstStock = itemStock.find(sc => sc.quantity > 0);
+                     setRelocateForm({
+                       sourceStoreId: firstStock?.storeId || '',
+                       destStoreId: '',
+                       quantity: '',
+                       notes: ''
+                     });
+                     setShowRelocateModal(true);
+                   }}>Relocate Stock</Button>
+                 )}
               </div>
               <div className="divide-y divide-[#F8FAFC]">
                 {itemStock.length === 0 ? (
@@ -306,11 +314,13 @@ export default function Inventory() {
               </div>
             </Card>
 
-            <div className="flex flex-col gap-2">
-              <Button variant="primary" className="w-full" icon={Icons.receive}>Receive stock</Button>
-              <Button variant="secondary" className="w-full" icon={Icons.issue}>Issue stock</Button>
-              <Button variant="secondary" className="w-full" icon={Icons.transfer}>Transfer</Button>
-            </div>
+            {(canReceive || canIssue || canTransfer) && (
+              <div className="flex flex-col gap-2">
+                {canReceive && <Button variant="primary" className="w-full" icon={Icons.receive}>Receive stock</Button>}
+                {canIssue && <Button variant="secondary" className="w-full" icon={Icons.issue}>Issue stock</Button>}
+                {canTransfer && <Button variant="secondary" className="w-full" icon={Icons.transfer}>Transfer</Button>}
+              </div>
+            )}
             <Button variant="ghost" className="w-full" onClick={() => setView('list')}>← Back to list</Button>
           </div>
         </div>
@@ -412,10 +422,12 @@ export default function Inventory() {
         subtitle="Track all stock items, quantities, and valuations"
         actions={
           <div className="flex items-center gap-2">
-            <Select options={[{ value: 'default', label: 'Default' }, { value: 'empty', label: 'Empty' }, { value: 'loading', label: 'Loading' }]}
-              value={stateMode} onChange={e => setStateMode(e.target.value as StateMode)} className="w-32 h-8 text-xs" />
-            <Button variant="secondary" size="sm" icon={Icons.download}>Export</Button>
-            <Button variant="primary" size="md" icon={Icons.plus} onClick={() => setShowModal(true)}>Add item</Button>
+            {canManageItems && (
+              <Button variant="secondary" size="sm" icon={Icons.download}>Export</Button>
+            )}
+            {canManageItems && (
+              <Button variant="primary" size="md" icon={Icons.plus} onClick={() => setShowModal(true)}>Add item</Button>
+            )}
           </div>
         }
       />
