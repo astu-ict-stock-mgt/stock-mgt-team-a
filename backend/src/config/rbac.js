@@ -4,7 +4,7 @@
  * SRS Traceability: Appendix C (Permission Matrix), FR-02, BR-20, Clarification C-01
  * Note on security levels: security levels range from 30 (REQUESTER) to 100 (ADMIN).
  * Middleware validates if the user's role satisfies the required level before authorization.
- * Trigger reload: 2026-08-28 16:39.
+ * Trigger reload: 2026-08-30 16:00.
  */
 
 // ============================================================================
