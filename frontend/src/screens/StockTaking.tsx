@@ -28,6 +28,12 @@ export default function StockTaking() {
   const [loadingCards, setLoadingCards] = useState(false)
 
   useEffect(() => {
+    if (stores.length > 0 && !storeId) {
+      setStoreId(stores[0].id)
+    }
+  }, [stores, storeId])
+
+  useEffect(() => {
     if (!storeId) {
       setLocalStockCards([])
       return

@@ -32,6 +32,16 @@ export default function StockTransfer() {
   const [loadingCards, setLoadingCards] = useState(false)
 
   useEffect(() => {
+    if (stores.length > 0 && !sourceStoreId) {
+      setSourceStoreId(stores[0].id)
+      const nextStore = stores.find(s => s.id !== stores[0].id)
+      if (nextStore) {
+        setDestinationStoreId(nextStore.id)
+      }
+    }
+  }, [stores, sourceStoreId])
+
+  useEffect(() => {
     if (!sourceStoreId) {
       setLocalStockCards([])
       return
