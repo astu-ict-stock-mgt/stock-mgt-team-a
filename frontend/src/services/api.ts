@@ -157,6 +157,11 @@ export const departmentsApi = {
     return api.get<ApiResponse<Array<{ id: string; name: string; code: string; status?: string }>>>(`/departments?${q.toString()}`)
   },
   getById: (id: string) => api.get<ApiResponse<{ id: string; name: string; code: string }>>(`/departments/${id}`),
+  create: (data: { name: string; code: string; description?: string; status?: string }) =>
+    api.post<ApiResponse<{ id: string; name: string; code: string }>>('/departments', data),
+  update: (id: string, data: Partial<{ name: string; code: string; status: string }>) => 
+    api.put<ApiResponse<{ id: string; name: string; code: string }>>(`/departments/${id}`, data),
+  delete: (id: string) => api.delete<ApiResponse<{ message: string }>>(`/departments/${id}`),
 }
 
 export const categoriesApi = {
@@ -364,14 +369,6 @@ export const notificationsApi = {
   delete: (id: string) => api.delete<ApiResponse<Notification>>(`/notifications/${id}`),
 }
 
-export const reportsApi = {
-  getInventoryValuation: (params?: { storeId?: string; categoryId?: string }) => {
-    const q = new URLSearchParams()
-    if (params?.storeId) q.set('storeId', params.storeId)
-    if (params?.categoryId) q.set('categoryId', params.categoryId)
-    return api.get<ApiResponse<unknown>>(`/inventory/valuation?${q.toString()}`)
-  },
-}
 
 export const evaluationsApi = {
   getAll: (params?: { status?: string }) => {
@@ -440,5 +437,30 @@ export const returnsApi = {
     api.post<ApiResponse<any>>(`/returns/${id}/post`),
 }
 
-
-
+export const reportsApi = {
+  getStockLevels: (params?: { storeId?: string; itemId?: string; page?: number; limit?: number }) => {
+    const q = new URLSearchParams()
+    if (params?.storeId) q.set('storeId', params.storeId)
+    if (params?.itemId) q.set('itemId', params.itemId)
+    if (params?.page) q.set('page', String(params.page))
+    if (params?.limit) q.set('limit', String(params.limit))
+    return api.get<ApiResponse<any>>(`/reports/stock-levels?${q.toString()}`)
+  },
+  getStockMovement: (params?: { storeId?: string; itemId?: string; transactionType?: string; dateFrom?: string; dateTo?: string; page?: number; limit?: number }) => {
+    const q = new URLSearchParams()
+    if (params?.storeId) q.set('storeId', params.storeId)
+    if (params?.itemId) q.set('itemId', params.itemId)
+    if (params?.transactionType) q.set('transactionType', params.transactionType)
+    if (params?.dateFrom) q.set('dateFrom', params.dateFrom)
+    if (params?.dateTo) q.set('dateTo', params.dateTo)
+    if (params?.page) q.set('page', String(params.page))
+    if (params?.limit) q.set('limit', String(params.limit))
+    return api.get<ApiResponse<any>>(`/reports/stock-movement?${q.toString()}`)
+  },
+  getInventoryValuation: (params?: { storeId?: string; itemId?: string }) => {
+    const q = new URLSearchParams()
+    if (params?.storeId) q.set('storeId', params.storeId)
+    if (params?.itemId) q.set('itemId', params.itemId)
+    return api.get<ApiResponse<any>>(`/reports/valuation?${q.toString()}`)
+  },
+}

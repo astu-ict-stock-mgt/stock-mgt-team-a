@@ -91,6 +91,7 @@ export default function Settings() {
     ]
     if (isAdmin) {
       list.push({ id: 'organization', label: 'Organization' })
+      list.push({ id: 'departments', label: 'Departments' })
     }
     if (canManageWarehouses) {
       list.push({ id: 'warehouses', label: 'Warehouses' })
@@ -224,6 +225,60 @@ export default function Settings() {
       refreshData().catch(() => {}) // keep global context synced!
     } catch (err: any) {
       toast.error(err.message || 'Failed to save warehouse')
+    }
+  }
+
+  // Department State
+  const [departments, setDepartments] = useState<Array<{ id: string; name: string; code: string; status?: string }>>([])
+  const [showDeptModal, setShowDeptModal] = useState(false)
+  const [editingDept, setEditingDept] = useState<{ id: string; name: string; code: string; status?: string } | null>(null)
+  const [deptForm, setDeptForm] = useState({ name: '', code: '', status: 'ACTIVE' })
+
+  const loadDepartments = useCallback(async () => {
+    if (!isAdmin) return
+    try {
+      const { departmentsApi } = await import('../services/api')
+      const res = await departmentsApi.getAll()
+      setDepartments(res.data || [])
+    } catch { /* ignore */ }
+  }, [isAdmin])
+
+  useEffect(() => {
+    if (activeTab === 'departments') {
+      loadDepartments()
+    }
+  }, [activeTab, loadDepartments])
+
+  const openAddDept = () => {
+    setEditingDept(null)
+    setDeptForm({ name: '', code: '', status: 'ACTIVE' })
+    setShowDeptModal(true)
+  }
+
+  const openEditDept = (d: any) => {
+    setEditingDept(d)
+    setDeptForm({ name: d.name, code: d.code, status: d.status || 'ACTIVE' })
+    setShowDeptModal(true)
+  }
+
+  const handleSaveDept = async () => {
+    if (!deptForm.name || !deptForm.code) {
+      toast.error('Name and Code are required')
+      return
+    }
+    try {
+      const { departmentsApi } = await import('../services/api')
+      if (editingDept) {
+        await departmentsApi.update(editingDept.id, deptForm)
+        toast.success(`Department "${deptForm.name}" updated successfully`)
+      } else {
+        await departmentsApi.create(deptForm)
+        toast.success(`Department "${deptForm.name}" created successfully`)
+      }
+      setShowDeptModal(false)
+      loadDepartments()
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to save department')
     }
   }
 
@@ -408,47 +463,47 @@ export default function Settings() {
             </div>
           )}
 
-          {/* REAL DATABASE WAREHOUSES TAB (Stores Managers Only) */}
-          {activeTab === 'warehouses' && canManageWarehouses && (
-            <Card padding={false}>
-              <div className="p-5 border-b border-[#E2E8F0] flex items-center justify-between">
+          {activeTab === 'warehouses' && (
+          <div className="col-span-3 space-y-6">
+            <Card>
+              <div className="flex justify-between items-center mb-6">
                 <div>
-                  <h4 className="text-sm font-semibold text-[#334155]">Active Stores / Warehouses</h4>
-                  <p className="text-xs text-[#94A3B8] mt-0.5">Manage warehouses in the system database. These stores will appear in new requisitions.</p>
+                  <h3 className="text-lg font-semibold text-[#0F172A]">Warehouses & Stores</h3>
+                  <p className="text-sm text-[#64748B]">Manage physical locations where stock is kept</p>
                 </div>
-                <Button variant="primary" size="sm" onClick={openAddWarehouse}>+ Add warehouse</Button>
+                <Button variant="primary" onClick={openAddWarehouse}>+ Add Warehouse</Button>
               </div>
 
               {loadingWarehouses ? (
-                <div className="py-12 text-center text-sm text-[#94A3B8]">Loading warehouses...</div>
+                <div className="py-8 text-center text-[#64748B]">Loading warehouses...</div>
+              ) : warehouses.length === 0 ? (
+                <div className="py-8 text-center text-[#64748B] bg-[#F8FAFC] rounded-lg border border-dashed border-[#CBD5E1]">
+                  No warehouses configured yet
+                </div>
               ) : (
-                <div className="divide-y divide-[#F8FAFC]">
-                  {warehouses.map((w) => (
-                    <div key={w.id} className="flex items-center justify-between px-5 py-4 hover:bg-[#F8FAFC] transition-colors">
-                      <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-xl bg-[#EEF2FF] text-[#4F46E5] flex items-center justify-center shrink-0">
-                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" /><polyline points="9 22 9 12 15 12 15 22" /></svg>
+                <div className="space-y-4">
+                  {warehouses.map(w => (
+                    <div key={w.id} className="flex items-center justify-between p-4 bg-white border border-[#E2E8F0] rounded-xl hover:border-[#CBD5E1] transition-colors">
+                      <div className="flex gap-4">
+                        <div className="w-10 h-10 rounded-lg bg-[#F1F5F9] flex items-center justify-center text-lg shrink-0">
+                          🏢
                         </div>
                         <div>
                           <div className="flex items-center gap-2">
-                            <p className="text-sm font-semibold text-[#1E293B]">{w.name}</p>
-                            <Badge variant="default">{w.code}</Badge>
+                            <h4 className="font-semibold text-[#0F172A]">{w.name}</h4>
+                            <span className="text-xs font-mono text-[#64748B] bg-[#F1F5F9] px-1.5 py-0.5 rounded">{w.code}</span>
+                            <Badge variant={w.status === 'ACTIVE' ? 'success' : 'default'} dot>{w.status || 'ACTIVE'}</Badge>
                           </div>
-                          <p className="text-xs text-[#94A3B8] mt-0.5">{w.address || 'No physical address listed'} · Type: {w.type === 'MAIN_STORE' ? 'Central Main Store' : 'Sub-Store'}</p>
+                          <p className="text-sm text-[#64748B] mt-0.5">{w.type.replace(/_/g, ' ')} • {w.address || 'No address'}</p>
                         </div>
                       </div>
-                      <div className="flex items-center gap-3">
-                        <Badge variant={w.status === 'ACTIVE' ? 'success' : 'danger'} dot>{w.status}</Badge>
-                        <Button variant="outline" size="sm" onClick={() => openEditWarehouse(w)}>Edit</Button>
-                      </div>
+                      <Button variant="ghost" size="sm" onClick={() => openEditWarehouse(w)}>Edit</Button>
                     </div>
                   ))}
-                  {warehouses.length === 0 && (
-                    <div className="py-12 text-center text-sm text-[#94A3B8]">No warehouses defined in database. Click Add Warehouse to create one.</div>
-                  )}
                 </div>
               )}
             </Card>
+          </div>
           )}
 
           {/* INTEGRATIONS TAB */}
@@ -543,6 +598,19 @@ export default function Settings() {
           <div className="flex justify-end gap-2 pt-2">
             <Button variant="secondary" onClick={() => setShowWarehouseModal(false)}>Cancel</Button>
             <Button variant="primary" onClick={handleSaveWarehouse}>{editingWarehouse ? 'Save Changes' : 'Create Warehouse'}</Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Department Modal */}
+      <Modal open={showDeptModal} onClose={() => setShowDeptModal(false)} title={editingDept ? 'Edit Department' : 'Add Department'}>
+        <div className="space-y-4">
+          <Input label="Department Name *" value={deptForm.name} onChange={e => setDeptForm(f => ({ ...f, name: e.target.value }))} placeholder="e.g. IT Department" />
+          <Input label="Department Code *" value={deptForm.code} onChange={e => setDeptForm(f => ({ ...f, code: e.target.value.toUpperCase() }))} placeholder="e.g. IT-01" />
+          <Select label="Status" value={deptForm.status} onChange={e => setDeptForm(f => ({ ...f, status: e.target.value }))} options={[ { value: 'ACTIVE', label: 'Active' }, { value: 'INACTIVE', label: 'Inactive' } ]} />
+          <div className="flex justify-end gap-3 mt-6 pt-6 border-t border-[#E2E8F0]">
+            <Button variant="ghost" onClick={() => setShowDeptModal(false)}>Cancel</Button>
+            <Button variant="primary" onClick={handleSaveDept}>Save Department</Button>
           </div>
         </div>
       </Modal>

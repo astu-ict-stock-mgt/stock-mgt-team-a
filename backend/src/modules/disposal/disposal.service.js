@@ -60,6 +60,9 @@ export async function createDisposalRequest({
         throw new ValidationError(`Item with ID '${line.itemId}' not found`)
       }
       let stockCard = null
+      let unitCost = item.unitCost ? Number(item.unitCost) : 0
+      let totalCost = unitCost * line.quantity
+
       if (storeId) {
         stockCard = await prisma.stockCard.findUnique({
           where: {
@@ -69,9 +72,33 @@ export async function createDisposalRequest({
             }
           }
         })
+        
+        if (stockCard) {
+          const batches = await prisma.stockBatch.findMany({
+            where: { stockCardId: stockCard.id, remainingQty: { gt: 0 } },
+            orderBy: { receivedAt: 'asc' }
+          })
+          
+          let remainingToEstimate = line.quantity
+          let calculatedTotalCost = 0
+          
+          for (const batch of batches) {
+            if (remainingToEstimate <= 0) break
+            const takeQty = Math.min(batch.remainingQty, remainingToEstimate)
+            calculatedTotalCost += takeQty * Number(batch.unitCost)
+            remainingToEstimate -= takeQty
+          }
+          
+          if (remainingToEstimate > 0 && batches.length > 0) {
+            calculatedTotalCost += remainingToEstimate * Number(batches[batches.length - 1].unitCost)
+          } else if (remainingToEstimate > 0 && batches.length === 0) {
+            calculatedTotalCost += remainingToEstimate * unitCost
+          }
+          
+          totalCost = calculatedTotalCost
+          unitCost = totalCost / line.quantity
+        }
       }
-      const unitCost = stockCard?.averageCost ? Number(stockCard.averageCost) : (item.unitCost ? Number(item.unitCost) : 0)
-      const totalCost = unitCost * line.quantity
       populatedLines.push({
         itemId: line.itemId,
         quantity: line.quantity,
@@ -330,6 +357,29 @@ export async function executeDisposal({
         )
       }
 
+      let remainingToDeduct = line.quantity
+      const batches = await tx.stockBatch.findMany({
+        where: { stockCardId: stockCard.id, remainingQty: { gt: 0 } },
+        orderBy: { receivedAt: 'asc' }
+      })
+
+      let calculatedTotalCost = 0
+
+      for (const batch of batches) {
+        if (remainingToDeduct <= 0) break
+        const deductQty = Math.min(batch.remainingQty, remainingToDeduct)
+        
+        await tx.stockBatch.update({
+          where: { id: batch.id },
+          data: { remainingQty: { decrement: deductQty } }
+        })
+        
+        calculatedTotalCost += deductQty * Number(batch.unitCost)
+        remainingToDeduct -= deductQty
+      }
+
+      const calculatedUnitCost = calculatedTotalCost / line.quantity
+
       await tx.stockCard.update({
         where: { id: stockCard.id },
         data: {
@@ -388,7 +438,11 @@ export async function executeDisposal({
 
       await tx.disposalRequestLine.update({
         where: { id: line.id },
-        data: { status: 'EXECUTED' },
+        data: { 
+          status: 'EXECUTED',
+          totalCost: typeof calculatedTotalCost !== 'undefined' ? calculatedTotalCost : undefined,
+          unitCost: typeof calculatedUnitCost !== 'undefined' ? calculatedUnitCost : undefined
+        },
       })
     }
 

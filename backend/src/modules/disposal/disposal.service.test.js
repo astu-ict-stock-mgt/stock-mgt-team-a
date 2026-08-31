@@ -41,6 +41,10 @@ vi.mock('../../config/database.js', () => {
         findUnique: vi.fn(),
         update: vi.fn(),
       },
+      stockBatch: {
+        findMany: vi.fn(),
+        update: vi.fn(),
+      },
       stockCardTransaction: {
         create: vi.fn(),
         findMany: vi.fn(),
@@ -297,6 +301,10 @@ describe('Disposal Execution Service (BE-139)', () => {
         availableQty: 20,
       })
 
+      prisma.stockBatch.findMany.mockResolvedValue([
+        { id: 'batch-1', remainingQty: 10, unitCost: '50' }
+      ])
+
       prisma.binCard.findUnique.mockResolvedValue({
         id: 'bin-1',
         itemId: 'item-1',
@@ -340,9 +348,12 @@ describe('Disposal Execution Service (BE-139)', () => {
         }),
       })
 
+      expect(prisma.stockBatch.findMany).toHaveBeenCalled()
+      expect(prisma.stockBatch.update).toHaveBeenCalled()
+
       expect(prisma.disposalRequestLine.update).toHaveBeenCalledWith({
         where: { id: 'line-1' },
-        data: { status: 'EXECUTED' },
+        data: expect.objectContaining({ status: 'EXECUTED' }),
       })
     })
   })

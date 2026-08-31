@@ -787,6 +787,7 @@ model StockCard {
   item         Item                   @relation(fields: [itemId], references: [id], onDelete: Restrict)
   store        Store                  @relation(fields: [storeId], references: [id], onDelete: Restrict)
   transactions StockCardTransaction[]
+  batches      StockBatch[]
 
   @@unique([itemId, storeId], name: "uq_stock_card_item_store")
   @@index([itemId])
@@ -835,6 +836,34 @@ model StockCardTransaction {
   @@index([createdAt])
   @@map("stock_card_transactions")
 }
+
+// ────────────────────────────────────────────────────────────────
+// Stock Batch Model (FIFO Valuation)
+//
+// Design notes:
+// - Tracks individual batches of received stock for true FIFO valuation.
+// - Records the unit cost and remaining unissued quantity.
+// ────────────────────────────────────────────────────────────────
+model StockBatch {
+  id              String    @id @default(uuid())
+  stockCardId     String    @map("stock_card_id")
+  receiptLineId   String?   @map("receipt_line_id")
+  originalQty     Int       @map("original_qty")
+  remainingQty    Int       @map("remaining_qty")
+  unitCost        Decimal   @map("unit_cost")
+  receivedAt      DateTime  @default(now()) @map("received_at")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  // Relationships
+  stockCard       StockCard @relation(fields: [stockCardId], references: [id], onDelete: Restrict)
+
+  @@index([stockCardId])
+  @@index([remainingQty])
+  @@index([receivedAt])
+  @@map("stock_batches")
+}
+
 
 // ────────────────────────────────────────────────────────────────
 // Bin Card Model (BE-083)

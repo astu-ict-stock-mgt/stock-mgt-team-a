@@ -164,9 +164,9 @@ export default function Users() {
         <div className="overflow-x-auto">
           <table className="w-full text-sm border-collapse">
             <thead>
-              <tr className="border-b border-[#E2E8F0]">
+              <tr className="border-b border-[#E2E8F0] bg-[#F8FAFC]/50">
                 {['User', 'Email', 'Roles', 'Status', 'Actions'].map(h => (
-                  <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-[#64748B] uppercase tracking-wide">{h}</th>
+                  <th key={h} className="px-5 py-3.5 text-left text-xs font-bold text-[#475569] uppercase tracking-wider">{h}</th>
                 ))}
               </tr>
             </thead>
@@ -175,28 +175,28 @@ export default function Users() {
                 <tr><td colSpan={5} className="px-4 py-16 text-center text-sm text-[#94A3B8]">No users found.</td></tr>
               ) : (
                 filteredUsers.map(u => (
-                  <tr key={u.id} className="border-b border-[#F8FAFC] hover:bg-[#F8FAFC]">
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-full bg-[#EEF2FF] text-[#4F46E5] text-xs font-semibold flex items-center justify-center">
+                  <tr key={u.id} className="border-b border-[#F1F5F9] hover:bg-[#F8FAFC]/80 transition-colors">
+                    <td className="px-5 py-4">
+                      <div className="flex items-center gap-4">
+                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-50 to-indigo-100/50 text-[#4F46E5] text-xs font-bold flex items-center justify-center border border-indigo-100/50">
                           {u.fullName.split(' ').map(n => n[0]).join('').slice(0, 2)}
                         </div>
-                        <span className="text-sm font-medium text-[#1E293B]">{u.fullName}</span>
+                        <span className="text-sm font-semibold text-[#1E293B]">{u.fullName}</span>
                       </div>
                     </td>
-                    <td className="px-4 py-3 text-xs text-[#64748B]">{u.email}</td>
-                    <td className="px-4 py-3">
-                      <div className="flex flex-wrap gap-1">
+                    <td className="px-5 py-4 text-xs font-medium text-[#64748B]">{u.email}</td>
+                    <td className="px-5 py-4">
+                      <div className="flex flex-wrap gap-1.5">
                         {u.roles?.length ? u.roles.map(r => (
                           <Badge key={r.id} variant="default">{r.name}</Badge>
-                        )) : <span className="text-xs text-[#94A3B8]">No role</span>}
+                        )) : <span className="text-xs text-[#94A3B8] italic">No role assigned</span>}
                       </div>
                     </td>
-                    <td className="px-4 py-3"><Badge variant={u.status === 'ACTIVE' ? 'success' : 'danger'} dot>{u.status === 'ACTIVE' ? 'Active' : 'Inactive'}</Badge></td>
-                    <td className="px-4 py-3">
-                      <div className="flex gap-1">
+                    <td className="px-5 py-4"><Badge variant={u.status === 'ACTIVE' ? 'success' : 'danger'} dot>{u.status === 'ACTIVE' ? 'Active' : 'Inactive'}</Badge></td>
+                    <td className="px-5 py-4">
+                      <div className="flex gap-2">
                         <Button variant="ghost" size="sm" onClick={() => openEditModal(u)}>Edit</Button>
-                        <Button variant="ghost" size="sm" onClick={() => handleDelete(u)}>Delete</Button>
+                        <Button variant="ghost" size="sm" className="text-red-600 hover:text-red-700 hover:bg-red-50" onClick={() => handleDelete(u)}>Delete</Button>
                       </div>
                     </td>
                   </tr>

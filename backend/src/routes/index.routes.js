@@ -32,6 +32,7 @@ import { disposalRoutes } from '../modules/disposal/index.js'
 import reconciliationRoutes from '../modules/reconciliation/reconciliation.routes.js'
 import stockTakingRoutes from '../modules/stock-taking/stock-taking.routes.js'
 import notificationsRoutes from '../modules/notifications/notifications.routes.js'
+import reportingRoutes from '../modules/reporting/reporting.routes.js'
 
 const router = Router()
 
@@ -67,5 +68,6 @@ router.use('/disposal-requests', disposalRoutes)
 router.use('/reconciliations', reconciliationRoutes)
 router.use('/stocktakes', stockTakingRoutes)
 router.use('/notifications', notificationsRoutes)
+router.use('/reports', reportingRoutes)
 
 export default router

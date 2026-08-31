@@ -328,10 +328,10 @@ export default function App() {
     <div className="flex h-screen bg-[#F8FAFC] overflow-hidden">
       {/* SIDEBAR */}
       <aside
-        className={`flex flex-col bg-[#0F172A] border-r border-[#1E293B] transition-all duration-200 ${sidebarCollapsed ? "w-14" : "w-56"} shrink-0 print:hidden`}
+        className={`flex flex-col bg-[#0B1121] border-r border-[#1E293B]/50 transition-all duration-300 ease-in-out ${sidebarCollapsed ? "w-16" : "w-64"} shrink-0 print:hidden shadow-xl z-20`}
       >
         <div
-          className={`flex items-center gap-3 border-b border-[#1E293B] bg-gradient-to-b from-white/[0.02] to-transparent ${sidebarCollapsed ? "px-3 py-4 justify-center" : "px-4 py-4"}`}
+          className={`flex items-center gap-3 border-b border-[#1E293B]/50 bg-white/[0.01] ${sidebarCollapsed ? "px-3 py-5 justify-center" : "px-5 py-5"}`}
         >
           <img src="/stock-management-logo.svg" alt="StockManager" className="w-8 h-8 shrink-0 rounded-lg" />
           {!sidebarCollapsed && (
@@ -364,12 +364,12 @@ export default function App() {
                   <button
                     key={item.id}
                     onClick={() => navigate(item.id)}
-                    className={`w-full flex items-center gap-2.5 px-2 py-2 rounded-lg text-sm font-medium transition-all duration-100 relative
-                      ${active ? "bg-[#4F46E5] text-white" : "text-[#94A3B8] hover:bg-[#1E293B] hover:text-[#CBD5E1]"}
+                    className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 relative group
+                      ${active ? "bg-[#4F46E5] text-white shadow-md shadow-indigo-500/20" : "text-[#94A3B8] hover:bg-white/5 hover:text-white"}
                       ${sidebarCollapsed ? "justify-center" : ""}`}
                     title={sidebarCollapsed ? item.label : undefined}
                   >
-                    <span className="shrink-0">{item.icon}</span>
+                    <span className={`shrink-0 transition-colors ${active ? 'text-white' : 'text-[#64748B] group-hover:text-[#94A3B8]'}`}>{item.icon}</span>
                     {!sidebarCollapsed && (
                       <span className="truncate">{item.label}</span>
                     )}
@@ -391,11 +391,11 @@ export default function App() {
         </nav>
 
         {/* Bottom: settings & collapse */}
-        <div className={`border-t border-[#1E293B] p-2 space-y-0.5`}>
+        <div className={`border-t border-[#1E293B]/50 p-3 space-y-1 bg-white/[0.01]`}>
           <button
             onClick={() => navigate("notifications")}
-            className={`w-full flex items-center gap-2.5 px-2 py-2 rounded-lg text-sm font-medium transition-all duration-100 relative
-              ${screen === "notifications" ? "bg-[#4F46E5] text-white" : "text-[#94A3B8] hover:bg-[#1E293B] hover:text-[#CBD5E1]"}
+            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 relative
+              ${screen === "notifications" ? "bg-[#4F46E5] text-white shadow-md shadow-indigo-500/20" : "text-[#94A3B8] hover:bg-white/5 hover:text-white"}
               ${sidebarCollapsed ? "justify-center" : ""}`}
           >
             <span className="shrink-0">{Icons.notifications}</span>
@@ -441,22 +441,22 @@ export default function App() {
       </aside>
 
       {/* MAIN CONTENT */}
-      <div className="flex-1 flex flex-col min-w-0 print:block">
+      <div className="flex-1 flex flex-col min-w-0 print:block bg-[#F8FAFC]">
         {/* TOP NAV */}
-        <header className="h-14 bg-white border-b border-[#E2E8F0] flex items-center justify-between px-4 shrink-0 print:hidden shadow-[0_1px_2px_0_rgb(0,0,0,0.03)]">
+        <header className="h-16 bg-white/80 backdrop-blur-md border-b border-[#F1F5F9] flex items-center justify-between px-6 shrink-0 print:hidden shadow-[0_4px_6px_-1px_rgb(0,0,0,0.02)] sticky top-0 z-10">
           <SearchBar
             value={globalSearch}
             onChange={setGlobalSearch}
-            placeholder="Search anything..."
-            className="w-64"
+            placeholder="Search resources, actions..."
+            className="w-72 shadow-sm"
           />
           <div className="flex-1" />
 
           {/* Quick stats */}
-          <div className="hidden lg:flex items-center gap-4 text-xs text-[#94A3B8] border-r border-[#E2E8F0] pr-4 mr-1">
-            <span className="flex items-center gap-1.5">
-              <span className={`w-2 h-2 rounded-full ${apiStatus === 'connected' ? 'bg-[#16A34A]' : 'bg-[#D97706] animate-pulse'}`} />
-              {apiStatus === 'connected' ? 'API Connected' : 'Connecting...'}
+          <div className="hidden lg:flex items-center gap-5 text-sm text-[#64748B] border-r border-[#E2E8F0] pr-6 mr-2 font-medium">
+            <span className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#F8FAFC]">
+              <span className={`w-2 h-2 rounded-full ${apiStatus === 'connected' ? 'bg-[#10B981]' : 'bg-[#F59E0B] animate-pulse'}`} />
+              {apiStatus === 'connected' ? 'Connected' : 'Connecting...'}
             </span>
             <span>
               <span className="text-[#D97706] font-semibold">

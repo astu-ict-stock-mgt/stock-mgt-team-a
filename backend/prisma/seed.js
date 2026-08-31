@@ -6,6 +6,7 @@
 import { env } from '../src/config/env.js'
 import { PrismaClient } from '@prisma/client'
 import { ROLES, PERMISSIONS, ROLE_PERMISSIONS_MATRIX } from '../src/config/rbac.js'
+import { hashPassword } from '../src/utils/password.js'
 
 const prisma = new PrismaClient({
   datasources: {
@@ -103,67 +104,68 @@ async function main() {
   }
 
   // 5. Seed Baseline Users (BE-021)
+  const defaultPasswordHash = await hashPassword('Password123!')
   const defaultUsers = [
     {
       email: 'admin@stockmgt.gov.et',
       fullName: 'System Administrator',
-      passwordHash: '$2b$10$GWw1R9I4KSEunFrgZtLoPe9.HjJgzWsZ2So61elw7OEhcU6IlmOUy',
+      passwordHash: defaultPasswordHash,
       status: 'ACTIVE',
       roleCode: ROLES.ADMIN.code,
     },
     {
       email: 'pao@stockmgt.gov.et',
       fullName: 'Property Administration Officer',
-      passwordHash: '$2b$10$GWw1R9I4KSEunFrgZtLoPe9.HjJgzWsZ2So61elw7OEhcU6IlmOUy',
+      passwordHash: defaultPasswordHash,
       status: 'ACTIVE',
       roleCode: ROLES.PAO.code,
     },
     {
       email: 'storekeeper@stockmgt.gov.et',
       fullName: 'Head Storekeeper',
-      passwordHash: '$2b$10$GWw1R9I4KSEunFrgZtLoPe9.HjJgzWsZ2So61elw7OEhcU6IlmOUy',
+      passwordHash: defaultPasswordHash,
       status: 'ACTIVE',
       roleCode: ROLES.STOREKEEPER.code,
     },
     {
       email: 'tec@stockmgt.gov.et',
       fullName: 'Technical Evaluation Committee Lead',
-      passwordHash: '$2b$10$GWw1R9I4KSEunFrgZtLoPe9.HjJgzWsZ2So61elw7OEhcU6IlmOUy',
+      passwordHash: defaultPasswordHash,
       status: 'ACTIVE',
       roleCode: ROLES.TEC.code,
     },
     {
       email: 'accountant@stockmgt.gov.et',
       fullName: 'Chief Financial Accountant',
-      passwordHash: '$2b$10$GWw1R9I4KSEunFrgZtLoPe9.HjJgzWsZ2So61elw7OEhcU6IlmOUy',
+      passwordHash: defaultPasswordHash,
       status: 'ACTIVE',
       roleCode: ROLES.ACCOUNTANT.code,
     },
     {
       email: 'depthead@stockmgt.gov.et',
       fullName: 'Department Head',
-      passwordHash: '$2b$10$GWw1R9I4KSEunFrgZtLoPe9.HjJgzWsZ2So61elw7OEhcU6IlmOUy',
+      passwordHash: defaultPasswordHash,
       status: 'ACTIVE',
       roleCode: ROLES.DEPARTMENT_HEAD.code,
     },
     {
       email: 'requester@stockmgt.gov.et',
       fullName: 'Department Requester',
-      passwordHash: '$2b$10$GWw1R9I4KSEunFrgZtLoPe9.HjJgzWsZ2So61elw7OEhcU6IlmOUy',
+      passwordHash: defaultPasswordHash,
       status: 'ACTIVE',
       roleCode: ROLES.REQUESTER.code,
     },
     {
       email: 'security@stockmgt.gov.et',
       fullName: 'Security Gate Officer',
-      passwordHash: '$2b$10$GWw1R9I4KSEunFrgZtLoPe9.HjJgzWsZ2So61elw7OEhcU6IlmOUy',
+      passwordHash: defaultPasswordHash,
       status: 'ACTIVE',
       roleCode: ROLES.SECURITY_OFFICER.code,
     },
     {
       email: 'property@stockmgt.gov.et',
       fullName: 'Property Registration Officer',
-      passwordHash: '$2b$10$GWw1R9I4KSEunFrgZtLoPe9.HjJgzWsZ2So61elw7OEhcU6IlmOUy',
+      passwordHash: defaultPasswordHash,
       status: 'ACTIVE',
       roleCode: ROLES.PROPERTY_REGISTRATION_OFFICER.code,
     },
@@ -219,298 +221,8 @@ async function main() {
     }
   }
 
-  // 5. Seed Demo Store & Department Metadata
-  const store = await prisma.store.upsert({
-    where: { code: 'STORE-MAIN-01' },
-    update: { name: 'Central Main Store 01' },
-    create: {
-      code: 'STORE-MAIN-01',
-      name: 'Central Main Store 01',
-      type: 'MAIN_STORE',
-      status: 'ACTIVE',
-    },
-  })
-
-  const dept = await prisma.department.upsert({
-    where: { code: 'DEPT-PAO-01' },
-    update: { name: 'Property Administration & Purchasing Department' },
-    create: {
-      code: 'DEPT-PAO-01',
-      name: 'Property Administration & Purchasing Department',
-      status: 'ACTIVE',
-    },
-  })
-
-  const unit = await prisma.unit.upsert({
-    where: { code: 'PCS' },
-    update: { name: 'Pieces' },
-    create: {
-      code: 'PCS',
-      name: 'Pieces',
-      symbol: 'pcs',
-      status: 'ACTIVE',
-    },
-  })
-
-  const item = await prisma.item.upsert({
-    where: { code: 'ITEM-LAPTOP-01' },
-    update: { name: 'High-Performance Workstation Laptop' },
-    create: {
-      code: 'ITEM-LAPTOP-01',
-      name: 'High-Performance Workstation Laptop',
-      unitId: unit.id,
-      status: 'ACTIVE',
-      minimumStock: 5,
-      reorderPoint: 10,
-    },
-  })
-
-  // 6. Seed Store Requisition Fixtures (BE-096)
-  console.log('📋 Seeding Requisition Fixtures (BE-096)...')
-  const requesterUser = userRecords['requester@stockmgt.gov.et'] || adminUser
-  if (requesterUser && store && dept && item) {
-    try {
-      await prisma.requisition.upsert({
-        where: { requisitionNumber: 'REQ-2026-00001' },
-        update: {},
-        create: {
-          requisitionNumber: 'REQ-2026-00001',
-          requesterId: requesterUser.id,
-          departmentId: dept.id,
-          storeId: store.id,
-          status: 'SUBMITTED',
-          purpose: 'Quarterly Departmental Hardware Renewal',
-          lines: {
-            create: [
-              {
-                itemId: item.id,
-                requestedQuantity: 3,
-                remarks: 'Urgent replacement for dev team',
-              },
-            ],
-          },
-        },
-      })
-      console.log('   - Seeded Requisition: REQ-2026-00001 (SUBMITTED)')
-    } catch (_err) {
-      console.log('   ℹ️ Requisition fixture REQ-2026-00001 ready')
-    }
-  }
-
-  // 7. Seed Store Issue Voucher (SIV) Fixtures (BE-103)
-  console.log('📦 Seeding SIV Fixtures (BE-103)...')
-  const reqRecord = await prisma.requisition.findUnique({ where: { requisitionNumber: 'REQ-2026-00001' } })
-  if (reqRecord && store && requesterUser && item) {
-    try {
-      await prisma.sIV.upsert({
-        where: { sivNumber: 'SIV-2026-00001' },
-        update: {},
-        create: {
-          sivNumber: 'SIV-2026-00001',
-          requisitionId: reqRecord.id,
-          storeId: store.id,
-          issuedToUserId: requesterUser.id,
-          preparedBy: requesterUser.id,
-          status: 'FINALIZED',
-          notes: 'Prepared store issue voucher for approved laptops',
-          lines: {
-            create: [
-              {
-                itemId: item.id,
-                quantityIssued: 3,
-                unitCost: 1500.0,
-                totalCost: 4500.0,
-                remarks: 'Delivered in sealed box',
-              },
-            ],
-          },
-        },
-      })
-      console.log('   - Seeded SIV: SIV-2026-00001 (FINALIZED)')
-    } catch (_err) {
-      console.log('   ℹ️ SIV fixture SIV-2026-00001 ready')
-    }
-  }
-
-  // 7b. Seed Supplier & Goods Receipt Fixtures (BE-063) for evaluation and registration flow
-  console.log('📦 Seeding Goods Receipt Fixtures for evaluation workflow...')
-  try {
-    const supplier = await prisma.supplier.upsert({
-      where: { code: 'SUPPLIER-DEFAULT-01' },
-      update: {},
-      create: {
-        code: 'SUPPLIER-DEFAULT-01',
-        name: 'Apex Tech Supplier Ltd',
-        status: 'ACTIVE',
-      },
-    })
-
-    if (supplier && store && requesterUser && item && unit) {
-      await prisma.goodsReceipt.upsert({
-        where: { receiptNumber: 'GR-20260828-0001' },
-        update: {},
-        create: {
-          receiptNumber: 'GR-20260828-0001',
-          supplierId: supplier.id,
-          storeId: store.id,
-          receivedBy: requesterUser.id,
-          status: 'PENDING_EVALUATION',
-          notes: 'Seed goods receipt for technical evaluation committee demo',
-          totalAmount: 4500.0,
-          lines: {
-            create: [
-              {
-                itemId: item.id,
-                unitId: unit.id,
-                quantity: 3,
-                unitCost: 1500.0,
-                totalCost: 4500.0,
-                condition: 'good',
-                batchNumber: 'BATCH-2026-001',
-                notes: 'Inspect seal carefully',
-              }
-            ]
-          }
-        }
-      })
-      console.log('   - Seeded Goods Receipt: GR-20260828-0001 (PENDING_EVALUATION)')
-    }
-  } catch (err) {
-    console.log('   ℹ️ Goods Receipt fixture ready or failed:', err.message)
-  }
-
-  // 8. Seed Stock Transfer Request & Lines Fixtures (BE-121, BE-122)
-  console.log('🔄 Seeding Transfer Request & Lines Fixtures (BE-121, BE-122)...')
-  if (store && requesterUser && item) {
-    try {
-      await prisma.transferRequest.upsert({
-        where: { transferNumber: 'STR-2026-00001' },
-        update: {},
-        create: {
-          transferNumber: 'STR-2026-00001',
-          transferType: 'STORE_TO_STORE',
-          status: 'SUBMITTED',
-          sourceStoreId: store.id,
-          destinationStoreId: store.id,
-          requestedBy: requesterUser.id,
-          notes: 'Inter-store transfer of hardware accessories',
-          lines: {
-            create: [
-              {
-                itemId: item.id,
-                quantityRequested: 5,
-                remarks: 'Transfer for project deployment',
-              },
-            ],
-          },
-        },
-      })
-      console.log('   - Seeded Transfer Request & Lines: STR-2026-00001 (SUBMITTED)')
-    } catch (_err) {
-      console.log('   ℹ️ Transfer Request fixture STR-2026-00001 ready')
-    }
-  }
-
-  // 9. Seed Fixed Asset Fixtures (BE-129)
-  console.log('🏛️ Seeding Fixed Asset Fixtures (BE-129)...')
-  if (item && dept && requesterUser) {
-    try {
-      await prisma.fixedAsset.upsert({
-        where: { assetTag: 'AST-2026-00001' },
-        update: {},
-        create: {
-          assetTag: 'AST-2026-00001',
-          name: 'Dell Latitude Developer Laptop',
-          itemId: item.id,
-          serialNumber: 'SN-DELL-2026-99',
-          category: 'IT Hardware',
-          status: 'REGISTERED',
-          custodianId: requesterUser.id,
-          departmentId: dept.id,
-          purchaseDate: new Date(),
-          purchaseCost: 1500.0,
-          currentValue: 1500.0,
-          notes: 'Registered fixed asset laptop from GRN receipt',
-        },
-      })
-      console.log('   - Seeded Fixed Asset: AST-2026-00001 (REGISTERED)')
-    } catch (_err) {
-      console.log('   ℹ️ Fixed Asset fixture AST-2026-00001 ready')
-    }
-  }
-
-  // 10. Seed Shelf-Life Fixtures (BE-132)
-  console.log('⏳ Seeding Shelf-Life Fixtures (BE-132)...')
-  if (item && store) {
-    try {
-      const futureExpiry = new Date()
-      futureExpiry.setDate(futureExpiry.getDate() + 90)
-
-      await prisma.shelfLifeRecord.upsert({
-        where: { uq_shelflife_item_batch: { itemId: item.id, batchNumber: 'BATCH-2026-001' } },
-        update: {},
-        create: {
-          itemId: item.id,
-          batchNumber: 'BATCH-2026-001',
-          quantity: 100,
-          expiryDate: futureExpiry,
-          alertDaysBeforeExpiry: 30,
-          status: 'HEALTHY',
-          storeId: store.id,
-          notes: 'Seeded shelf-life batch record (HEALTHY)',
-        },
-      })
-      console.log('   - Seeded Shelf-Life Batch: BATCH-2026-001 (HEALTHY)')
-    } catch (_err) {
-      console.log('   ℹ️ Shelf-Life fixture BATCH-2026-001 ready')
-    }
-  }
-
-  // 11. Seed Disposal Request Fixtures (BE-136)
-  console.log('🗑️ Seeding Disposal Request Fixtures (BE-136)...')
-  if (store && requesterUser) {
-    try {
-      await prisma.disposalRequest.upsert({
-        where: { disposalNumber: 'DSP-2026-00001' },
-        update: {},
-        create: {
-          disposalNumber: 'DSP-2026-00001',
-          disposalMethod: 'DESTRUCTION',
-          status: 'SUBMITTED',
-          storeId: store.id,
-          requestedBy: requesterUser.id,
-          reason: 'Damaged and obsolete inventory items',
-          notes: 'Disposal request submitted for committee review',
-        },
-      })
-      console.log('   - Seeded Disposal Request: DSP-2026-00001 (SUBMITTED)')
-    } catch (_err) {
-      console.log('   ℹ️ Disposal Request fixture DSP-2026-00001 ready')
-    }
-  }
-
-  // 12. Seed Reconciliation Fixtures (BE-146)
-  console.log('⚖️ Seeding Reconciliation Fixtures (BE-146)...')
-  if (store && requesterUser) {
-    try {
-      await prisma.reconciliation.upsert({
-        where: { reconciliationNo: 'REC-2026-00001' },
-        update: {},
-        create: {
-          reconciliationNo: 'REC-2026-00001',
-          storeId: store.id,
-          status: 'SUBMITTED',
-          countDate: new Date(),
-          initiatedBy: requesterUser.id,
-          reason: 'Annual physical stock count and variance reconciliation',
-          notes: 'Submitted for PAO variance approval',
-        },
-      })
-      console.log('   - Seeded Reconciliation: REC-2026-00001 (SUBMITTED)')
-    } catch (_err) {
-      console.log('   ℹ️ Reconciliation fixture REC-2026-00001 ready')
-    }
-  }
+  // Seed script now only contains necessary baseline data (Settings, Roles, Permissions, Admin Users)
+  // All mock fixtures (Stores, Items, Requisitions, SIVs, etc.) have been removed as requested.
 
   console.log('✅ Deterministic Database Seeding Completed Successfully!')
 }

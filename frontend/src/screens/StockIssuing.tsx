@@ -174,12 +174,7 @@ export default function StockIssuing() {
       })))
     }
 
-    if (nonStockedItems.length > 0) {
-      options.push(...nonStockedItems.map(i => ({
-        value: i.id,
-        label: `ℹ️ ${i.name} (${i.code}) — (0 in this warehouse)`
-      })))
-    }
+    // Do not show nonStockedItems in the dropdown to avoid confusion about items that have never been in this store
 
     return options
   }, [reqForm.storeId, loadingWarehouseStock, warehouseStock, allItems])
@@ -230,7 +225,12 @@ export default function StockIssuing() {
       }
     }
 
-    const deptId = reqForm.departmentId || (allDepartments.length > 0 ? allDepartments[0].id : '00000000-0000-0000-0000-000000000000')
+    if (allDepartments.length === 0) {
+      toast.error('No departments found. Please create a Department in Settings first.')
+      return
+    }
+
+    const deptId = reqForm.departmentId || allDepartments[0].id
 
     setSubmittingReq(true)
     try {
@@ -585,12 +585,18 @@ export default function StockIssuing() {
               value={reqForm.storeId}
               onChange={e => handleWarehouseChange(e.target.value)}
             />
+            {allDepartments.length === 0 && (
+              <div className="bg-[#FFFBEB] border border-[#FDE68A] text-[#D97706] p-3 rounded-lg text-sm mb-4">
+                ⚠️ You must create at least one Department in Settings before you can create a Requisition.
+              </div>
+            )}
+            
             {allDepartments.length > 0 && (
               <Select
                 label="Department"
-                options={allDepartments.map(d => ({ value: d.id, label: d.name }))}
-                value={reqForm.departmentId}
+                value={reqForm.departmentId || (allDepartments.length > 0 ? allDepartments[0].id : '')}
                 onChange={e => setReqForm(f => ({ ...f, departmentId: e.target.value }))}
+                options={allDepartments.map(d => ({ value: d.id, label: d.name }))}
               />
             )}
           </div>
@@ -637,7 +643,7 @@ export default function StockIssuing() {
                   <div key={idx} className="p-3 bg-[#F8FAFC] rounded-lg border border-[#E2E8F0] space-y-2">
                     <div className="flex gap-2 items-center">
                       <Select
-                        options={availableItemOptions}
+                        options={availableItemOptions.filter(opt => !nonStockedItems.includes(opt.value))}
                         value={line.itemId}
                         onChange={e => setReqLines(ls => ls.map((l, i) => i === idx ? { ...l, itemId: e.target.value } : l))}
                         className="flex-1"
@@ -696,10 +702,12 @@ export default function StockIssuing() {
               + Add another item
             </button>
           </div>
-        </div>
-        <div slot="footer">
-          <Button variant="ghost" onClick={() => setShowCreateReq(false)}>Cancel</Button>
-          <Button variant="primary" loading={submittingReq} onClick={handleCreateRequisition}>Submit Requisition</Button>
+          <div className="flex justify-end gap-3 mt-6 pt-6 border-t border-[#E2E8F0]">
+            <Button variant="ghost" onClick={() => setShowCreateReq(false)} disabled={submittingReq}>Cancel</Button>
+            <Button variant="primary" onClick={handleCreateRequisition} disabled={submittingReq || allDepartments.length === 0}>
+              {submittingReq ? 'Submitting...' : 'Submit Requisition'}
+            </Button>
+          </div>
         </div>
       </Modal>
 

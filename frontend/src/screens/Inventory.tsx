@@ -358,11 +358,11 @@ export default function Inventory() {
               <Input label="SKU / Part number" placeholder="e.g. HPA-12-300" value={editForm.code} onChange={e => setEditForm(f => ({ ...f, code: e.target.value }))} error={errors.code} />
             </div>
             <div className="grid grid-cols-3 gap-3">
-              <Select label="Category" options={[{ value: '', label: 'Select...' }, ...categories.map(c => ({ value: c.id, label: c.name }))]}
+              <Select label="Category" options={categories.length ? [{ value: '', label: 'Select...' }, ...categories.map(c => ({ value: c.id, label: c.name }))] : [{ value: '', label: '⚠️ Create a category first' }]}
                 value={editForm.categoryId} onChange={e => setEditForm(f => ({ ...f, categoryId: e.target.value }))} error={errors.categoryId} />
-              <Select label="Unit" options={[{ value: '', label: 'Select...' }, ...units.map(u => ({ value: u.id, label: u.name }))]}
+              <Select label="Unit" options={units.length ? [{ value: '', label: 'Select...' }, ...units.map(u => ({ value: u.id, label: u.name }))] : [{ value: '', label: '⚠️ Create a unit first' }]}
                 value={editForm.unitId} onChange={e => setEditForm(f => ({ ...f, unitId: e.target.value }))} />
-              <Select label="Supplier" options={[{ value: '', label: 'Select...' }, ...suppliers.map(s => ({ value: s.id, label: s.name }))]}
+              <Select label="Supplier" options={suppliers.length ? [{ value: '', label: 'Select...' }, ...suppliers.map(s => ({ value: s.id, label: s.name }))] : [{ value: '', label: '⚠️ No suppliers found' }]}
                 value={editForm.supplierId} onChange={e => setEditForm(f => ({ ...f, supplierId: e.target.value }))} />
             </div>
             <div className="grid grid-cols-3 gap-3">
@@ -486,11 +486,11 @@ export default function Inventory() {
             <Input label="SKU / Part number" placeholder="e.g. HPA-12-300" value={form.code} onChange={e => setForm(f => ({ ...f, code: e.target.value }))} error={errors.code} />
           </div>
           <div className="grid grid-cols-3 gap-3">
-            <Select label="Category" options={[{ value: '', label: 'Select...' }, ...categories.map(c => ({ value: c.id, label: c.name }))]}
+            <Select label="Category" options={categories.length ? [{ value: '', label: 'Select...' }, ...categories.map(c => ({ value: c.id, label: c.name }))] : [{ value: '', label: '⚠️ Create a category first' }]}
               value={form.categoryId} onChange={e => setForm(f => ({ ...f, categoryId: e.target.value }))} error={errors.categoryId} />
-            <Select label="Unit" options={[{ value: '', label: 'Select...' }, ...units.map(u => ({ value: u.id, label: u.name }))]}
+            <Select label="Unit" options={units.length ? [{ value: '', label: 'Select...' }, ...units.map(u => ({ value: u.id, label: u.name }))] : [{ value: '', label: '⚠️ Create a unit first' }]}
               value={form.unitId} onChange={e => setForm(f => ({ ...f, unitId: e.target.value }))} />
-            <Select label="Supplier" options={[{ value: '', label: 'Select...' }, ...suppliers.map(s => ({ value: s.id, label: s.name }))]}
+            <Select label="Supplier" options={suppliers.length ? [{ value: '', label: 'Select...' }, ...suppliers.map(s => ({ value: s.id, label: s.name }))] : [{ value: '', label: '⚠️ No suppliers found' }]}
               value={form.supplierId} onChange={e => setForm(f => ({ ...f, supplierId: e.target.value }))} />
           </div>
           <div className="grid grid-cols-3 gap-3">

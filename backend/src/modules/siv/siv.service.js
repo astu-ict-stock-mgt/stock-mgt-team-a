@@ -203,6 +203,37 @@ export async function finalizeSIV({ id, finalizerId }) {
       })
 
       if (stockCard) {
+        let remainingToDeduct = line.quantityIssued
+        const batches = await tx.stockBatch.findMany({
+          where: { stockCardId: stockCard.id, remainingQty: { gt: 0 } },
+          orderBy: { receivedAt: 'asc' }
+        })
+
+        let calculatedTotalCost = 0
+
+        for (const batch of batches) {
+          if (remainingToDeduct <= 0) break
+          const deductQty = Math.min(batch.remainingQty, remainingToDeduct)
+          
+          await tx.stockBatch.update({
+            where: { id: batch.id },
+            data: { remainingQty: { decrement: deductQty } }
+          })
+          
+          calculatedTotalCost += deductQty * Number(batch.unitCost)
+          remainingToDeduct -= deductQty
+        }
+
+        const calculatedUnitCost = calculatedTotalCost / line.quantityIssued
+
+        await tx.sIVLine.update({
+          where: { id: line.id },
+          data: {
+            totalCost: calculatedTotalCost,
+            unitCost: calculatedUnitCost,
+          }
+        })
+
         const newQty = Math.max(0, stockCard.quantity - line.quantityIssued)
         const newAvailable = Math.max(0, stockCard.availableQty - line.quantityIssued)
 
@@ -438,6 +469,37 @@ export async function directIssue({ storeId, purpose, userId, lines }) {
       })
 
       if (stockCard) {
+        let remainingToDeduct = line.quantityIssued
+        const batches = await tx.stockBatch.findMany({
+          where: { stockCardId: stockCard.id, remainingQty: { gt: 0 } },
+          orderBy: { receivedAt: 'asc' }
+        })
+
+        let calculatedTotalCost = 0
+
+        for (const batch of batches) {
+          if (remainingToDeduct <= 0) break
+          const deductQty = Math.min(batch.remainingQty, remainingToDeduct)
+          
+          await tx.stockBatch.update({
+            where: { id: batch.id },
+            data: { remainingQty: { decrement: deductQty } }
+          })
+          
+          calculatedTotalCost += deductQty * Number(batch.unitCost)
+          remainingToDeduct -= deductQty
+        }
+
+        const calculatedUnitCost = calculatedTotalCost / line.quantityIssued
+
+        await tx.sIVLine.update({
+          where: { id: line.id },
+          data: {
+            totalCost: calculatedTotalCost,
+            unitCost: calculatedUnitCost,
+          }
+        })
+
         const newQty = Math.max(0, stockCard.quantity - line.quantityIssued)
         const newAvailable = Math.max(0, stockCard.availableQty - line.quantityIssued)
 
