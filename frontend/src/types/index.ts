@@ -54,7 +54,7 @@ export interface Store {
   id: string
   code: string
   name: string
-  type: 'MAIN_STORE' | 'DEPARTMENT_STORE' | 'WAREHOUSE' | 'TRANSIT_STORE' | 'QUARANTINE_STORE'
+  type: 'MAIN_STORE' | 'DEPARTMENT_STORE' | 'WAREHOUSE' | 'TRANSIT_STORE' | 'QUARANTINE_STORE' | 'CAFE_STORE'
   status: 'ACTIVE' | 'INACTIVE'
   description: string | null
   address: string | null
@@ -454,7 +454,23 @@ export interface Notification {
   userId: string
   title: string
   message: string
-  type: 'INFO' | 'EXPIRY_WARNING' | 'LOW_STOCK' | 'DISPOSAL_CANDIDATE'
+  type:
+    | 'INFO'
+    | 'WARNING'
+    | 'APPROVAL_REQUIRED'
+    | 'APPROVED'
+    | 'REJECTED'
+    | 'STATUS_UPDATE'
+    | 'RECEIPT_EVALUATION'
+    | 'MATERIAL_ACCEPTED'
+    | 'MATERIAL_REJECTED'
+    | 'GRN_READY'
+    | 'LOW_STOCK'
+    | 'EXPIRY_WARNING'
+    | 'DISPOSAL_CANDIDATE'
+    | 'PROPERTY_REGISTRATION_REQUIRED'
+    | 'SECURITY_EVENT'
+  priority: 'LOW' | 'MEDIUM' | 'HIGH'
   referenceId: string | null
   referenceType: string | null
   isRead: boolean

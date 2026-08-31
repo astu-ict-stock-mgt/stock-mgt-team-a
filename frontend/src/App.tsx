@@ -20,18 +20,28 @@ import Reports from "./screens/Reports";
 import AuditLog from "./screens/AuditLog";
 import Notifications from "./screens/Notifications";
 import Settings from "./screens/Settings";
+import AssetRegister from "./screens/AssetRegister";
+import GateControl from "./screens/GateControl";
+import MaterialEvaluation from "./screens/MaterialEvaluation";
+import DisposalManagement from "./screens/DisposalManagement";
+import ReturnsManagement from "./screens/ReturnsManagement";
 
 type Screen =
   | "dashboard"
   | "inventory"
+  | "asset-register"
   | "categories"
   | "units"
   | "stores"
   | "stock-receiving"
+  | "material-evaluation"
   | "stock-issuing"
+  | "gate-control"
   | "stock-transfer"
   | "stock-tracking"
   | "stock-taking"
+  | "disposal-requests"
+  | "returns"
   | "suppliers"
   | "users"
   | "roles"
@@ -61,6 +71,7 @@ const navGroups: NavGroup[] = [
     label: "Inventory",
     items: [
       { id: "inventory", label: "Inventory", icon: Icons.inventory },
+      { id: "asset-register", label: "Asset Register", icon: Icons.dashboard },
       { id: "categories", label: "Categories", icon: Icons.dashboard },
       { id: "units", label: "Units", icon: Icons.dashboard },
       { id: "stores", label: "Stores", icon: Icons.dashboard },
@@ -71,10 +82,14 @@ const navGroups: NavGroup[] = [
     label: "Stock Operations",
     items: [
       { id: "stock-receiving", label: "Receiving", icon: Icons.receive },
+      { id: "material-evaluation", label: "Material Evaluation", icon: Icons.dashboard },
       { id: "stock-issuing", label: "Issuing", icon: Icons.issue },
+      { id: "gate-control", label: "Gate Control", icon: Icons.tracking },
       { id: "stock-transfer", label: "Transfer", icon: Icons.transfer },
       { id: "stock-tracking", label: "Tracking", icon: Icons.tracking },
       { id: "stock-taking", label: "Stock Taking", icon: Icons.stocktake },
+      { id: "disposal-requests", label: "Disposal", icon: Icons.dashboard },
+      { id: "returns", label: "Returns", icon: Icons.receive },
     ],
   },
   {
@@ -96,15 +111,20 @@ const navGroups: NavGroup[] = [
 const screenTitles: Record<Screen, string> = {
   dashboard: "Dashboard",
   inventory: "Inventory Management",
+  "asset-register": "Fixed Asset Register",
   categories: "Category Management",
   units: "Unit of Measure",
   stores: "Store Management",
   suppliers: "Supplier Management",
   "stock-receiving": "Stock Receiving",
+  "material-evaluation": "Material Evaluation",
   "stock-issuing": "Stock Issuing",
+  "gate-control": "Gate Control",
   "stock-transfer": "Stock Transfer",
   "stock-tracking": "Stock Tracking",
   "stock-taking": "Stock Taking",
+  "disposal-requests": "Material Disposal",
+  returns: "Material Returns",
   users: "User Management",
   roles: "Roles & Permissions",
   reports: "Reports",
@@ -117,12 +137,16 @@ function LoginScreen({ onLogin }: { onLogin: (email: string, password: string) =
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+    setError(null);
     try {
       await onLogin(email, password);
+    } catch (err: any) {
+      setError(err.message || "Invalid email or password");
     } finally {
       setLoading(false);
     }
@@ -136,6 +160,12 @@ function LoginScreen({ onLogin }: { onLogin: (email: string, password: string) =
           <h1 className="text-2xl font-bold text-[#0F172A]">StockManager</h1>
           <p className="text-sm text-[#64748B] mt-1">Sign in to your account</p>
         </div>
+        {error && (
+          <div className="mb-5 p-3.5 bg-red-50 border border-red-200 text-red-600 rounded-xl text-xs font-medium flex items-center gap-2.5">
+            <span className="text-base shrink-0">⚠️</span>
+            <span>{error}</span>
+          </div>
+        )}
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="text-sm font-medium text-[#334155]">Email</label>
@@ -175,9 +205,10 @@ export default function App() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [globalSearch, setGlobalSearch] = useState("");
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [notifPanelOpen, setNotifPanelOpen] = useState(false);
   const { toasts, toast, remove } = useToast();
 
-  const { notifications, inventoryItems, stockCards, requisitions, transfers, isAuthenticated, currentUser, userRoles, login, logout, isLoading, apiStatus } = useApp();
+  const { notifications, inventoryItems, stockCards, requisitions, transfers, unreadCount, markNotificationRead, markAllNotificationsRead, refreshNotifications, isAuthenticated, currentUser, userRoles, login, logout, isLoading, apiStatus } = useApp();
 
   // Filter navigation based on user permissions
   const filteredNavGroups = useMemo(() => {
@@ -189,6 +220,8 @@ export default function App() {
         switch (item.id) {
           case 'inventory':
             return hasPermission(userRoles, PERMISSIONS.STOCK_CARDS_READ)
+          case 'asset-register':
+            return hasPermission(userRoles, PERMISSIONS.ASSETS_REGISTER) || hasPermission(userRoles, PERMISSIONS.ASSETS_READ)
           case 'categories':
             return hasPermission(userRoles, PERMISSIONS.CATEGORIES_READ) || hasPermission(userRoles, PERMISSIONS.CATEGORIES_MANAGE)
           case 'units':
@@ -199,16 +232,25 @@ export default function App() {
             return hasPermission(userRoles, PERMISSIONS.SUPPLIERS_MANAGE)
           case 'stock-receiving':
             return hasPermission(userRoles, PERMISSIONS.RECEIPTS_CREATE) || hasPermission(userRoles, PERMISSIONS.GOODS_RECEIPT_CREATE)
+          case 'material-evaluation':
+            return hasPermission(userRoles, PERMISSIONS.EVALUATIONS_DECIDE) || hasPermission(userRoles, PERMISSIONS.EVALUATIONS_CREATE)
           case 'stock-issuing':
             return hasPermission(userRoles, PERMISSIONS.REQUISITIONS_CREATE) || hasPermission(userRoles, PERMISSIONS.REQUISITIONS_APPROVE) || hasPermission(userRoles, PERMISSIONS.SIV_PREPARE)
+          case 'gate-control':
+            return hasPermission(userRoles, PERMISSIONS.DISPATCH_VERIFY)
           case 'stock-transfer':
             return hasPermission(userRoles, PERMISSIONS.TRANSFERS_CREATE) || hasPermission(userRoles, PERMISSIONS.TRANSFERS_APPROVE)
           case 'stock-tracking':
             return hasPermission(userRoles, PERMISSIONS.STOCK_CARDS_READ)
           case 'stock-taking':
             return hasPermission(userRoles, PERMISSIONS.RECONCILIATION_CREATE) || hasPermission(userRoles, PERMISSIONS.RECONCILIATION_APPROVE)
+          case 'disposal-requests':
+            return hasPermission(userRoles, PERMISSIONS.SHELFLIFE_READ) || hasPermission(userRoles, PERMISSIONS.DISPOSAL_REQUEST)
+          case 'returns':
+            return hasPermission(userRoles, PERMISSIONS.RETURNS_READ) || hasPermission(userRoles, PERMISSIONS.RETURNS_CREATE)
           case 'users':
-            return hasPermission(userRoles, PERMISSIONS.USERS_READ)
+            // User management is ADMIN-only
+            return hasPermission(userRoles, PERMISSIONS.USERS_MANAGE)
           case 'roles':
             return hasPermission(userRoles, PERMISSIONS.ROLES_READ)
           case 'reports':
@@ -221,9 +263,9 @@ export default function App() {
       }),
     })).filter(group => group.items.length > 0)
   }, [userRoles])
-  const unreadNotifications = notifications.filter((n) => !n.isRead).length;
+  const unreadNotifications = unreadCount;
   const lowStockCount = inventoryItems.filter(i => stockCards.some(sc => sc.itemId === i.id && sc.availableQty <= i.minimumStock)).length;
-  const pendingApprovals = requisitions.filter(r => r.status === 'SUBMITTED').length + transfers.filter(t => t.status === 'SUBMITTED').length;
+  const pendingApprovals = requisitions.filter(r => r.status === 'SUBMITTED' || r.status === 'DEPARTMENT_APPROVED').length + transfers.filter(t => t.status === 'SUBMITTED').length;
 
   if (isLoading) {
     return (
@@ -279,16 +321,17 @@ export default function App() {
   const navigate = (s: Screen) => {
     setScreen(s);
     setUserMenuOpen(false);
+    setNotifPanelOpen(false);
   };
 
   return (
     <div className="flex h-screen bg-[#F8FAFC] overflow-hidden">
       {/* SIDEBAR */}
       <aside
-        className={`flex flex-col bg-[#0F172A] border-r border-[#1E293B] transition-all duration-200 ${sidebarCollapsed ? "w-14" : "w-56"} shrink-0 print:hidden`}
+        className={`flex flex-col bg-[#0B1121] border-r border-[#1E293B]/50 transition-all duration-300 ease-in-out ${sidebarCollapsed ? "w-16" : "w-64"} shrink-0 print:hidden shadow-xl z-20`}
       >
         <div
-          className={`flex items-center gap-3 border-b border-[#1E293B] bg-gradient-to-b from-white/[0.02] to-transparent ${sidebarCollapsed ? "px-3 py-4 justify-center" : "px-4 py-4"}`}
+          className={`flex items-center gap-3 border-b border-[#1E293B]/50 bg-white/[0.01] ${sidebarCollapsed ? "px-3 py-5 justify-center" : "px-5 py-5"}`}
         >
           <img src="/stock-management-logo.svg" alt="StockManager" className="w-8 h-8 shrink-0 rounded-lg" />
           {!sidebarCollapsed && (
@@ -321,12 +364,12 @@ export default function App() {
                   <button
                     key={item.id}
                     onClick={() => navigate(item.id)}
-                    className={`w-full flex items-center gap-2.5 px-2 py-2 rounded-lg text-sm font-medium transition-all duration-100 relative
-                      ${active ? "bg-[#4F46E5] text-white" : "text-[#94A3B8] hover:bg-[#1E293B] hover:text-[#CBD5E1]"}
+                    className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 relative group
+                      ${active ? "bg-[#4F46E5] text-white shadow-md shadow-indigo-500/20" : "text-[#94A3B8] hover:bg-white/5 hover:text-white"}
                       ${sidebarCollapsed ? "justify-center" : ""}`}
                     title={sidebarCollapsed ? item.label : undefined}
                   >
-                    <span className="shrink-0">{item.icon}</span>
+                    <span className={`shrink-0 transition-colors ${active ? 'text-white' : 'text-[#64748B] group-hover:text-[#94A3B8]'}`}>{item.icon}</span>
                     {!sidebarCollapsed && (
                       <span className="truncate">{item.label}</span>
                     )}
@@ -348,11 +391,11 @@ export default function App() {
         </nav>
 
         {/* Bottom: settings & collapse */}
-        <div className={`border-t border-[#1E293B] p-2 space-y-0.5`}>
+        <div className={`border-t border-[#1E293B]/50 p-3 space-y-1 bg-white/[0.01]`}>
           <button
             onClick={() => navigate("notifications")}
-            className={`w-full flex items-center gap-2.5 px-2 py-2 rounded-lg text-sm font-medium transition-all duration-100 relative
-              ${screen === "notifications" ? "bg-[#4F46E5] text-white" : "text-[#94A3B8] hover:bg-[#1E293B] hover:text-[#CBD5E1]"}
+            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 relative
+              ${screen === "notifications" ? "bg-[#4F46E5] text-white shadow-md shadow-indigo-500/20" : "text-[#94A3B8] hover:bg-white/5 hover:text-white"}
               ${sidebarCollapsed ? "justify-center" : ""}`}
           >
             <span className="shrink-0">{Icons.notifications}</span>
@@ -398,22 +441,22 @@ export default function App() {
       </aside>
 
       {/* MAIN CONTENT */}
-      <div className="flex-1 flex flex-col min-w-0 print:block">
+      <div className="flex-1 flex flex-col min-w-0 print:block bg-[#F8FAFC]">
         {/* TOP NAV */}
-        <header className="h-14 bg-white border-b border-[#E2E8F0] flex items-center justify-between px-4 shrink-0 print:hidden shadow-[0_1px_2px_0_rgb(0,0,0,0.03)]">
+        <header className="h-16 bg-white/80 backdrop-blur-md border-b border-[#F1F5F9] flex items-center justify-between px-6 shrink-0 print:hidden shadow-[0_4px_6px_-1px_rgb(0,0,0,0.02)] sticky top-0 z-10">
           <SearchBar
             value={globalSearch}
             onChange={setGlobalSearch}
-            placeholder="Search anything..."
-            className="w-64"
+            placeholder="Search resources, actions..."
+            className="w-72 shadow-sm"
           />
           <div className="flex-1" />
 
           {/* Quick stats */}
-          <div className="hidden lg:flex items-center gap-4 text-xs text-[#94A3B8] border-r border-[#E2E8F0] pr-4 mr-1">
-            <span className="flex items-center gap-1.5">
-              <span className={`w-2 h-2 rounded-full ${apiStatus === 'connected' ? 'bg-[#16A34A]' : 'bg-[#D97706] animate-pulse'}`} />
-              {apiStatus === 'connected' ? 'API Connected' : 'Connecting...'}
+          <div className="hidden lg:flex items-center gap-5 text-sm text-[#64748B] border-r border-[#E2E8F0] pr-6 mr-2 font-medium">
+            <span className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#F8FAFC]">
+              <span className={`w-2 h-2 rounded-full ${apiStatus === 'connected' ? 'bg-[#10B981]' : 'bg-[#F59E0B] animate-pulse'}`} />
+              {apiStatus === 'connected' ? 'Connected' : 'Connecting...'}
             </span>
             <span>
               <span className="text-[#D97706] font-semibold">
@@ -421,23 +464,116 @@ export default function App() {
               </span>{" "}
               low stock
             </span>
-            <span>
-              <span className="text-[#4F46E5] font-semibold">{pendingApprovals}</span> pending
+            <span title={`Requisitions: ${requisitions.filter(r => r.status === 'SUBMITTED' || r.status === 'DEPARTMENT_APPROVED').length}\nTransfers: ${transfers.filter(t => t.status === 'SUBMITTED').length}`}>
+              <span className="text-[#4F46E5] font-semibold cursor-help border-b border-dotted border-[#94A3B8]">{pendingApprovals}</span> pending approvals
             </span>
           </div>
 
-          {/* Notification bell */}
-          <button
-            onClick={() => navigate("notifications")}
-            className="relative w-9 h-9 rounded-lg hover:bg-[#F1F5F9] flex items-center justify-center text-[#64748B] hover:text-[#1E293B] transition-colors"
-          >
-            {Icons.notifications}
-            {unreadNotifications > 0 && (
-              <span className="absolute top-1 right-1 w-4 h-4 bg-[#DC2626] text-white text-[9px] rounded-full flex items-center justify-center font-bold">
-                {unreadNotifications}
-              </span>
+          {/* Notification bell with dropdown panel */}
+          <div className="relative">
+            <button
+              id="notification-bell"
+              onClick={() => {
+                setNotifPanelOpen(o => {
+                  const next = !o;
+                  if (next) {
+                    refreshNotifications().catch(() => {});
+                  }
+                  return next;
+                });
+                setUserMenuOpen(false);
+              }}
+              className="relative w-9 h-9 rounded-lg hover:bg-[#F1F5F9] flex items-center justify-center text-[#64748B] hover:text-[#1E293B] transition-colors"
+              aria-label="Notifications"
+            >
+              {Icons.notifications}
+              {unreadNotifications > 0 && (
+                <span className="absolute top-1 right-1 w-4 h-4 bg-[#DC2626] text-white text-[9px] rounded-full flex items-center justify-center font-bold">
+                  {unreadNotifications > 99 ? '99+' : unreadNotifications}
+                </span>
+              )}
+            </button>
+
+            {/* Notification dropdown panel */}
+            {notifPanelOpen && (
+              <div className="absolute right-0 top-full mt-2 w-80 bg-white rounded-xl border border-[#E2E8F0] shadow-xl z-40 overflow-hidden">
+                {/* Panel header */}
+                <div className="flex items-center justify-between px-4 py-3 border-b border-[#F1F5F9]">
+                  <div className="flex items-center gap-2">
+                    <p className="text-sm font-semibold text-[#0F172A]">Notifications</p>
+                    {unreadNotifications > 0 && (
+                      <span className="px-1.5 py-0.5 bg-[#4F46E5] text-white text-[10px] rounded-full font-bold">
+                        {unreadNotifications}
+                      </span>
+                    )}
+                  </div>
+                  {unreadNotifications > 0 && (
+                    <button
+                      onClick={() => markAllNotificationsRead()}
+                      className="text-xs text-[#4F46E5] hover:text-[#4338CA] font-medium transition-colors"
+                    >
+                      Mark all read
+                    </button>
+                  )}
+                </div>
+
+                {/* Recent notifications list */}
+                <div className="max-h-72 overflow-y-auto">
+                  {notifications.length === 0 ? (
+                    <div className="flex flex-col items-center py-10 text-center">
+                      <span className="text-2xl mb-2">ðŸ””</span>
+                      <p className="text-xs text-[#94A3B8]">No notifications yet</p>
+                    </div>
+                  ) : (
+                    notifications.slice(0, 8).map(n => {
+                      const iconMap: Record<string, string> = {
+                        APPROVAL_REQUIRED: '📋', APPROVED: '✅', REJECTED: '❌',
+                        STATUS_UPDATE: '🔄', GRN_READY: '📦',
+                        LOW_STOCK: '📉', EXPIRY_WARNING: '⚠️', DISPOSAL_CANDIDATE: '🗑️',
+                        SECURITY_EVENT: '🔒', INFO: 'ℹ️',
+                      };
+                      const priorityDot: Record<string, string> = {
+                        HIGH: 'bg-[#DC2626]', MEDIUM: 'bg-[#D97706]', LOW: 'bg-[#94A3B8]',
+                      };
+
+                      return (
+                        <button
+                          key={n.id}
+                          onClick={() => { markNotificationRead(n.id); setNotifPanelOpen(false); }}
+                          className={`w-full flex items-start gap-3 px-4 py-3 text-left hover:bg-[#F8FAFC] transition-colors border-b border-[#F8FAFC] last:border-0 ${
+                            !n.isRead ? 'bg-[#FAFBFF]' : 'bg-white'
+                          }`}
+                        >
+                          <span className="text-base shrink-0 mt-0.5">{iconMap[n.type] || 'ℹ️'}</span>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-1.5 mb-0.5">
+                              <p className={`text-xs font-semibold truncate ${
+                                n.isRead ? 'text-[#64748B]' : 'text-[#0F172A]'
+                              }`}>{n.title}</p>
+                              {!n.isRead && (
+                                <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${priorityDot[n.priority] || 'bg-[#4F46E5]'}`} />
+                              )}
+                            </div>
+                            <p className="text-[11px] text-[#64748B] leading-relaxed line-clamp-2">{n.message}</p>
+                          </div>
+                        </button>
+                      );
+                    })
+                  )}
+                </div>
+
+                {/* View all link */}
+                <div className="px-4 py-2.5 border-t border-[#F1F5F9] bg-[#FAFAFA]">
+                  <button
+                    onClick={() => navigate('notifications')}
+                    className="w-full text-center text-xs text-[#4F46E5] hover:text-[#4338CA] font-medium transition-colors py-0.5"
+                  >
+                    View all notifications →
+                  </button>
+                </div>
+              </div>
             )}
-          </button>
+          </div>
 
           {/* User menu */}
           <div className="relative">
@@ -532,16 +668,21 @@ export default function App() {
           <div className="p-6 max-w-[1400px] mx-auto min-h-full print:p-0 print:max-w-none">
             {screen === "dashboard" && <Dashboard />}
             {screen === "inventory" && hasPermission(userRoles, PERMISSIONS.STOCK_CARDS_READ) && <Inventory />}
+            {screen === "asset-register" && (hasPermission(userRoles, PERMISSIONS.ASSETS_REGISTER) || hasPermission(userRoles, PERMISSIONS.ASSETS_READ)) && <AssetRegister />}
             {screen === "categories" && (hasPermission(userRoles, PERMISSIONS.CATEGORIES_READ) || hasPermission(userRoles, PERMISSIONS.CATEGORIES_MANAGE)) && <Categories />}
             {screen === "units" && (hasPermission(userRoles, PERMISSIONS.UNITS_READ) || hasPermission(userRoles, PERMISSIONS.UNITS_MANAGE)) && <Units />}
             {screen === "stores" && (hasPermission(userRoles, PERMISSIONS.STORES_READ) || hasPermission(userRoles, PERMISSIONS.STORES_MANAGE)) && <Stores />}
             {screen === "suppliers" && hasPermission(userRoles, PERMISSIONS.SUPPLIERS_MANAGE) && <Suppliers />}
             {screen === "stock-receiving" && (hasPermission(userRoles, PERMISSIONS.RECEIPTS_CREATE) || hasPermission(userRoles, PERMISSIONS.GOODS_RECEIPT_CREATE)) && <StockReceiving />}
+            {screen === "material-evaluation" && (hasPermission(userRoles, PERMISSIONS.EVALUATIONS_DECIDE) || hasPermission(userRoles, PERMISSIONS.EVALUATIONS_CREATE)) && <MaterialEvaluation />}
             {screen === "stock-issuing" && (hasPermission(userRoles, PERMISSIONS.REQUISITIONS_CREATE) || hasPermission(userRoles, PERMISSIONS.REQUISITIONS_APPROVE) || hasPermission(userRoles, PERMISSIONS.SIV_PREPARE)) && <StockIssuing />}
+            {screen === "gate-control" && hasPermission(userRoles, PERMISSIONS.DISPATCH_VERIFY) && <GateControl />}
             {screen === "stock-transfer" && (hasPermission(userRoles, PERMISSIONS.TRANSFERS_CREATE) || hasPermission(userRoles, PERMISSIONS.TRANSFERS_APPROVE)) && <StockTransfer />}
             {screen === "stock-tracking" && hasPermission(userRoles, PERMISSIONS.STOCK_CARDS_READ) && <StockTracking />}
             {screen === "stock-taking" && (hasPermission(userRoles, PERMISSIONS.RECONCILIATION_CREATE) || hasPermission(userRoles, PERMISSIONS.RECONCILIATION_APPROVE)) && <StockTaking />}
-            {screen === "users" && hasPermission(userRoles, PERMISSIONS.USERS_READ) && <Users />}
+            {screen === "disposal-requests" && (hasPermission(userRoles, PERMISSIONS.SHELFLIFE_READ) || hasPermission(userRoles, PERMISSIONS.DISPOSAL_REQUEST)) && <DisposalManagement />}
+            {screen === "returns" && (hasPermission(userRoles, PERMISSIONS.RETURNS_READ) || hasPermission(userRoles, PERMISSIONS.RETURNS_CREATE)) && <ReturnsManagement />}
+            {screen === "users" && hasPermission(userRoles, PERMISSIONS.USERS_MANAGE) && <Users />}
             {screen === "roles" && hasPermission(userRoles, PERMISSIONS.ROLES_READ) && <RolesPermissions />}
             {screen === "reports" && hasPermission(userRoles, PERMISSIONS.REPORTS_VIEW) && <Reports />}
             {screen === "audit" && hasPermission(userRoles, PERMISSIONS.AUDIT_READ) && <AuditLog />}

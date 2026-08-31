@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
-import { Button, Input, Select, SectionHeader, Card, Badge, Tabs, Modal, Textarea, useToast } from '../components/ui'
+import { Button, Input, Select, SectionHeader, Card, Badge, Tabs, Modal, Textarea, useToast, ToastContainer } from '../components/ui'
 import { useApp } from '../context/AppContext'
 import { requisitionsApi, sivApi, storesApi, itemsApi, departmentsApi, inventoryApi } from '../services/api'
 import { hasPermission, PERMISSIONS } from '../lib/permissions'
@@ -36,8 +36,8 @@ const statusLabels: Record<string, string> = {
 }
 
 export default function StockIssuing() {
-  const { currentUser, userRoles } = useApp()
-  const { toast } = useToast()
+  const { currentUser, userRoles, refreshData, requisitions, setRequisitions } = useApp()
+  const { toasts, toast, remove } = useToast()
 
   const canCreateRequisition = hasPermission(userRoles, PERMISSIONS.REQUISITIONS_CREATE)
   const canApproveRequisition = hasPermission(userRoles, PERMISSIONS.REQUISITIONS_APPROVE)
@@ -47,13 +47,18 @@ export default function StockIssuing() {
 
   const [activeTab, setActiveTab] = useState('requisitions')
 
+  // Reject modal state
+  const [showRejectModal, setShowRejectModal] = useState(false)
+  const [rejectTarget, setRejectTarget] = useState<{ id: string; level: 'DEPARTMENT' | 'PAO' } | null>(null)
+  const [rejectReason, setRejectReason] = useState('')
+  const [submittingReject, setSubmittingReject] = useState(false)
+
   const [allStores, setAllStores] = useState<Store[]>([])
   const [allItems, setAllItems] = useState<Item[]>([])
   const [allDepartments, setAllDepartments] = useState<Array<{ id: string; name: string }>>([])
   const [warehouseStock, setWarehouseStock] = useState<StockCard[]>([])
   const [loadingWarehouseStock, setLoadingWarehouseStock] = useState(false)
 
-  const [requisitions, setRequisitions] = useState<Requisition[]>([])
   const [loadingReqs, setLoadingReqs] = useState(false)
   const [sivs, setSivs] = useState<SIV[]>([])
   const [loadingSivs, setLoadingSivs] = useState(false)
@@ -158,23 +163,18 @@ export default function StockIssuing() {
     if (inStock.length > 0) {
       options.push(...inStock.map(sc => ({
         value: sc.itemId,
-        label: `✓ ${sc.item.name} (${sc.item.code}) — Avail: ${sc.availableQty} ${sc.item.unit?.symbol || ''} (On Hand: ${sc.balance})`
+        label: `✓ ${sc.item?.name || 'Unknown'} (${sc.item?.code || ''}) — Avail: ${sc.availableQty} ${sc.item?.unit?.symbol || ''} (On Hand: ${sc.quantity})`
       })))
     }
 
     if (zeroStock.length > 0) {
       options.push(...zeroStock.map(sc => ({
         value: sc.itemId,
-        label: `⚠️ ${sc.item.name} (${sc.item.code}) — 0 Available (Out of stock)`
+        label: `⚠️ ${sc.item?.name || 'Unknown'} (${sc.item?.code || ''}) — 0 Available (Out of stock)`
       })))
     }
 
-    if (nonStockedItems.length > 0) {
-      options.push(...nonStockedItems.map(i => ({
-        value: i.id,
-        label: `ℹ️ ${i.name} (${i.code}) — (0 in this warehouse)`
-      })))
-    }
+    // Do not show nonStockedItems in the dropdown to avoid confusion about items that have never been in this store
 
     return options
   }, [reqForm.storeId, loadingWarehouseStock, warehouseStock, allItems])
@@ -225,7 +225,12 @@ export default function StockIssuing() {
       }
     }
 
-    const deptId = reqForm.departmentId || (allDepartments.length > 0 ? allDepartments[0].id : '00000000-0000-0000-0000-000000000000')
+    if (allDepartments.length === 0) {
+      toast.error('No departments found. Please create a Department in Settings first.')
+      return
+    }
+
+    const deptId = reqForm.departmentId || allDepartments[0].id
 
     setSubmittingReq(true)
     try {
@@ -241,6 +246,7 @@ export default function StockIssuing() {
       setReqLines([])
       setWarehouseStock([])
       loadRequisitions()
+      refreshData().catch(() => {})
     } catch (err: any) {
       toast.error(err.message || 'Failed to create requisition')
     } finally {
@@ -264,6 +270,7 @@ export default function StockIssuing() {
         toast.success('Requisition approved by PAO')
       }
       loadRequisitions()
+      refreshData().catch(() => {})
     } catch (err: any) {
       toast.error(err.message || 'Failed to approve requisition')
     } finally {
@@ -272,17 +279,30 @@ export default function StockIssuing() {
   }
 
   const handleRejectRequisition = async (id: string, level: 'DEPARTMENT' | 'PAO' = 'DEPARTMENT') => {
-    const reason = prompt(`Rejection reason (${level === 'DEPARTMENT' ? 'Department Level' : 'PAO Level'}):`)
-    if (!reason) return
-    setProcessingId(id)
+    setRejectTarget({ id, level })
+    setRejectReason('')
+    setShowRejectModal(true)
+  }
+
+  const confirmReject = async () => {
+    if (!rejectTarget) return
+    if (!rejectReason.trim() || rejectReason.trim().length < 3) {
+      toast.error('Please provide a rejection reason (at least 3 characters)')
+      return
+    }
+    setSubmittingReject(true)
     try {
-      await requisitionsApi.reject(id, reason, level)
-      toast.success(`Requisition rejected at ${level === 'DEPARTMENT' ? 'Department' : 'PAO'} level`)
+      await requisitionsApi.reject(rejectTarget.id, rejectReason.trim(), rejectTarget.level)
+      toast.success(`Requisition rejected at ${rejectTarget.level === 'DEPARTMENT' ? 'Department' : 'PAO'} level`)
+      setShowRejectModal(false)
+      setRejectTarget(null)
+      setRejectReason('')
       loadRequisitions()
+      refreshData().catch(() => {})
     } catch (err: any) {
       toast.error(err.message || 'Failed to reject requisition')
     } finally {
-      setProcessingId(null)
+      setSubmittingReject(false)
     }
   }
 
@@ -325,6 +345,7 @@ export default function StockIssuing() {
       setShowCreateSiv(false)
       setSelectedReq(null)
       loadSivs()
+      refreshData().catch(() => {})
     } catch (err: any) {
       toast.error(err.message || 'Failed to create SIV')
     } finally {
@@ -338,6 +359,7 @@ export default function StockIssuing() {
       await sivApi.approve(id)
       toast.success('SIV approved')
       loadSivs()
+      refreshData().catch(() => {})
     } catch (err: any) {
       toast.error(err.message || 'Failed to approve SIV')
     } finally {
@@ -352,6 +374,7 @@ export default function StockIssuing() {
       await sivApi.finalize(id)
       toast.success('SIV finalized — stock deducted from inventory')
       loadSivs()
+      refreshData().catch(() => {})
     } catch (err: any) {
       toast.error(err.message || 'Failed to finalize SIV')
     } finally {
@@ -370,6 +393,7 @@ export default function StockIssuing() {
 
   return (
     <div>
+      <ToastContainer toasts={toasts} onRemove={remove} />
       <SectionHeader title="Stock Issuing" subtitle="Manage requisitions and store issue vouchers (SIV)" />
 
       <div className="mb-6">
@@ -561,12 +585,18 @@ export default function StockIssuing() {
               value={reqForm.storeId}
               onChange={e => handleWarehouseChange(e.target.value)}
             />
+            {allDepartments.length === 0 && (
+              <div className="bg-[#FFFBEB] border border-[#FDE68A] text-[#D97706] p-3 rounded-lg text-sm mb-4">
+                ⚠️ You must create at least one Department in Settings before you can create a Requisition.
+              </div>
+            )}
+            
             {allDepartments.length > 0 && (
               <Select
                 label="Department"
-                options={allDepartments.map(d => ({ value: d.id, label: d.name }))}
-                value={reqForm.departmentId}
+                value={reqForm.departmentId || (allDepartments.length > 0 ? allDepartments[0].id : '')}
                 onChange={e => setReqForm(f => ({ ...f, departmentId: e.target.value }))}
+                options={allDepartments.map(d => ({ value: d.id, label: d.name }))}
               />
             )}
           </div>
@@ -613,7 +643,7 @@ export default function StockIssuing() {
                   <div key={idx} className="p-3 bg-[#F8FAFC] rounded-lg border border-[#E2E8F0] space-y-2">
                     <div className="flex gap-2 items-center">
                       <Select
-                        options={availableItemOptions}
+                        options={availableItemOptions.filter(opt => !nonStockedItems.includes(opt.value))}
                         value={line.itemId}
                         onChange={e => setReqLines(ls => ls.map((l, i) => i === idx ? { ...l, itemId: e.target.value } : l))}
                         className="flex-1"
@@ -644,7 +674,7 @@ export default function StockIssuing() {
                         {selectedStock ? (
                           <span className={`px-2 py-0.5 rounded font-medium ${selectedStock.availableQty > 0 ? 'bg-[#ECFDF5] text-[#059669]' : 'bg-[#FEF2F2] text-[#DC2626]'}`}>
                             {selectedStock.availableQty > 0
-                              ? `✓ Available Stock: ${selectedStock.availableQty} ${selectedStock.item?.unit?.symbol || ''} (Total On Hand: ${selectedStock.balance})`
+                              ? `✓ Available Stock: ${selectedStock.availableQty} ${selectedStock.item?.unit?.symbol || ''} (Total On Hand: ${selectedStock.quantity})`
                               : '⚠️ 0 Available in this warehouse'}
                           </span>
                         ) : (
@@ -672,10 +702,12 @@ export default function StockIssuing() {
               + Add another item
             </button>
           </div>
-        </div>
-        <div slot="footer">
-          <Button variant="ghost" onClick={() => setShowCreateReq(false)}>Cancel</Button>
-          <Button variant="primary" loading={submittingReq} onClick={handleCreateRequisition}>Submit Requisition</Button>
+          <div className="flex justify-end gap-3 mt-6 pt-6 border-t border-[#E2E8F0]">
+            <Button variant="ghost" onClick={() => setShowCreateReq(false)} disabled={submittingReq}>Cancel</Button>
+            <Button variant="primary" onClick={handleCreateRequisition} disabled={submittingReq || allDepartments.length === 0}>
+              {submittingReq ? 'Submitting...' : 'Submit Requisition'}
+            </Button>
+          </div>
         </div>
       </Modal>
 
@@ -782,6 +814,31 @@ export default function StockIssuing() {
             )}
           </div>
         )}
+      </Modal>
+      {/* Reject Requisition Modal */}
+      <Modal open={showRejectModal} onClose={() => setShowRejectModal(false)} title="Reject Requisition">
+        <div className="space-y-4">
+          <p className="text-sm text-[#64748B]">
+            Provide a clear reason for rejecting this requisition. The requester will be notified.
+          </p>
+          <Textarea
+            label="Rejection Reason *"
+            placeholder="e.g. Budget exceeded, items not in approved list, duplicate request..."
+            value={rejectReason}
+            onChange={e => setRejectReason(e.target.value)}
+          />
+          <div className="flex justify-end gap-2 pt-1">
+            <Button variant="ghost" onClick={() => setShowRejectModal(false)}>Cancel</Button>
+            <Button
+              variant="destructive"
+              loading={submittingReject}
+              disabled={submittingReject || !rejectReason.trim()}
+              onClick={confirmReject}
+            >
+              Confirm Rejection
+            </Button>
+          </div>
+        </div>
       </Modal>
     </div>
   )

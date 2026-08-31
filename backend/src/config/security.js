@@ -35,17 +35,17 @@ export function getCorsOptions() {
  */
 export function getHelmetOptions() {
   return {
-    contentSecurityPolicy: {
+    contentSecurityPolicy: process.env.NODE_ENV === 'production' ? {
       directives: {
         defaultSrc: ["'self'"],
-        scriptSrc: ["'self'", "'unsafe-inline'"], // Swagger UI needs inline
-        styleSrc: ["'self'", "'unsafe-inline'"],   // Swagger UI needs inline
+        scriptSrc: ["'self'", "'unsafe-inline'"],
+        styleSrc: ["'self'", "'unsafe-inline'"],
         imgSrc: ["'self'", 'data:'],
         connectSrc: ["'self'"]
       }
-    },
-    crossOriginEmbedderPolicy: false, // Swagger UI
-    crossOriginResourcePolicy: { policy: 'cross-origin' } // Swagger UI
+    } : false,
+    crossOriginEmbedderPolicy: false,
+    crossOriginResourcePolicy: { policy: 'cross-origin' }
   }
 }
 

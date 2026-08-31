@@ -10,6 +10,7 @@ import {
   listReturns,
   evaluateReturn,
   approveReturn,
+  postReturnStock,
 } from './return.service.js'
 import { sendCreated, sendSuccess } from '../../utils/response.js'
 
@@ -90,3 +91,20 @@ export const approve = async (req, res, next) => {
     next(err)
   }
 }
+
+/**
+ * Handle POST /api/returns/:id/post endpoint to execute stock posting
+ */
+export const postStock = async (req, res, next) => {
+  try {
+    const postingUserId = req.user?.userId || req.user?.id || 'usr-storekeeper-1'
+    const result = await postReturnStock({
+      id: req.params.id,
+      postingUserId,
+    })
+    sendSuccess(res, result)
+  } catch (err) {
+    next(err)
+  }
+}
+

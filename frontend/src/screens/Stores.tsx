@@ -1,12 +1,14 @@
 import { useState } from 'react'
 import { Table, Button, Badge, Modal, Input, Select, SearchBar, SectionHeader, Icons, Tabs, Pagination, Card, Breadcrumb, useToast } from '../components/ui'
 import { useApp } from '../context/AppContext'
+import { hasPermission, PERMISSIONS } from '../lib/permissions'
 
 type View = 'list' | 'detail' | 'add'
 
 export default function Stores() {
-  const { stores, addStore, updateStore, deleteStore, users } = useApp()
+  const { stores, addStore, updateStore, deleteStore, users, userRoles } = useApp()
   const { toast } = useToast()
+  const canManageStores = hasPermission(userRoles, PERMISSIONS.STORES_MANAGE)
 
   const [view, setView] = useState<View>('list')
   const [selected, setSelected] = useState<typeof stores[0] | null>(null)
@@ -16,7 +18,7 @@ export default function Stores() {
   const [showModal, setShowModal] = useState(false)
   const [showEditModal, setShowEditModal] = useState(false)
   const [errors, setErrors] = useState<Record<string, string>>({})
-  type StoreType = 'MAIN_STORE' | 'DEPARTMENT_STORE' | 'WAREHOUSE' | 'TRANSIT_STORE' | 'QUARANTINE_STORE'
+  type StoreType = 'MAIN_STORE' | 'DEPARTMENT_STORE' | 'WAREHOUSE' | 'TRANSIT_STORE' | 'QUARANTINE_STORE' | 'CAFE_STORE'
   type StoreStatus = 'ACTIVE' | 'INACTIVE'
   const [form, setForm] = useState({ name: '', code: '', type: 'MAIN_STORE' as StoreType, status: 'ACTIVE' as StoreStatus, description: '', address: '', responsibleOfficerId: '' })
   const [editForm, setEditForm] = useState({ name: '', code: '', type: 'MAIN_STORE' as StoreType, status: 'ACTIVE' as StoreStatus, description: '', address: '', responsibleOfficerId: '' })
@@ -27,6 +29,7 @@ export default function Stores() {
     { value: 'WAREHOUSE', label: 'Warehouse' },
     { value: 'TRANSIT_STORE', label: 'Transit Store' },
     { value: 'QUARANTINE_STORE', label: 'Quarantine Store' },
+    { value: 'CAFE_STORE', label: 'Cafe Store' },
   ]
 
   const storeStatuses = [
@@ -68,6 +71,7 @@ export default function Stores() {
       WAREHOUSE: { variant: 'warning', label: 'Warehouse' },
       TRANSIT_STORE: { variant: 'default', label: 'Transit' },
       QUARANTINE_STORE: { variant: 'danger', label: 'Quarantine' },
+      CAFE_STORE: { variant: 'warning', label: 'Cafe Store' },
     }
     const config = map[type] || { variant: 'default' as const, label: type }
     return <Badge variant={config.variant}>{config.label}</Badge>
@@ -141,21 +145,25 @@ export default function Stores() {
             <Card>
               <h3 className="text-xs font-semibold text-[#94A3B8] uppercase tracking-wide mb-4">Quick Actions</h3>
               <div className="flex flex-col gap-2">
-                <Button variant="primary" className="w-full" icon={Icons.edit} onClick={() => {
-                  setEditForm({
-                    name: s.name, code: s.code, type: s.type, status: s.status,
-                    description: s.description || '', address: s.address || '',
-                    responsibleOfficerId: s.responsibleOfficerId || ''
-                  })
-                  setShowEditModal(true)
-                }}>Edit Store</Button>
-                <Button variant="ghost" className="w-full text-[#DC2626] hover:bg-[#FEF2F2]" onClick={() => {
-                  if (confirm('Delete this store?')) {
-                    deleteStore(s.id)
-                    toast.success('Store deleted')
-                    setView('list')
-                  }
-                }}>Delete</Button>
+                {canManageStores && (
+                  <Button variant="primary" className="w-full" icon={Icons.edit} onClick={() => {
+                    setEditForm({
+                      name: s.name, code: s.code, type: s.type, status: s.status,
+                      description: s.description || '', address: s.address || '',
+                      responsibleOfficerId: s.responsibleOfficerId || ''
+                    })
+                    setShowEditModal(true)
+                  }}>Edit Store</Button>
+                )}
+                {canManageStores && (
+                  <Button variant="ghost" className="w-full text-[#DC2626] hover:bg-[#FEF2F2]" onClick={() => {
+                    if (confirm('Delete this store?')) {
+                      deleteStore(s.id)
+                      toast.success('Store deleted')
+                      setView('list')
+                    }
+                  }}>Delete</Button>
+                )}
               </div>
             </Card>
             <Button variant="ghost" className="w-full" onClick={() => setView('list')}>← Back to list</Button>
@@ -213,7 +221,9 @@ export default function Stores() {
         subtitle="Manage warehouses, stores, and storage locations"
         actions={
           <div className="flex items-center gap-2">
-            <Button variant="primary" size="md" icon={Icons.plus} onClick={() => setShowModal(true)}>Add store</Button>
+            {canManageStores && (
+              <Button variant="primary" size="md" icon={Icons.plus} onClick={() => setShowModal(true)}>Add store</Button>
+            )}
           </div>
         }
       />

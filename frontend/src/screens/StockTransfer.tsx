@@ -1,7 +1,8 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { Button, Badge, SectionHeader, Card, Select, Input, Tabs, Modal, FormGroup, Icons, useToast } from '../components/ui'
 import { useApp } from '../context/AppContext'
-import { transfersApi } from '../services/api'
+import { transfersApi, inventoryApi } from '../services/api'
+import { hasPermission, PERMISSIONS } from '../lib/permissions'
 
 const statusColors: Record<string, 'default' | 'warning' | 'primary' | 'success' | 'danger'> = {
   SUBMITTED: 'warning', APPROVED: 'primary', REJECTED: 'danger', IN_TRANSIT: 'warning', COMPLETED: 'success',
@@ -12,8 +13,9 @@ const statusLabels: Record<string, string> = {
 }
 
 export default function StockTransfer() {
-  const { transfers, stores, inventoryItems, stockCards, units, addStockMovement } = useApp()
+  const { transfers, stores, inventoryItems, stockCards, units, addStockMovement, refreshData, userRoles } = useApp()
   const { toast } = useToast()
+  const canCreateTransfer = hasPermission(userRoles, PERMISSIONS.TRANSFERS_CREATE)
 
   const [phase, setPhase] = useState<'setup' | 'list' | 'detail'>('list')
   const [selectedTransfer, setSelectedTransfer] = useState<typeof transfers[0] | null>(null)
@@ -26,6 +28,44 @@ export default function StockTransfer() {
   const [notes, setNotes] = useState('')
   const [newItems, setNewItems] = useState<{ itemId: string; qty: number; remarks: string }[]>([])
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [localStockCards, setLocalStockCards] = useState<any[]>([])
+  const [loadingCards, setLoadingCards] = useState(false)
+
+  useEffect(() => {
+    if (stores.length > 0 && !sourceStoreId) {
+      setSourceStoreId(stores[0].id)
+      const nextStore = stores.find(s => s.id !== stores[0].id)
+      if (nextStore) {
+        setDestinationStoreId(nextStore.id)
+      }
+    }
+  }, [stores, sourceStoreId])
+
+  useEffect(() => {
+    if (!sourceStoreId) {
+      setLocalStockCards([])
+      return
+    }
+    let active = true
+    const fetchCards = async () => {
+      setLoadingCards(true)
+      try {
+        const res = await inventoryApi.getStockByStore(sourceStoreId)
+        if (active) {
+          setLocalStockCards(res.data || [])
+        }
+      } catch {
+        if (active) {
+          setLocalStockCards([])
+          toast.error('Failed to load stock cards for the selected store')
+        }
+      } finally {
+        if (active) setLoadingCards(false)
+      }
+    }
+    fetchCards()
+    return () => { active = false }
+  }, [sourceStoreId])
 
   const filteredTransfers = activeTab === 'all' ? transfers : transfers.filter(t => t.status === activeTab)
 
@@ -45,14 +85,18 @@ export default function StockTransfer() {
 
   const sourceItems = useMemo(() => {
     if (!sourceStoreId) return []
-    return stockCards.filter(sc => sc.storeId === sourceStoreId && sc.availableQty > 0).map(sc => {
+    return localStockCards.filter(sc => sc.availableQty > 0).map(sc => {
       const item = inventoryItems.find(i => i.id === sc.itemId)
       const unit = item ? units.find(u => u.id === item.unitId) : null
       return { ...sc, itemName: item?.name || '', itemCode: item?.code || '', unitSymbol: unit?.symbol || '' }
     })
-  }, [sourceStoreId, stockCards, inventoryItems, units])
+  }, [sourceStoreId, localStockCards, inventoryItems, units])
 
   const addItem = () => {
+    if (sourceItems.length === 0) {
+      toast.error('No items available in the source store to transfer')
+      return
+    }
     setNewItems(prev => [...prev, { itemId: sourceItems[0]?.itemId || '', qty: 1, remarks: '' }])
   }
 
@@ -77,6 +121,7 @@ export default function StockTransfer() {
         lines: newItems.map(item => ({ itemId: item.itemId, quantityRequested: item.qty })),
       })
       toast.success('Transfer request created and pending approval')
+      refreshData().catch(() => {})
       setPhase('list')
       setNewItems([])
       setNotes('')
@@ -225,7 +270,7 @@ export default function StockTransfer() {
       <SectionHeader
         title="Stock Transfer & Tracking"
         subtitle="Transfer items between stores and departments"
-        actions={<Button variant="primary" icon={Icons.plus} onClick={() => { setPhase('setup'); setNewItems([]) }}>New Transfer</Button>}
+        actions={canCreateTransfer ? <Button variant="primary" icon={Icons.plus} onClick={() => { setPhase('setup'); setNewItems([]) }}>New Transfer</Button> : undefined}
       />
 
       <div className="grid grid-cols-3 gap-4 mb-5">

@@ -13,6 +13,15 @@ export const createDisposalSchema = z.object({
   storeId: z.string().optional().nullable(),
   reason: z.string().optional(),
   notes: z.string().optional(),
+  lines: z.array(z.object({
+    itemId: z.string(),
+    quantity: z.number().min(1),
+    locationId: z.string().optional().nullable(),
+    remarks: z.string().optional().nullable(),
+    condition: z.string().optional().nullable(),
+    batchNumber: z.string().optional().nullable(),
+    expiryDate: z.string().optional().nullable(),
+  })).optional(),
 })
 
 export const evaluateDisposalSchema = z.object({

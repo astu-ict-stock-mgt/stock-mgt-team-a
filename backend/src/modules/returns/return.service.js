@@ -2,10 +2,15 @@
  * Central Stock Return Note (SRN / Return) Service & Workflow Engine
  * Tasks: BE-114, BE-115, BE-116, BE-120 (Implement Return Stock Posting)
  * SRS Traceability: Section 7 (Stock Return Module), SRS BR-13, Clarification Register C-09
+ * BE-150: Notification events integrated — all calls are fire-and-forget.
  */
 
 import { prisma } from '../../config/database.js'
 import { NotFoundError, ValidationError, ConflictError } from '../../utils/errors.js'
+import {
+  notifyApprovalPending,
+  notifyStatusChange,
+} from '../notifications/notification-events.service.js'
 
 /**
  * Generate sequential Return Number SRN-YYYY-XXXXX
@@ -45,8 +50,8 @@ export async function createReturn({ sivId, storeId, requestedById, reason = 'UN
 
   const returnNumber = await generateReturnNumber()
 
-  return prisma.$transaction(async (tx) => {
-    const returnRecord = await tx.return.create({
+  const returnRecord = await prisma.$transaction(async (tx) => {
+    const record = await tx.return.create({
       data: {
         returnNumber,
         sivId,
@@ -71,9 +76,20 @@ export async function createReturn({ sivId, storeId, requestedById, reason = 'UN
       },
     })
 
-    return returnRecord
+    return record
   })
+
+  // BE-150: Notify TEC + STOREKEEPER that a return awaits evaluation/approval
+  notifyApprovalPending({
+    entityType: 'RETURN',
+    entityId: returnRecord.id,
+    entityNumber: returnRecord.returnNumber,
+    submitterId: requestedById,
+  }).catch(() => {})
+
+  return returnRecord
 }
+
 
 /**
  * Get Return by ID
@@ -153,16 +169,28 @@ export async function evaluateReturn({ id, evaluatorId, remarks }) {
     throw new ConflictError(`Return request cannot be evaluated from current status '${returnRecord.status}'`)
   }
 
-  return prisma.return.update({
+  const updated = await prisma.return.update({
     where: { id },
     data: {
-      status: 'EVALUATED',
+      status: 'UNDER_EVALUATION',
       evaluatedBy: evaluatorId,
       evaluatedAt: new Date(),
       ...(remarks && { notes: remarks }),
     },
     include: { lines: true },
   })
+
+  // BE-150: Notify requester their return was evaluated
+  notifyStatusChange({
+    userId: returnRecord.requestedById,
+    entityType: 'RETURN',
+    entityId: returnRecord.id,
+    entityNumber: returnRecord.returnNumber,
+    oldStatus: returnRecord.status,
+    newStatus: 'UNDER_EVALUATION',
+  }).catch(() => {})
+
+  return updated
 }
 
 /**
@@ -174,18 +202,18 @@ export async function evaluateReturn({ id, evaluatorId, remarks }) {
 export async function approveReturn({ id, approverId, disposition = 'RESTOCK', remarks, isApproved = true }) {
   const returnRecord = await getReturnById(id)
 
-  if (!['SUBMITTED', 'EVALUATED'].includes(returnRecord.status)) {
+  if (!['SUBMITTED', 'UNDER_EVALUATION'].includes(returnRecord.status)) {
     throw new ConflictError(`Return request cannot be approved from current status '${returnRecord.status}'`)
   }
 
-  const validDispositions = ['RESTOCK', 'QUARANTINE', 'REPAIR', 'DISPOSAL', 'REPLACE']
+  const validDispositions = ['RESTOCK', 'QUARANTINE', 'REPAIR', 'DISPOSAL', 'REPLACEMENT']
   if (!validDispositions.includes(disposition)) {
     throw new ValidationError(`Invalid return disposition '${disposition}'. Allowed: ${validDispositions.join(', ')}`)
   }
 
   const targetStatus = isApproved ? 'APPROVED' : 'REJECTED'
 
-  return prisma.return.update({
+  const updated = await prisma.return.update({
     where: { id },
     data: {
       status: targetStatus,
@@ -196,6 +224,18 @@ export async function approveReturn({ id, approverId, disposition = 'RESTOCK', r
     },
     include: { lines: true },
   })
+
+  // BE-150: Notify requester of approval/rejection
+  notifyStatusChange({
+    userId: returnRecord.requestedById,
+    entityType: 'RETURN',
+    entityId: returnRecord.id,
+    entityNumber: returnRecord.returnNumber,
+    oldStatus: returnRecord.status,
+    newStatus: targetStatus,
+  }).catch(() => {})
+
+  return updated
 }
 
 /**

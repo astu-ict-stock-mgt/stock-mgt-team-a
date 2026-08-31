@@ -13,8 +13,9 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 // ────────────────────────────────────────────────────────────────
@@ -418,6 +419,7 @@ enum StoreType {
   WAREHOUSE
   TRANSIT_STORE
   QUARANTINE_STORE
+  CAFE_STORE
 }
 
 enum StoreStatus {
@@ -785,6 +787,7 @@ model StockCard {
   item         Item                   @relation(fields: [itemId], references: [id], onDelete: Restrict)
   store        Store                  @relation(fields: [storeId], references: [id], onDelete: Restrict)
   transactions StockCardTransaction[]
+  batches      StockBatch[]
 
   @@unique([itemId, storeId], name: "uq_stock_card_item_store")
   @@index([itemId])
@@ -833,6 +836,34 @@ model StockCardTransaction {
   @@index([createdAt])
   @@map("stock_card_transactions")
 }
+
+// ────────────────────────────────────────────────────────────────
+// Stock Batch Model (FIFO Valuation)
+//
+// Design notes:
+// - Tracks individual batches of received stock for true FIFO valuation.
+// - Records the unit cost and remaining unissued quantity.
+// ────────────────────────────────────────────────────────────────
+model StockBatch {
+  id              String    @id @default(uuid())
+  stockCardId     String    @map("stock_card_id")
+  receiptLineId   String?   @map("receipt_line_id")
+  originalQty     Int       @map("original_qty")
+  remainingQty    Int       @map("remaining_qty")
+  unitCost        Decimal   @map("unit_cost")
+  receivedAt      DateTime  @default(now()) @map("received_at")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  // Relationships
+  stockCard       StockCard @relation(fields: [stockCardId], references: [id], onDelete: Restrict)
+
+  @@index([stockCardId])
+  @@index([remainingQty])
+  @@index([receivedAt])
+  @@map("stock_batches")
+}
+
 
 // ────────────────────────────────────────────────────────────────
 // Bin Card Model (BE-083)
@@ -1525,6 +1556,7 @@ model Notification {
   title         String
   message       String
   type          String    @default("INFO")
+  priority      String    @default("MEDIUM")
   referenceId   String?   @map("reference_id")
   referenceType String?   @map("reference_type")
   isRead        Boolean   @default(false) @map("is_read")
@@ -1534,7 +1566,8 @@ model Notification {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
-  @@index([isRead])
+  @@index([userId, isRead])
+  @@index([userId, isRead, createdAt])
   @@index([type])
   @@index([createdAt])
   @@map("notifications")
