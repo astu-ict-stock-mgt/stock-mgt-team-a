@@ -186,16 +186,8 @@ export async function getBinMovementReport(filters = {}) {
 
 /**
  * Inventory valuation report.
- *
- * NEEDS CLARIFICATION (SRS C-13, not resolved by this function): this
- * reads stockCard.averageCost * quantity as the valuation figure. C-13
- * asks whether FIFO applies only to financial valuation or also to which
- * physical units get selected on issue — BE-085's actual costing logic
- * (how averageCost is computed/maintained) was never supplied, so this
- * function trusts whatever value is already stored rather than
- * recomputing a FIFO cost itself. If BE-085 uses a different valuation
- * method internally, this report will silently disagree with it — flag
- * against C-13 before this is relied on for financial reporting.
+ * Calculates the exact FIFO valuation by summing (remainingQty * unitCost)
+ * across all active batches for the item.
  *
  * @param {Object} filters - { storeId, itemId }
  */
@@ -212,23 +204,28 @@ export async function getValuationReport(filters = {}) {
     include: {
       item: { select: { id: true, name: true, code: true } },
       store: { select: { id: true, name: true, code: true } },
+      batches: {
+        where: { remainingQty: { gt: 0 } },
+      },
     },
   })
 
-  const lines = stockCards.map((card) => ({
-    itemId: card.itemId,
-    item: card.item,
-    storeId: card.storeId,
-    store: card.store,
-    quantity: card.quantity,
-    averageCost: card.averageCost,
-    totalValue:
-      card.averageCost != null ? Number(card.averageCost) * card.quantity : null,
-  }))
+  const lines = stockCards.map((card) => {
+    const totalValue = card.batches.reduce((sum, batch) => sum + (batch.remainingQty * Number(batch.unitCost)), 0)
+    return {
+      itemId: card.itemId,
+      item: card.item,
+      storeId: card.storeId,
+      store: card.store,
+      quantity: card.quantity,
+      totalValue,
+      valuationMethod: 'FIFO',
+    }
+  })
 
   const totalValue = lines.reduce((sum, line) => sum + (line.totalValue ?? 0), 0)
 
-  return { lines, totalValue, valuationMethod: 'AVERAGE_COST_STORED' }
+  return { lines, totalValue, valuationMethod: 'FIFO' }
 }
 
 /**

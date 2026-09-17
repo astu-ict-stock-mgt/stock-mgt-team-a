@@ -262,9 +262,10 @@ interface TableProps<T> {
   selectable?: boolean
   onRowClick?: (row: T) => void
   rowKey: (row: T) => string
+  onDeleteSelected?: (keys: string[]) => void
 }
 
-export function Table<T>({ columns, data, loading, empty, emptyMessage = 'No records found', selectable, onRowClick, rowKey }: TableProps<T>) {
+export function Table<T>({ columns, data, loading, empty, emptyMessage = 'No records found', selectable, onRowClick, rowKey, onDeleteSelected }: TableProps<T>) {
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [sortKey, setSortKey] = useState<string | null>(null)
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
@@ -290,7 +291,11 @@ export function Table<T>({ columns, data, loading, empty, emptyMessage = 'No rec
           <span className="text-sm font-semibold text-[#4F46E5]">{selected.size} item(s) selected</span>
           <div className="flex gap-2">
             <Button variant="secondary" size="sm">Export Selected</Button>
-            <Button variant="destructive" size="sm">Delete</Button>
+            {onDeleteSelected && (
+              <Button variant="destructive" size="sm" onClick={() => onDeleteSelected(Array.from(selected))}>
+                Delete
+              </Button>
+            )}
             <Button variant="ghost" size="sm" onClick={() => setSelected(new Set())}>Clear Selection</Button>
           </div>
         </div>
@@ -491,15 +496,48 @@ export function ToastContainer({ toasts, onRemove }: ToastContainerProps) {
   )
 }
 
+// Global shared toast state for useToast hook
+let globalToasts: Toast[] = []
+const toastListeners = new Set<(toasts: Toast[]) => void>()
+
+const notifyToastListeners = () => {
+  toastListeners.forEach(l => l([...globalToasts]))
+}
+
+const addGlobalToast = (type: ToastType, message: string) => {
+  const id = Math.random().toString(36).slice(2)
+  globalToasts = [...globalToasts, { id, type, message }]
+  notifyToastListeners()
+  setTimeout(() => {
+    removeGlobalToast(id)
+  }, 4000)
+}
+
+const removeGlobalToast = (id: string) => {
+  globalToasts = globalToasts.filter(x => x.id !== id)
+  notifyToastListeners()
+}
+
 export function useToast() {
-  const [toasts, setToasts] = useState<Toast[]>([])
-  const add = (type: ToastType, message: string) => {
-    const id = Math.random().toString(36).slice(2)
-    setToasts(t => [...t, { id, type, message }])
-    setTimeout(() => setToasts(t => t.filter(x => x.id !== id)), 4000)
+  const [toasts, setToasts] = useState<Toast[]>(globalToasts)
+
+  useEffect(() => {
+    toastListeners.add(setToasts)
+    return () => {
+      toastListeners.delete(setToasts)
+    }
+  }, [])
+
+  return {
+    toasts,
+    toast: {
+      success: (m: string) => addGlobalToast('success', m),
+      error: (m: string) => addGlobalToast('error', m),
+      warning: (m: string) => addGlobalToast('warning', m),
+      info: (m: string) => addGlobalToast('info', m),
+    },
+    remove: removeGlobalToast,
   }
-  const remove = (id: string) => setToasts(t => t.filter(x => x.id !== id))
-  return { toasts, toast: { success: (m: string) => add('success', m), error: (m: string) => add('error', m), warning: (m: string) => add('warning', m), info: (m: string) => add('info', m) }, remove }
 }
 
 // ─── TABS ─────────────────────────────────────────────────────────────────────

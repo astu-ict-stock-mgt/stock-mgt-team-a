@@ -44,6 +44,37 @@ export class TransferPostingService {
       // 2. Validate preconditions, source availability, destination validity & quantities (BE-127)
       await TransferValidationService.validateTransferExecution(transferRequest, tx)
 
+      // Directive 1095/2017 Article 19: User-to-User transfers do NOT touch warehouse stock cards
+      if (transferRequest.transferType === 'USER_TO_USER') {
+        for (const line of transferRequest.lines) {
+          if (line.assetId) {
+            await tx.fixedAsset.update({
+              where: { id: line.assetId },
+              data: {
+                custodianId: transferRequest.destinationUserId,
+                status: 'IN_USE',
+              },
+            })
+          }
+        }
+
+        const updatedTransfer = await tx.transferRequest.update({
+          where: { id: transferRequestId },
+          data: {
+            status: 'COMPLETED',
+            acknowledgedBy: transferRequest.acknowledgedBy || transferRequest.destinationUserId,
+            acknowledgedAt: transferRequest.acknowledgedAt || new Date(),
+          },
+        })
+
+        return {
+          success: true,
+          transferNumber: updatedTransfer.transferNumber,
+          status: updatedTransfer.status,
+          movements: [],
+        }
+      }
+
       const {
         transferNumber,
         sourceStoreId,
@@ -250,8 +281,6 @@ export class TransferPostingService {
         where: { id: transferRequestId },
         data: {
           status: 'COMPLETED',
-          executedBy: executedByUserId,
-          executedAt: new Date(),
         },
       })
 
@@ -259,7 +288,6 @@ export class TransferPostingService {
         success: true,
         transferNumber: updatedTransfer.transferNumber,
         status: updatedTransfer.status,
-        executedAt: updatedTransfer.executedAt,
         movements,
       }
     })

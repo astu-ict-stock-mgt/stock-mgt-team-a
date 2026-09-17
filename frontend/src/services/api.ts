@@ -9,15 +9,15 @@ class ApiClient {
 
   constructor(baseUrl: string) {
     this.baseUrl = baseUrl
-    this.token = localStorage.getItem('sms_token')
+    this.token = sessionStorage.getItem('sms_token')
   }
 
   setToken(token: string | null) {
     this.token = token
     if (token) {
-      localStorage.setItem('sms_token', token)
+      sessionStorage.setItem('sms_token', token)
     } else {
-      localStorage.removeItem('sms_token')
+      sessionStorage.removeItem('sms_token')
     }
   }
 
@@ -95,6 +95,8 @@ export const authApi = {
     api.post<ApiResponse<{ user: User; token: string }>>('/auth/login', { email, password }),
   logout: () => api.post<ApiResponse<{ message: string }>>('/auth/logout'),
   me: () => api.get<ApiResponse<{ userId: string; email: string; fullName: string; status: string }>>('/auth/me'),
+  changePassword: (data: { currentPassword: string; newPassword: string }) =>
+    api.post<ApiResponse<{ message: string }>>('/auth/change-password', data),
 }
 
 export const usersApi = {
@@ -155,6 +157,11 @@ export const departmentsApi = {
     return api.get<ApiResponse<Array<{ id: string; name: string; code: string; status?: string }>>>(`/departments?${q.toString()}`)
   },
   getById: (id: string) => api.get<ApiResponse<{ id: string; name: string; code: string }>>(`/departments/${id}`),
+  create: (data: { name: string; code: string; description?: string; status?: string }) =>
+    api.post<ApiResponse<{ id: string; name: string; code: string }>>('/departments', data),
+  update: (id: string, data: Partial<{ name: string; code: string; status: string }>) => 
+    api.put<ApiResponse<{ id: string; name: string; code: string }>>(`/departments/${id}`, data),
+  delete: (id: string) => api.delete<ApiResponse<{ message: string }>>(`/departments/${id}`),
 }
 
 export const categoriesApi = {
@@ -220,6 +227,13 @@ export const itemsApi = {
 }
 
 export const inventoryApi = {
+  getAllStock: (params?: { categoryId?: string; search?: string; lowStock?: boolean }) => {
+    const q = new URLSearchParams()
+    if (params?.categoryId) q.set('categoryId', params.categoryId)
+    if (params?.search) q.set('search', params.search)
+    if (params?.lowStock) q.set('lowStock', 'true')
+    return api.get<ApiResponse<StockCard[]>>(`/inventory/stock/all?${q.toString()}`)
+  },
   getStockByStore: (storeId: string, params?: { categoryId?: string; search?: string; lowStock?: boolean }) => {
     const q = new URLSearchParams()
     if (params?.categoryId) q.set('categoryId', params.categoryId)
@@ -249,20 +263,40 @@ export const inventoryApi = {
 }
 
 export const transfersApi = {
-  getAll: (params?: { status?: string; transferType?: string; page?: number; limit?: number }) => {
+  getAll: (params?: { status?: string; transferType?: string; sourceStoreId?: string; destinationStoreId?: string; sourceUserId?: string; destinationUserId?: string; page?: number; limit?: number }) => {
     const q = new URLSearchParams()
     if (params?.status) q.set('status', params.status)
     if (params?.transferType) q.set('transferType', params.transferType)
+    if (params?.sourceStoreId) q.set('sourceStoreId', params.sourceStoreId)
+    if (params?.destinationStoreId) q.set('destinationStoreId', params.destinationStoreId)
+    if (params?.sourceUserId) q.set('sourceUserId', params.sourceUserId)
+    if (params?.destinationUserId) q.set('destinationUserId', params.destinationUserId)
     if (params?.page) q.set('page', String(params.page))
     if (params?.limit) q.set('limit', String(params.limit))
     return api.get<ApiResponse<TransferRequest[]>>(`/transfers?${q.toString()}`)
   },
   getById: (id: string) => api.get<ApiResponse<TransferRequest>>(`/transfers/${id}`),
-  create: (data: { sourceStoreId: string; destinationStoreId: string; transferType?: string; notes?: string; lines: Array<{ itemId: string; quantityRequested: number }> }) =>
-    api.post<ApiResponse<TransferRequest>>('/transfers', data),
+  create: (data: {
+    sourceStoreId?: string | null
+    destinationStoreId?: string | null
+    sourceUserId?: string | null
+    destinationUserId?: string | null
+    transferType?: string
+    reason?: string
+    notes?: string
+    lines: Array<{
+      itemId: string
+      assetId?: string | null
+      quantityRequested: number
+      quantity?: number
+      remarks?: string
+    }>
+  }) => api.post<ApiResponse<TransferRequest>>('/transfers', data),
   approve: (id: string, data?: { isApproved?: boolean; notes?: string }) =>
     api.patch<ApiResponse<TransferRequest>>(`/transfers/${id}/approve`, data),
   dispatch: (id: string) => api.patch<ApiResponse<TransferRequest>>(`/transfers/${id}/dispatch`),
+  acknowledge: (id: string, data?: { notes?: string }) =>
+    api.patch<ApiResponse<TransferRequest>>(`/transfers/${id}/acknowledge`, data),
   complete: (id: string) => api.patch<ApiResponse<TransferRequest>>(`/transfers/${id}/complete`),
 }
 
@@ -331,6 +365,8 @@ export const sivApi = {
   getById: (id: string) => api.get<ApiResponse<unknown>>(`/sivs/${id}`),
   approve: (id: string) => api.patch<ApiResponse<unknown>>(`/sivs/${id}/approve`),
   finalize: (id: string) => api.patch<ApiResponse<unknown>>(`/sivs/${id}/finalize`),
+  verifyDispatch: (id: string, data: { vehicleNumber?: string; driverName?: string; gateNumber?: string; remarks?: string }) =>
+    api.post<ApiResponse<unknown>>(`/sivs/${id}/verify-dispatch`, data),
 }
 
 export const auditApi = {
@@ -353,15 +389,133 @@ export const notificationsApi = {
     if (params?.limit) q.set('limit', String(params.limit))
     return api.get<ApiResponse<Notification[]>>(`/notifications?${q.toString()}`)
   },
-  markRead: (id: string) => api.post<ApiResponse<Notification>>(`/notifications/${id}/read`),
-  markAllRead: () => api.post<ApiResponse<{ count: number }>>('/notifications/mark-all-read'),
+  getById: (id: string) => api.get<ApiResponse<Notification>>(`/notifications/${id}`),
+  getUnreadCount: () => api.get<ApiResponse<{ unreadCount: number }>>('/notifications/unread-count'),
+  markRead: (id: string) => api.patch<ApiResponse<Notification>>(`/notifications/${id}/read`),
+  markAllRead: () => api.patch<ApiResponse<{ count: number }>>('/notifications/read-all'),
+  delete: (id: string) => api.delete<ApiResponse<Notification>>(`/notifications/${id}`),
+}
+
+
+export const evaluationsApi = {
+  getAll: (params?: { status?: string }) => {
+    const q = new URLSearchParams()
+    if (params?.status) q.set('status', params.status)
+    return api.get<ApiResponse<any[]>>(`/evaluations?${q.toString()}`)
+  },
+  getById: (id: string) => api.get<ApiResponse<any>>(`/evaluations/${id}`),
+  create: (data: { goodsReceiptId: string; notes?: string }) =>
+    api.post<ApiResponse<any>>('/evaluations', data),
+  startEvaluation: (id: string, userId?: string) =>
+    api.patch<ApiResponse<any>>(`/evaluations/${id}/start`),
+  updateDecision: (id: string, decision: 'APPROVED' | 'REJECTED', notes?: string) =>
+    api.patch<ApiResponse<any>>(`/evaluations/${id}/decision`, { decision, notes }),
+}
+
+export const assetsApi = {
+  getAll: (params?: { status?: string; custodianId?: string; departmentId?: string; search?: string; page?: number; limit?: number }) => {
+    const q = new URLSearchParams()
+    if (params?.status) q.set('status', params.status)
+    if (params?.custodianId) q.set('custodianId', params.custodianId)
+    if (params?.departmentId) q.set('departmentId', params.departmentId)
+    if (params?.search) q.set('search', params.search)
+    if (params?.page) q.set('page', String(params.page))
+    if (params?.limit) q.set('limit', String(params.limit))
+    return api.get<ApiResponse<any[]>>(`/assets?${q.toString()}`)
+  },
+  getById: (id: string) => api.get<ApiResponse<any>>(`/assets/${id}`),
+  register: (data: { name: string; itemId?: string; serialNumber?: string; assetTag?: string; category?: string; purchaseCost?: number; location?: string; grnId?: string; notes?: string }) =>
+    api.post<ApiResponse<any>>('/assets', data),
+}
+
+export const disposalsApi = {
+  getAll: (params?: { status?: string; disposalMethod?: string; storeId?: string; page?: number; limit?: number }) => {
+    const q = new URLSearchParams()
+    if (params?.status) q.set('status', params.status)
+    if (params?.disposalMethod) q.set('disposalMethod', params.disposalMethod)
+    if (params?.storeId) q.set('storeId', params.storeId)
+    if (params?.page) q.set('page', String(params.page))
+    if (params?.limit) q.set('limit', String(params.limit))
+    return api.get<ApiResponse<any[]>>(`/disposals?${q.toString()}`)
+  },
+  getById: (id: string) => api.get<ApiResponse<any>>(`/disposals/${id}`),
+  create: (data: {
+    storeId: string
+    disposalMethod: string
+    reason?: string
+    notes?: string
+    // Directive 1095/2017: TRANSFER_OUT proposal fields
+    receivingPublicBody?: string
+    authorizationRef?: string
+    lines?: Array<{ itemId: string; quantity: number; locationId?: string | null; remarks?: string | null; condition?: string | null; batchNumber?: string | null; expiryDate?: string | null }>
+  }) =>
+    api.post<ApiResponse<any>>('/disposals', data),
+  evaluate: (id: string, data: { notes: string }) =>
+    api.patch<ApiResponse<any>>(`/disposals/${id}/evaluate`, data),
+  approve: (id: string, data: { notes?: string; disposalMethod?: string }) =>
+    api.patch<ApiResponse<any>>(`/disposals/${id}/approve`, data),
+  reject: (id: string, data: { reason: string }) =>
+    api.patch<ApiResponse<any>>(`/disposals/${id}/reject`, data),
+  execute: (id: string, data: {
+    executionNotes?: string
+    witnessName?: string
+    certificateNumber?: string
+    disposalLocation?: string
+    // Directive 1095/2017: TRANSFER_OUT handover execution fields
+    receivingPublicBody?: string
+    authorizationRef?: string
+    handoverDocRef?: string
+    recipientOfficer?: string
+  }) =>
+    api.post<ApiResponse<any>>(`/disposals/${id}/execute`, data),
+  getHistory: (id: string) => api.get<ApiResponse<any>>(`/disposals/${id}/history`),
+}
+
+export const returnsApi = {
+  getAll: (params?: { status?: string; storeId?: string; requestedById?: string; page?: number; limit?: number }) => {
+    const q = new URLSearchParams()
+    if (params?.status) q.set('status', params.status)
+    if (params?.storeId) q.set('storeId', params.storeId)
+    if (params?.requestedById) q.set('requestedById', params.requestedById)
+    if (params?.page) q.set('page', String(params.page))
+    if (params?.limit) q.set('limit', String(params.limit))
+    return api.get<ApiResponse<any[]>>(`/returns?${q.toString()}`)
+  },
+  getById: (id: string) => api.get<ApiResponse<any>>(`/returns/${id}`),
+  create: (data: { sivId: string; storeId: string; reason: string; notes?: string; lines: Array<{ itemId: string; quantityReturned: number; remarks?: string | null }> }) =>
+    api.post<ApiResponse<any>>('/returns', data),
+  evaluate: (id: string, data: { remarks: string }) =>
+    api.patch<ApiResponse<any>>(`/returns/${id}/evaluate`, data),
+  approve: (id: string, data: { disposition: string; remarks?: string; isApproved: boolean }) =>
+    api.patch<ApiResponse<any>>(`/returns/${id}/approve`, data),
+  postStock: (id: string) =>
+    api.post<ApiResponse<any>>(`/returns/${id}/post`),
 }
 
 export const reportsApi = {
-  getInventoryValuation: (params?: { storeId?: string; categoryId?: string }) => {
+  getStockLevels: (params?: { storeId?: string; itemId?: string; page?: number; limit?: number }) => {
     const q = new URLSearchParams()
     if (params?.storeId) q.set('storeId', params.storeId)
-    if (params?.categoryId) q.set('categoryId', params.categoryId)
-    return api.get<ApiResponse<unknown>>(`/inventory/valuation?${q.toString()}`)
+    if (params?.itemId) q.set('itemId', params.itemId)
+    if (params?.page) q.set('page', String(params.page))
+    if (params?.limit) q.set('limit', String(params.limit))
+    return api.get<ApiResponse<any>>(`/reports/stock-levels?${q.toString()}`)
+  },
+  getStockMovement: (params?: { storeId?: string; itemId?: string; transactionType?: string; dateFrom?: string; dateTo?: string; page?: number; limit?: number }) => {
+    const q = new URLSearchParams()
+    if (params?.storeId) q.set('storeId', params.storeId)
+    if (params?.itemId) q.set('itemId', params.itemId)
+    if (params?.transactionType) q.set('transactionType', params.transactionType)
+    if (params?.dateFrom) q.set('dateFrom', params.dateFrom)
+    if (params?.dateTo) q.set('dateTo', params.dateTo)
+    if (params?.page) q.set('page', String(params.page))
+    if (params?.limit) q.set('limit', String(params.limit))
+    return api.get<ApiResponse<any>>(`/reports/stock-movement?${q.toString()}`)
+  },
+  getInventoryValuation: (params?: { storeId?: string; itemId?: string }) => {
+    const q = new URLSearchParams()
+    if (params?.storeId) q.set('storeId', params.storeId)
+    if (params?.itemId) q.set('itemId', params.itemId)
+    return api.get<ApiResponse<any>>(`/reports/valuation?${q.toString()}`)
   },
 }

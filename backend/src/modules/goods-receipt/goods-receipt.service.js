@@ -19,7 +19,7 @@ class GoodsReceiptService {
         notes: receiptData.notes,
         totalAmount: receiptData.lines?.reduce((sum, l) => sum + (l.quantity * l.unitCost), 0) || 0,
         currency: receiptData.currency || 'ETB',
-        status: 'APPROVED',
+        status: 'PENDING_EVALUATION',
         lines: {
           create: receiptData.lines?.map(line => ({
             itemId: line.itemId,
@@ -76,12 +76,9 @@ class GoodsReceiptService {
         where: { uq_stock_card_item_store: { itemId, storeId } },
       });
 
-      let stockCardId, newBalance, newAverageCost;
+      let stockCardId, newBalance;
       if (existingCard) {
-        const totalQty = existingCard.quantity + quantity;
-        const totalValue = (existingCard.quantity * Number(existingCard.averageCost)) + (quantity * unitCost);
-        newAverageCost = totalQty > 0 ? totalValue / totalQty : unitCost;
-        newBalance = totalQty;
+        newBalance = existingCard.quantity + quantity;
         stockCardId = existingCard.id;
 
         await tx.stockCard.update({
@@ -89,12 +86,10 @@ class GoodsReceiptService {
           data: {
             quantity: { increment: quantity },
             availableQty: { increment: quantity },
-            averageCost: String(newAverageCost),
           },
         });
       } else {
         newBalance = quantity;
-        newAverageCost = unitCost;
 
         const newCard = await tx.stockCard.create({
           data: {
@@ -103,7 +98,6 @@ class GoodsReceiptService {
             quantity,
             availableQty: quantity,
             reservedQty: 0,
-            averageCost: String(unitCost),
           },
         });
         stockCardId = newCard.id;
@@ -121,6 +115,17 @@ class GoodsReceiptService {
           referenceNumber: receipt.receiptNumber,
           notes: `Received via ${receipt.receiptNumber}`,
           createdBy: userId,
+        },
+      });
+
+      // Create StockBatch for FIFO
+      await tx.stockBatch.create({
+        data: {
+          stockCardId,
+          receiptLineId: line.id,
+          originalQty: quantity,
+          remainingQty: quantity,
+          unitCost: String(unitCost),
         },
       });
     });
@@ -153,6 +158,18 @@ class GoodsReceiptService {
       include: {
         supplier: { select: { id: true, code: true, name: true } },
         store: { select: { id: true, code: true, name: true } },
+        lines: {
+          include: {
+            item: { select: { id: true, code: true, name: true } },
+            unit: { select: { id: true, code: true, name: true, symbol: true } },
+          },
+        },
+        evaluations: {
+          include: {
+            evaluator: { select: { id: true, fullName: true } },
+          },
+        },
+        grn: { select: { id: true, grnNumber: true } },
         _count: { select: { lines: true } },
       },
       orderBy: { receivedDate: 'desc' },

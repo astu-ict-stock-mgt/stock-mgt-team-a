@@ -1,6 +1,8 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { Button, Badge, SectionHeader, Card, Select, Icons, useToast } from '../components/ui'
 import { useApp } from '../context/AppContext'
+import { hasPermission, PERMISSIONS } from '../lib/permissions'
+import { inventoryApi } from '../services/api'
 
 interface CountEntry {
   itemId: string
@@ -15,21 +17,56 @@ interface CountEntry {
 }
 
 export default function StockTaking() {
-  const { inventoryItems, stockCards, stores, units, categories, addStockMovement } = useApp()
+  const { inventoryItems, stockCards, stores, units, categories, addStockMovement, userRoles } = useApp()
   const { toast } = useToast()
+  const canCreateReconciliation = hasPermission(userRoles, PERMISSIONS.RECONCILIATION_CREATE)
 
   const [phase, setPhase] = useState<'setup' | 'count' | 'variance'>('setup')
   const [storeId, setStoreId] = useState('')
   const [entries, setEntries] = useState<CountEntry[]>([])
+  const [localStockCards, setLocalStockCards] = useState<any[]>([])
+  const [loadingCards, setLoadingCards] = useState(false)
+
+  useEffect(() => {
+    if (stores.length > 0 && !storeId) {
+      setStoreId(stores[0].id)
+    }
+  }, [stores, storeId])
+
+  useEffect(() => {
+    if (!storeId) {
+      setLocalStockCards([])
+      return
+    }
+    let active = true
+    const fetchCards = async () => {
+      setLoadingCards(true)
+      try {
+        const res = await inventoryApi.getStockByStore(storeId)
+        if (active) {
+          setLocalStockCards(res.data || [])
+        }
+      } catch {
+        if (active) {
+          setLocalStockCards([])
+          toast.error('Failed to load stock cards for the selected store')
+        }
+      } finally {
+        if (active) setLoadingCards(false)
+      }
+    }
+    fetchCards()
+    return () => { active = false }
+  }, [storeId])
 
   const storeItems = useMemo(() => {
     if (!storeId) return []
-    return stockCards.filter(sc => sc.storeId === storeId).map(sc => {
+    return localStockCards.map(sc => {
       const item = inventoryItems.find(i => i.id === sc.itemId)
       const unit = item ? units.find(u => u.id === item.unitId) : null
       return { ...sc, item, unit }
     }).filter(si => si.item)
-  }, [storeId, stockCards, inventoryItems, units])
+  }, [storeId, localStockCards, inventoryItems, units])
 
   const countedItems = entries.filter(e => e.counted).length
   const totalItems = entries.length
@@ -78,27 +115,39 @@ export default function StockTaking() {
                 </tr>
               </thead>
               <tbody>
-                {entries.filter(e => e.counted).map(e => {
-                  const variance = (e.physicalCount ?? 0) - e.systemCount
-                  const varianceValue = variance * e.unitCost
-                  const hasVariance = variance !== 0
+                {entries.map(e => {
+                  const variance = e.physicalCount !== null ? e.physicalCount - e.systemCount : null
+                  const varianceValue = variance !== null ? variance * e.unitCost : 0
+                  const hasVariance = variance !== null && variance !== 0
                   return (
                     <tr key={e.itemId} className={`border-b border-[#F8FAFC] hover:bg-[#F8FAFC] ${hasVariance ? 'bg-[#FFFBEB]' : ''}`}>
                       <td className="px-4 py-3"><div className="text-sm font-medium text-[#1E293B]">{e.name}</div></td>
                       <td className="px-4 py-3 font-mono text-xs text-[#64748B]">{e.code}</td>
                       <td className="px-4 py-3 font-mono text-sm font-semibold text-[#334155]">{e.systemCount} {e.unitSymbol}</td>
-                      <td className="px-4 py-3 font-mono text-sm font-semibold text-[#1E293B]">{e.physicalCount ?? '—'} {e.unitSymbol}</td>
+                      <td className="px-4 py-3 font-mono text-sm font-semibold text-[#1E293B]">{e.physicalCount !== null ? `${e.physicalCount} ${e.unitSymbol}` : '—'}</td>
                       <td className="px-4 py-3">
-                        <span className={`font-mono text-sm font-bold ${variance > 0 ? 'text-[#16A34A]' : variance < 0 ? 'text-[#DC2626]' : 'text-[#94A3B8]'}`}>
-                          {variance > 0 ? '+' : ''}{variance} {e.unitSymbol}
-                        </span>
+                        {variance !== null ? (
+                          <span className={`font-mono text-sm font-bold ${variance > 0 ? 'text-[#16A34A]' : variance < 0 ? 'text-[#DC2626]' : 'text-[#94A3B8]'}`}>
+                            {variance > 0 ? '+' : ''}{variance} {e.unitSymbol}
+                          </span>
+                        ) : <span className="text-[#94A3B8]">—</span>}
                       </td>
                       <td className="px-4 py-3">
-                        <span className={`font-mono text-sm font-semibold ${varianceValue > 0 ? 'text-[#16A34A]' : varianceValue < 0 ? 'text-[#DC2626]' : 'text-[#94A3B8]'}`}>
-                          {varianceValue > 0 ? '+' : ''}${varianceValue.toFixed(2)}
-                        </span>
+                        {variance !== null ? (
+                          <span className={`font-mono text-sm font-semibold ${varianceValue > 0 ? 'text-[#16A34A]' : varianceValue < 0 ? 'text-[#DC2626]' : 'text-[#94A3B8]'}`}>
+                            {varianceValue > 0 ? '+' : ''}${varianceValue.toFixed(2)}
+                          </span>
+                        ) : <span className="text-[#94A3B8]">—</span>}
                       </td>
-                      <td className="px-4 py-3">{hasVariance ? <Badge variant="warning" dot>Variance</Badge> : <Badge variant="success" dot>Match</Badge>}</td>
+                      <td className="px-4 py-3">
+                        {e.physicalCount === null ? (
+                          <Badge variant="default">Pending</Badge>
+                        ) : hasVariance ? (
+                          <Badge variant="warning" dot>Variance</Badge>
+                        ) : (
+                          <Badge variant="success" dot>Match</Badge>
+                        )}
+                      </td>
                     </tr>
                   )
                 })}
@@ -200,34 +249,52 @@ export default function StockTaking() {
     <div>
       <SectionHeader title="Stock Taking & Reconciliation" subtitle="Conduct a physical inventory count" />
       <div className="max-w-xl mx-auto">
-        <Card>
-          <h3 className="text-base font-semibold text-[#0F172A] mb-5">New Stock Count Setup</h3>
-          <div className="space-y-4">
-            <Select label="Store" options={stores.map(s => ({ value: s.id, label: s.name }))}
-              value={storeId} onChange={e => setStoreId(e.target.value)} />
-            <div className="p-4 bg-[#F8FAFC] rounded-xl">
-              <p className="text-sm font-medium text-[#334155] mb-2">Count summary</p>
-              <div className="grid grid-cols-2 gap-3">
-                <div><p className="text-xs text-[#94A3B8]">Items to count</p><p className="text-lg font-bold font-mono text-[#0F172A]">{storeItems.length}</p></div>
-                <div><p className="text-xs text-[#94A3B8]">System total value</p><p className="text-lg font-bold font-mono text-[#0F172A]">${storeItems.reduce((s, si) => s + si.quantity * (Number(si.averageCost) || 0), 0).toFixed(2)}</p></div>
+        {canCreateReconciliation ? (
+          <Card>
+            <h3 className="text-base font-semibold text-[#0F172A] mb-5">New Stock Count Setup</h3>
+            <div className="space-y-4">
+              <Select label="Store" options={stores.map(s => ({ value: s.id, label: s.name }))}
+                value={storeId} onChange={e => setStoreId(e.target.value)} />
+              <div className="p-4 bg-[#F8FAFC] rounded-xl">
+                <p className="text-sm font-medium text-[#334155] mb-2">Count summary</p>
+                {loadingCards ? (
+                  <p className="text-xs text-[#94A3B8] py-2">Loading store items...</p>
+                ) : (
+                  <div className="grid grid-cols-2 gap-3">
+                    <div><p className="text-xs text-[#94A3B8]">Items to count</p><p className="text-lg font-bold font-mono text-[#0F172A]">{storeItems.length}</p></div>
+                    <div><p className="text-xs text-[#94A3B8]">System total value</p><p className="text-lg font-bold font-mono text-[#0F172A]">${storeItems.reduce((s, si) => s + si.quantity * (Number(si.averageCost) || 0), 0).toFixed(2)}</p></div>
+                  </div>
+                )}
+              </div>
+              <div className="p-3 bg-[#FFFBEB] border border-[#FDE68A] rounded-lg text-xs text-[#92400E]">
+                Freeze stock movements before starting the count to ensure accuracy.
               </div>
             </div>
-            <div className="p-3 bg-[#FFFBEB] border border-[#FDE68A] rounded-lg text-xs text-[#92400E]">
-              Freeze stock movements before starting the count to ensure accuracy.
+            <div className="flex justify-end mt-5 pt-5 border-t border-[#E2E8F0]">
+              <Button variant="primary" disabled={storeItems.length === 0 || loadingCards} onClick={() => {
+                setEntries(storeItems.map(si => ({
+                  itemId: si.itemId, name: si.item?.name || '', code: si.item?.code || '',
+                  systemCount: si.quantity, physicalCount: null,
+                  unitSymbol: si.unit?.symbol || '', unitCost: Number(si.averageCost) || 0,
+                  notes: '', counted: false,
+                })))
+                setPhase('count')
+              }}>Start counting →</Button>
             </div>
-          </div>
-          <div className="flex justify-end mt-5 pt-5 border-t border-[#E2E8F0]">
-            <Button variant="primary" onClick={() => {
-              setEntries(storeItems.map(si => ({
-                itemId: si.itemId, name: si.item?.name || '', code: si.item?.code || '',
-                systemCount: si.quantity, physicalCount: null,
-                unitSymbol: si.unit?.symbol || '', unitCost: Number(si.averageCost) || 0,
-                notes: '', counted: false,
-              })))
-              setPhase('count')
-            }}>Start counting →</Button>
-          </div>
-        </Card>
+          </Card>
+        ) : (
+          <Card>
+            <div className="py-12 text-center">
+              <div className="w-12 h-12 rounded-full bg-[#F1F5F9] flex items-center justify-center mx-auto mb-3 text-xl">
+                📋
+              </div>
+              <p className="text-sm font-medium text-[#1E293B]">Verification Only Mode</p>
+              <p className="text-xs text-[#64748B] mt-1.5 max-w-sm mx-auto leading-relaxed">
+                Only Storekeepers are authorized to start and perform physical stock takes. Property Administration Officers and Administrators can review variance reports once submitted.
+              </p>
+            </div>
+          </Card>
+        )}
       </div>
     </div>
   )

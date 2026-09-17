@@ -6,6 +6,7 @@
 
 import { prisma } from '../../config/database.js'
 import { NotFoundError, ValidationError, ConflictError } from '../../utils/errors.js'
+import { notifySecurityEvent } from '../notifications/notification-events.service.js'
 
 /**
  * Generate sequential SIV Number SIV-YYYY-XXXXX
@@ -65,6 +66,7 @@ export async function createSIV({ requisitionId, storeId, issuedToUserId, prepar
         lines: {
           create: lines.map((l) => ({
             itemId: l.itemId,
+            assetId: l.assetId || null,
             quantityIssued: l.quantityIssued,
             unitCost: l.unitCost || null,
             totalCost: l.unitCost ? l.unitCost * l.quantityIssued : null,
@@ -99,7 +101,12 @@ export async function getSivById(id) {
       issuedToUser: { select: { id: true, fullName: true, email: true } },
       preparedByUser: { select: { id: true, fullName: true } },
       approvedByUser: { select: { id: true, fullName: true } },
-      lines: { include: { item: { select: { id: true, name: true, code: true } } } },
+      lines: {
+        include: {
+          item: { select: { id: true, name: true, code: true } },
+          asset: { select: { id: true, assetTag: true, serialNumber: true, name: true, status: true } },
+        },
+      },
     },
   })
 
@@ -202,6 +209,37 @@ export async function finalizeSIV({ id, finalizerId }) {
       })
 
       if (stockCard) {
+        let remainingToDeduct = line.quantityIssued
+        const batches = await tx.stockBatch.findMany({
+          where: { stockCardId: stockCard.id, remainingQty: { gt: 0 } },
+          orderBy: { receivedAt: 'asc' }
+        })
+
+        let calculatedTotalCost = 0
+
+        for (const batch of batches) {
+          if (remainingToDeduct <= 0) break
+          const deductQty = Math.min(batch.remainingQty, remainingToDeduct)
+          
+          await tx.stockBatch.update({
+            where: { id: batch.id },
+            data: { remainingQty: { decrement: deductQty } }
+          })
+          
+          calculatedTotalCost += deductQty * Number(batch.unitCost)
+          remainingToDeduct -= deductQty
+        }
+
+        const calculatedUnitCost = calculatedTotalCost / line.quantityIssued
+
+        await tx.sIVLine.update({
+          where: { id: line.id },
+          data: {
+            totalCost: calculatedTotalCost,
+            unitCost: calculatedUnitCost,
+          }
+        })
+
         const newQty = Math.max(0, stockCard.quantity - line.quantityIssued)
         const newAvailable = Math.max(0, stockCard.availableQty - line.quantityIssued)
 
@@ -237,6 +275,42 @@ export async function finalizeSIV({ id, finalizerId }) {
           issuedQuantity: { increment: line.quantityIssued },
         },
       })
+
+      // PHASE 1: Connect Finalized SIV Issue to Initial FixedAsset Custody Assignment
+      let targetAsset = null
+      if (line.assetId) {
+        targetAsset = await tx.fixedAsset.findUnique({ where: { id: line.assetId } })
+      } else if (line.itemId) {
+        // Automatically check if an unassigned registered asset exists for this item
+        targetAsset = await tx.fixedAsset.findFirst({
+          where: {
+            itemId: line.itemId,
+            custodianId: null,
+            status: 'REGISTERED',
+          },
+        })
+      }
+
+      if (targetAsset) {
+        await tx.fixedAsset.update({
+          where: { id: targetAsset.id },
+          data: {
+            custodianId: siv.issuedToUserId,
+            status: 'IN_USE',
+            notes: targetAsset.notes
+              ? `${targetAsset.notes} | Initial issue via SIV ${siv.sivNumber}`
+              : `Initial issue via SIV ${siv.sivNumber}`,
+          },
+        })
+
+        // Also ensure SIVLine links to this assetId for audit traceability
+        if (!line.assetId) {
+          await tx.sIVLine.update({
+            where: { id: line.id },
+            data: { assetId: targetAsset.id },
+          })
+        }
+      }
     }
 
     // Update parent requisition lifecycle state based on fulfilled line quantities
@@ -319,6 +393,14 @@ export async function verifyDispatchSIV({ id, verifierId, vehicleNumber, driverN
   if (!['FINALIZED', 'APPROVED'].includes(siv.status)) {
     throw new ConflictError(`Cannot verify gate exit for un-finalized SIV in status '${siv.status}'`)
   }
+
+  // BE-150: Notify SECURITY_OFFICER and ADMIN of gate verification — fire-and-forget
+  notifySecurityEvent({
+    title: 'SIV Gate Verification',
+    message: `SIV ${siv.sivNumber} exit verification completed at Gate ${gateNumber || 'MAIN_GATE_01'}. Driver: ${driverName || 'N/A'}. Vehicle: ${vehicleNumber || 'N/A'}.`,
+    referenceId: siv.id,
+    referenceType: 'SIV',
+  }).catch(() => {})
 
   return {
     verified: true,
@@ -429,6 +511,37 @@ export async function directIssue({ storeId, purpose, userId, lines }) {
       })
 
       if (stockCard) {
+        let remainingToDeduct = line.quantityIssued
+        const batches = await tx.stockBatch.findMany({
+          where: { stockCardId: stockCard.id, remainingQty: { gt: 0 } },
+          orderBy: { receivedAt: 'asc' }
+        })
+
+        let calculatedTotalCost = 0
+
+        for (const batch of batches) {
+          if (remainingToDeduct <= 0) break
+          const deductQty = Math.min(batch.remainingQty, remainingToDeduct)
+          
+          await tx.stockBatch.update({
+            where: { id: batch.id },
+            data: { remainingQty: { decrement: deductQty } }
+          })
+          
+          calculatedTotalCost += deductQty * Number(batch.unitCost)
+          remainingToDeduct -= deductQty
+        }
+
+        const calculatedUnitCost = calculatedTotalCost / line.quantityIssued
+
+        await tx.sIVLine.update({
+          where: { id: line.id },
+          data: {
+            totalCost: calculatedTotalCost,
+            unitCost: calculatedUnitCost,
+          }
+        })
+
         const newQty = Math.max(0, stockCard.quantity - line.quantityIssued)
         const newAvailable = Math.max(0, stockCard.availableQty - line.quantityIssued)
 

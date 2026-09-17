@@ -1,5 +1,14 @@
+/**
+ * Goods Receiving Note (GRN) Service
+ * BE-150: Notification events integrated — all calls are fire-and-forget.
+ */
 import { PrismaClient } from '@prisma/client';
 import { NotFoundError, ValidationError } from '../../utils/errors.js';
+import {
+  notifyGRNCreated,
+  notifyGoodsReceiptEvaluationRequired,
+  notifyPropertyRegistrationRequired,
+} from '../notifications/notification-events.service.js';
 
 const prisma = new PrismaClient();
 
@@ -27,7 +36,7 @@ class GRNService {
 
     const grnNumber = await this.generateGRNNumber();
 
-    return prisma.gRN.create({
+    const grn = await prisma.gRN.create({
       data: {
         grnNumber,
         goodsReceiptId: grnData.goodsReceiptId,
@@ -48,6 +57,24 @@ class GRNService {
         },
       },
     });
+
+    // BE-150: Notify STOREKEEPER + ACCOUNTANT of new GRN — fire-and-forget
+    notifyGRNCreated({
+      grnId: grn.id,
+      grnNumber: grn.grnNumber,
+      creatorId: userId,
+    }).catch(() => {});
+
+    // BE-150: If goods receipt requires evaluation, notify TEC — fire-and-forget
+    if (receipt.status === 'PENDING_EVALUATION' || receipt.requiresEvaluation) {
+      notifyGoodsReceiptEvaluationRequired({
+        goodsReceiptId: grnData.goodsReceiptId,
+        receiptNumber: receipt.receiptNumber || grnData.goodsReceiptId,
+        submitterId: userId,
+      }).catch(() => {});
+    }
+
+    return grn;
   }
 
   async findAll(filters = {}) {
@@ -118,7 +145,7 @@ class GRNService {
       throw new ValidationError('GRN must be in DRAFT status to finalize');
     }
 
-    return prisma.gRN.update({
+    const updated = await prisma.gRN.update({
       where: { id },
       data: {
         status: 'FINALIZED',
@@ -126,6 +153,22 @@ class GRNService {
         finalizedBy: userId,
       },
     });
+
+    // BE-150: Notify STOREKEEPER + ACCOUNTANT on finalization — fire-and-forget
+    notifyGRNCreated({
+      grnId: updated.id,
+      grnNumber: updated.grnNumber,
+      creatorId: userId,
+    }).catch(() => {});
+
+    // BE-150: Notify PROPERTY_REGISTRATION_OFFICER for asset tagging — fire-and-forget
+    notifyPropertyRegistrationRequired({
+      entityId: updated.id,
+      entityNumber: updated.grnNumber,
+      entityType: 'GRN',
+    }).catch(() => {});
+
+    return updated;
   }
 
   async cancel(id) {

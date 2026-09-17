@@ -21,7 +21,7 @@ export async function generateDisposalNumber() {
 
 /**
  * Create a new Disposal Request (BE-137)
- * @param {Object} data - { storeId, requestedBy, disposalMethod, reason, notes, lines }
+ * @param {Object} data - { storeId, requestedBy, disposalMethod, reason, notes, receivingPublicBody, authorizationRef, lines }
  * @returns {Promise<Object>} Created Disposal Request record
  */
 export async function createDisposalRequest({
@@ -30,6 +30,9 @@ export async function createDisposalRequest({
   disposalMethod = 'WRITE_OFF',
   reason,
   notes,
+  receivingPublicBody,
+  authorizationRef,
+  lines,
 }) {
   if (!requestedBy) {
     throw new ValidationError('requestedBy user ID is required')
@@ -45,6 +48,73 @@ export async function createDisposalRequest({
 
   const disposalNumber = await generateDisposalNumber()
 
+  const populatedLines = []
+  if (Array.isArray(lines) && lines.length > 0) {
+    for (const line of lines) {
+      if (!line.itemId) {
+        throw new ValidationError('itemId is required for each disposal request line')
+      }
+      if (!line.quantity || line.quantity <= 0) {
+        throw new ValidationError('quantity must be greater than 0 for each line')
+      }
+      const item = await prisma.item.findUnique({ where: { id: line.itemId } })
+      if (!item) {
+        throw new ValidationError(`Item with ID '${line.itemId}' not found`)
+      }
+      let stockCard = null
+      let unitCost = item.unitCost ? Number(item.unitCost) : 0
+      let totalCost = unitCost * line.quantity
+
+      if (storeId) {
+        stockCard = await prisma.stockCard.findUnique({
+          where: {
+            uq_stock_card_item_store: {
+              itemId: line.itemId,
+              storeId: storeId,
+            }
+          }
+        })
+        
+        if (stockCard) {
+          const batches = await prisma.stockBatch.findMany({
+            where: { stockCardId: stockCard.id, remainingQty: { gt: 0 } },
+            orderBy: { receivedAt: 'asc' }
+          })
+          
+          let remainingToEstimate = line.quantity
+          let calculatedTotalCost = 0
+          
+          for (const batch of batches) {
+            if (remainingToEstimate <= 0) break
+            const takeQty = Math.min(batch.remainingQty, remainingToEstimate)
+            calculatedTotalCost += takeQty * Number(batch.unitCost)
+            remainingToEstimate -= takeQty
+          }
+          
+          if (remainingToEstimate > 0 && batches.length > 0) {
+            calculatedTotalCost += remainingToEstimate * Number(batches[batches.length - 1].unitCost)
+          } else if (remainingToEstimate > 0 && batches.length === 0) {
+            calculatedTotalCost += remainingToEstimate * unitCost
+          }
+          
+          totalCost = calculatedTotalCost
+          unitCost = totalCost / line.quantity
+        }
+      }
+      populatedLines.push({
+        itemId: line.itemId,
+        quantity: line.quantity,
+        locationId: line.locationId || null,
+        unitCost,
+        totalCost,
+        remarks: line.remarks || null,
+        condition: line.condition || null,
+        batchNumber: line.batchNumber || null,
+        expiryDate: line.expiryDate ? new Date(line.expiryDate) : null,
+      })
+    }
+  }
+
   const record = await prisma.disposalRequest.create({
     data: {
       disposalNumber,
@@ -54,10 +124,22 @@ export async function createDisposalRequest({
       requestedBy,
       reason: reason || null,
       notes: notes || null,
+      // Directive 1095/2017: TRANSFER_OUT proposal fields stored as proper auditable DB columns
+      receivingPublicBody: receivingPublicBody || null,
+      authorizationRef: authorizationRef || null,
+      lines: {
+        create: populatedLines
+      }
     },
     include: {
       store: { select: { id: true, name: true, code: true } },
       requestedByUser: { select: { id: true, fullName: true, email: true } },
+      lines: {
+        include: {
+          item: { select: { id: true, name: true, code: true } },
+          location: { select: { id: true, name: true, code: true } },
+        }
+      }
     },
   })
 
@@ -246,6 +328,10 @@ export async function executeDisposal({
   witnessName,
   certificateNumber,
   disposalLocation,
+  receivingPublicBody,
+  authorizationRef,
+  handoverDocRef,
+  recipientOfficer,
 }) {
   const disposal = await getDisposalById(id)
 
@@ -262,6 +348,9 @@ export async function executeDisposal({
   if (!Array.isArray(disposal.lines) || disposal.lines.length === 0) {
     throw new ValidationError('Disposal request has no line items to execute')
   }
+
+  // Construct detailed handover / execution notes (free-text only, structured fields stored as DB columns)
+  const finalNotes = executionNotes || null
 
   return prisma.$transaction(async (tx) => {
     for (const line of disposal.lines) {
@@ -280,6 +369,29 @@ export async function executeDisposal({
         )
       }
 
+      let remainingToDeduct = line.quantity
+      const batches = await tx.stockBatch.findMany({
+        where: { stockCardId: stockCard.id, remainingQty: { gt: 0 } },
+        orderBy: { receivedAt: 'asc' }
+      })
+
+      let calculatedTotalCost = 0
+
+      for (const batch of batches) {
+        if (remainingToDeduct <= 0) break
+        const deductQty = Math.min(batch.remainingQty, remainingToDeduct)
+        
+        await tx.stockBatch.update({
+          where: { id: batch.id },
+          data: { remainingQty: { decrement: deductQty } }
+        })
+        
+        calculatedTotalCost += deductQty * Number(batch.unitCost)
+        remainingToDeduct -= deductQty
+      }
+
+      const calculatedUnitCost = calculatedTotalCost / line.quantity
+
       await tx.stockCard.update({
         where: { id: stockCard.id },
         data: {
@@ -297,7 +409,7 @@ export async function executeDisposal({
           referenceType: 'DISPOSAL_REQUEST',
           referenceId: disposal.id,
           referenceNumber: disposal.disposalNumber,
-          notes: executionNotes || `Disposal execution for request ${disposal.disposalNumber}`,
+          notes: finalNotes || `Disposal execution for request ${disposal.disposalNumber}`,
           createdBy: executedBy || disposal.requestedBy,
         },
       })
@@ -329,7 +441,7 @@ export async function executeDisposal({
               referenceType: 'DISPOSAL_REQUEST',
               referenceId: disposal.id,
               referenceNumber: disposal.disposalNumber,
-              notes: executionNotes || `Disposal execution for ${disposal.disposalNumber}`,
+              notes: finalNotes || `Disposal execution for ${disposal.disposalNumber}`,
               createdBy: executedBy || disposal.requestedBy,
             },
           })
@@ -338,7 +450,11 @@ export async function executeDisposal({
 
       await tx.disposalRequestLine.update({
         where: { id: line.id },
-        data: { status: 'EXECUTED' },
+        data: { 
+          status: 'EXECUTED',
+          totalCost: typeof calculatedTotalCost !== 'undefined' ? calculatedTotalCost : undefined,
+          unitCost: typeof calculatedUnitCost !== 'undefined' ? calculatedUnitCost : undefined
+        },
       })
     }
 
@@ -348,7 +464,17 @@ export async function executeDisposal({
         status: 'EXECUTED',
         executedBy: executedBy || null,
         executedAt: new Date(),
-        notes: executionNotes || null,
+        // Directive 1095/2017: all execution evidence stored as proper auditable DB columns
+        executionNotes: executionNotes || null,
+        witnessName: witnessName || null,
+        certificateNumber: certificateNumber || null,
+        disposalLocation: disposalLocation || null,
+        // TRANSFER_OUT handover fields: supplement proposal-time values if provided at execution
+        receivingPublicBody: receivingPublicBody || disposal.receivingPublicBody || null,
+        authorizationRef: authorizationRef || disposal.authorizationRef || null,
+        handoverDocRef: handoverDocRef || null,
+        recipientOfficer: recipientOfficer || null,
+        notes: finalNotes || null,
       },
       include: {
         store: { select: { id: true, name: true, code: true } },
@@ -413,7 +539,7 @@ export async function getDisposalAuditHistory(id) {
       actor: disposal.approvedByUser
         ? { id: disposal.approvedByUser.id, fullName: disposal.approvedByUser.fullName }
         : null,
-      details: `Disposal request approved.`,
+      details: `Disposal request approved. Method: ${disposal.disposalMethod}.`,
     })
   }
 
@@ -430,14 +556,28 @@ export async function getDisposalAuditHistory(id) {
   }
 
   if (disposal.status === 'EXECUTED') {
+    const isTransferOut = disposal.disposalMethod === 'TRANSFER_OUT'
+    // Build structured handover detail from dedicated DB columns (Directive 1095/2017)
+    let transferOutDetail = ''
+    if (isTransferOut) {
+      const parts = []
+      if (disposal.receivingPublicBody) parts.push(`Receiving Body: ${disposal.receivingPublicBody}`)
+      if (disposal.authorizationRef) parts.push(`Auth Ref: ${disposal.authorizationRef}`)
+      if (disposal.handoverDocRef) parts.push(`Handover Doc: ${disposal.handoverDocRef}`)
+      if (disposal.recipientOfficer) parts.push(`Recipient Officer: ${disposal.recipientOfficer}`)
+      if (disposal.witnessName) parts.push(`Witness: ${disposal.witnessName}`)
+      if (parts.length > 0) transferOutDetail = ` [${parts.join(' | ')}]`
+    }
     events.push({
-      eventType: 'DISPOSAL_EXECUTED',
+      eventType: isTransferOut ? 'DISPOSAL_TRANSFER_OUT_EXECUTED' : 'DISPOSAL_EXECUTED_AND_STOCK_DEDUCTED',
       status: 'EXECUTED',
       timestamp: disposal.executedAt || disposal.updatedAt,
       actor: disposal.executedByUser
         ? { id: disposal.executedByUser.id, fullName: disposal.executedByUser.fullName }
         : null,
-      details: `Disposal executed. Stock deducted for ${disposal.lines?.length || 0} line item(s).`,
+      details: isTransferOut
+        ? `Disposal transfer out executed to receiving public body. Stock deducted for ${disposal.lines?.length || 0} line item(s).${transferOutDetail}`.trim()
+        : `Disposal executed. Stock deducted for ${disposal.lines?.length || 0} line item(s).`,
     })
   }
 

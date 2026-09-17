@@ -83,6 +83,30 @@ class TransactionPostingEngine {
       }
 
       // 5. Update stock card
+      let calculatedTotalCost = 0;
+
+      const isOutbound = outboundTransactionTypes.includes(transactionType) || (transactionType === 'ADJUSTMENT' && quantity < 0);
+      if (isOutbound) {
+        let remainingToDeduct = Math.abs(quantity);
+        const batches = await tx.stockBatch.findMany({
+          where: { stockCardId: stockCard.id, remainingQty: { gt: 0 } },
+          orderBy: { receivedAt: 'asc' }
+        });
+
+        for (const batch of batches) {
+          if (remainingToDeduct <= 0) break;
+          const deductQty = Math.min(batch.remainingQty, remainingToDeduct);
+          
+          await tx.stockBatch.update({
+            where: { id: batch.id },
+            data: { remainingQty: { decrement: deductQty } }
+          });
+          
+          calculatedTotalCost += deductQty * Number(batch.unitCost);
+          remainingToDeduct -= deductQty;
+        }
+      }
+
       await tx.stockCard.update({
         where: { id: stockCard.id },
         data: {
@@ -158,6 +182,7 @@ class TransactionPostingEngine {
       return {
         stockTransaction,
         newBalance: newQuantity,
+        totalCost: isOutbound ? calculatedTotalCost : undefined,
         newAvailableBalance: newAvailableQty,
       };
     });
@@ -181,7 +206,6 @@ class TransactionPostingEngine {
         quantity: 0,
         reservedQty: 0,
         availableQty: 0,
-        averageCost: null,
         lastMovementAt: null,
       };
     }

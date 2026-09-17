@@ -13,6 +13,17 @@ export const createDisposalSchema = z.object({
   storeId: z.string().optional().nullable(),
   reason: z.string().optional(),
   notes: z.string().optional(),
+  receivingPublicBody: z.string().optional().nullable(),
+  authorizationRef: z.string().optional().nullable(),
+  lines: z.array(z.object({
+    itemId: z.string(),
+    quantity: z.number().min(1),
+    locationId: z.string().optional().nullable(),
+    remarks: z.string().optional().nullable(),
+    condition: z.string().optional().nullable(),
+    batchNumber: z.string().optional().nullable(),
+    expiryDate: z.string().optional().nullable(),
+  })).optional(),
 })
 
 export const evaluateDisposalSchema = z.object({
@@ -37,4 +48,8 @@ export const executeDisposalSchema = z.object({
   witnessName: z.string().optional().nullable(),
   certificateNumber: z.string().optional().nullable(),
   disposalLocation: z.string().optional().nullable(),
+  receivingPublicBody: z.string().optional().nullable(),
+  authorizationRef: z.string().optional().nullable(),
+  handoverDocRef: z.string().optional().nullable(),
+  recipientOfficer: z.string().optional().nullable(),
 })

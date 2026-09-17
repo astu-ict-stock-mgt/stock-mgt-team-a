@@ -40,6 +40,44 @@ class InventoryLedgerService {
     return stockCards;
   }
 
+  async getAllStock(filters = {}) {
+    const { categoryId, search, lowStock } = filters;
+
+    const where = {
+      ...(categoryId && { item: { categoryId } }),
+      ...(search && {
+        item: {
+          OR: [
+            { name: { contains: search, mode: 'insensitive' } },
+            { code: { contains: search, mode: 'insensitive' } },
+          ],
+        },
+      }),
+    };
+
+    const stockCards = await prisma.stockCard.findMany({
+      where,
+      include: {
+        item: {
+          include: {
+            category: { select: { id: true, code: true, name: true } },
+            unit: { select: { id: true, code: true, name: true, symbol: true } },
+          },
+        },
+        store: { select: { id: true, code: true, name: true } },
+      },
+      orderBy: { item: { name: 'asc' } },
+    });
+
+    if (lowStock) {
+      return stockCards.filter(sc => 
+        sc.item.reorderPoint && sc.availableQty <= sc.item.reorderPoint
+      );
+    }
+
+    return stockCards;
+  }
+
   async getStockByItem(itemId) {
     return prisma.stockCard.findMany({
       where: { itemId },

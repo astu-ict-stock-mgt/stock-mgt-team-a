@@ -4,7 +4,7 @@
  */
 
 import { Router } from 'express'
-import { create, getById, list, approve, dispatch, complete } from './transfer.controller.js'
+import { create, getById, list, approve, dispatch, complete, acknowledge } from './transfer.controller.js'
 import { validateRequest } from '../../middleware/validate.middleware.js'
 import { authenticate } from '../../middleware/auth.middleware.js'
 import { authorize } from '../../middleware/rbac.middleware.js'
@@ -117,6 +117,32 @@ router.patch(
   authenticate,
   authorize(PERMISSIONS.TRANSFERS_EXECUTE),
   dispatch
+)
+
+/**
+ * @openapi
+ * /transfers/{id}/acknowledge:
+ *   patch:
+ *     summary: Transferee confirms receipt of user-to-user property transfer (Article 19)
+ *     tags:
+ *       - Stock Transfers
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Transfer acknowledged successfully
+ */
+router.patch(
+  '/:id/acknowledge',
+  authenticate,
+  authorize(PERMISSIONS.TRANSFERS_READ),
+  acknowledge
 )
 
 /**

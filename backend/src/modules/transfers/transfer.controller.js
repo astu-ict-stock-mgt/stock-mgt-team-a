@@ -11,6 +11,7 @@ import {
   approveTransfer,
   dispatchTransfer,
   completeTransfer,
+  acknowledgeTransfer,
 } from './transfer.service.js'
 import { sendCreated, sendSuccess } from '../../utils/response.js'
 
@@ -20,9 +21,11 @@ import { sendCreated, sendSuccess } from '../../utils/response.js'
 export const create = async (req, res, next) => {
   try {
     const requestedBy = req.user?.userId || req.user?.id || 'usr-storekeeper-1'
+    const userRoles = req.user?.roles || []
     const transfer = await createTransfer({
       ...req.body,
       requestedBy,
+      userRoles,
     })
     sendCreated(res, transfer)
   } catch (err) {
@@ -47,7 +50,28 @@ export const getById = async (req, res, next) => {
  */
 export const list = async (req, res, next) => {
   try {
-    const result = await listTransfers(req.query)
+    const userRoles = req.user?.roles || []
+    const isOfficer = userRoles.some(r => ['ADMIN', 'SUPER_ADMIN', 'PAO'].includes(r))
+    const isStorekeeper = userRoles.includes('STOREKEEPER') && !isOfficer
+    const isDeptHead = userRoles.includes('DEPARTMENT_HEAD') && !isOfficer
+    const filters = { ...req.query }
+
+    // Storekeeper only views store-to-store warehouse transfers
+    if (isStorekeeper) {
+      filters.isStorekeeperOnly = true
+    }
+
+    // Non-central officers:
+    // - Storekeepers see warehouse store transfers (isStorekeeperOnly = true)
+    // - Dept Heads and Requesters are participant-scoped
+    if (!isOfficer && !isStorekeeper && (req.user?.userId || req.user?.id)) {
+      filters.userInvolvedId = req.user.userId || req.user.id
+      if (isDeptHead) {
+        filters.isDeptHead = true
+      }
+    }
+
+    const result = await listTransfers(filters)
     sendSuccess(res, result.transfers, 200, {
       total: result.total,
       page: result.page,
@@ -64,9 +88,11 @@ export const list = async (req, res, next) => {
 export const approve = async (req, res, next) => {
   try {
     const approverId = req.user?.userId || req.user?.id || 'usr-pao-1'
+    const userRoles = req.user?.roles || []
     const result = await approveTransfer({
       id: req.params.id,
       approverId,
+      userRoles,
       ...req.body,
     })
     sendSuccess(res, result)
@@ -80,7 +106,27 @@ export const approve = async (req, res, next) => {
  */
 export const dispatch = async (req, res, next) => {
   try {
-    const result = await dispatchTransfer({ id: req.params.id })
+    const userRoles = req.user?.roles || []
+    const result = await dispatchTransfer({ id: req.params.id, userRoles })
+    sendSuccess(res, result)
+  } catch (err) {
+    next(err)
+  }
+}
+
+/**
+ * Handle PATCH /api/transfers/:id/acknowledge endpoint (Article 19 receipt confirmation)
+ */
+export const acknowledge = async (req, res, next) => {
+  try {
+    const userId = req.user?.userId || req.user?.id
+    const userRoles = req.user?.roles || []
+    const result = await acknowledgeTransfer({
+      id: req.params.id,
+      userId,
+      userRoles,
+      notes: req.body?.notes,
+    })
     sendSuccess(res, result)
   } catch (err) {
     next(err)
@@ -92,7 +138,13 @@ export const dispatch = async (req, res, next) => {
  */
 export const complete = async (req, res, next) => {
   try {
-    const result = await completeTransfer({ id: req.params.id })
+    const executionUserId = req.user?.userId || req.user?.id
+    const userRoles = req.user?.roles || []
+    const result = await completeTransfer({
+      id: req.params.id,
+      executionUserId,
+      userRoles,
+    })
     sendSuccess(res, result)
   } catch (err) {
     next(err)

@@ -4,7 +4,7 @@
  */
 
 import { Router } from 'express'
-import { create, getById, list, evaluate, approve } from './return.controller.js'
+import { create, getById, list, evaluate, approve, postStock } from './return.controller.js'
 import { validateRequest } from '../../middleware/validate.middleware.js'
 import { authenticate } from '../../middleware/auth.middleware.js'
 import { authorize } from '../../middleware/rbac.middleware.js'
@@ -120,6 +120,14 @@ router.patch(
   validateRequest({ body: approveReturnSchema }),
   approve
 )
+
+router.post(
+  '/:id/post',
+  authenticate,
+  authorize(PERMISSIONS.RETURNS_CREATE),
+  postStock
+)
+
 
 router.get('/', authenticate, authorize(PERMISSIONS.RETURNS_READ), list)
 router.get('/:id', authenticate, authorize(PERMISSIONS.RETURNS_READ), getById)

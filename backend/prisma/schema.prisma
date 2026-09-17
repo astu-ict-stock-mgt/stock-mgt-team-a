@@ -13,8 +13,9 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 // ────────────────────────────────────────────────────────────────
@@ -88,8 +89,10 @@ model User {
   returnsApproved  Return[] @relation("ReturnApprovedBy")
 
   // BE-121: transfers requested / approved by this user
-  transfersRequested TransferRequest[] @relation("TransferRequestedBy")
-  transfersApproved  TransferRequest[] @relation("TransferApprovedBy")
+  transfersRequested   TransferRequest[] @relation("TransferRequestedBy")
+  transfersApproved    TransferRequest[] @relation("TransferApprovedBy")
+  transfersSource      TransferRequest[] @relation("TransferSourceUser")
+  transfersDestination TransferRequest[] @relation("TransferDestinationUser")
 
   // BE-129: fixed assets custodied by this user
   fixedAssetsCustody FixedAsset[] @relation("FixedAssetCustodian")
@@ -418,6 +421,7 @@ enum StoreType {
   WAREHOUSE
   TRANSIT_STORE
   QUARANTINE_STORE
+  CAFE_STORE
 }
 
 enum StoreStatus {
@@ -785,6 +789,7 @@ model StockCard {
   item         Item                   @relation(fields: [itemId], references: [id], onDelete: Restrict)
   store        Store                  @relation(fields: [storeId], references: [id], onDelete: Restrict)
   transactions StockCardTransaction[]
+  batches      StockBatch[]
 
   @@unique([itemId, storeId], name: "uq_stock_card_item_store")
   @@index([itemId])
@@ -833,6 +838,34 @@ model StockCardTransaction {
   @@index([createdAt])
   @@map("stock_card_transactions")
 }
+
+// ────────────────────────────────────────────────────────────────
+// Stock Batch Model (FIFO Valuation)
+//
+// Design notes:
+// - Tracks individual batches of received stock for true FIFO valuation.
+// - Records the unit cost and remaining unissued quantity.
+// ────────────────────────────────────────────────────────────────
+model StockBatch {
+  id              String    @id @default(uuid())
+  stockCardId     String    @map("stock_card_id")
+  receiptLineId   String?   @map("receipt_line_id")
+  originalQty     Int       @map("original_qty")
+  remainingQty    Int       @map("remaining_qty")
+  unitCost        Decimal   @map("unit_cost")
+  receivedAt      DateTime  @default(now()) @map("received_at")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  // Relationships
+  stockCard       StockCard @relation(fields: [stockCardId], references: [id], onDelete: Restrict)
+
+  @@index([stockCardId])
+  @@index([remainingQty])
+  @@index([receivedAt])
+  @@map("stock_batches")
+}
+
 
 // ────────────────────────────────────────────────────────────────
 // Bin Card Model (BE-083)
@@ -1004,22 +1037,25 @@ model SIV {
 }
 
 model SIVLine {
-  id             String   @id @default(uuid())
-  sivId          String   @map("siv_id")
-  itemId         String   @map("item_id")
-  quantityIssued Int      @map("quantity_issued")
-  unitCost       Decimal? @map("unit_cost")
-  totalCost      Decimal? @map("total_cost")
+  id             String      @id @default(uuid())
+  sivId          String      @map("siv_id")
+  itemId         String      @map("item_id")
+  assetId        String?     @map("asset_id")
+  quantityIssued Int         @map("quantity_issued")
+  unitCost       Decimal?    @map("unit_cost")
+  totalCost      Decimal?    @map("total_cost")
   remarks        String?
-  createdAt      DateTime @default(now()) @map("created_at")
-  updatedAt      DateTime @updatedAt @map("updated_at")
+  createdAt      DateTime    @default(now()) @map("created_at")
+  updatedAt      DateTime    @updatedAt @map("updated_at")
 
-  siv  SIV  @relation(fields: [sivId], references: [id], onDelete: Cascade)
-  item Item @relation(fields: [itemId], references: [id], onDelete: Restrict)
+  siv   SIV         @relation(fields: [sivId], references: [id], onDelete: Cascade)
+  item  Item        @relation(fields: [itemId], references: [id], onDelete: Restrict)
+  asset FixedAsset? @relation(fields: [assetId], references: [id], onDelete: SetNull)
 
   @@unique([sivId, itemId], name: "uq_siv_line_item")
   @@index([sivId])
   @@index([itemId])
+  @@index([assetId])
   @@map("siv_lines")
 }
 
@@ -1135,12 +1171,16 @@ enum TransferType {
   STORE_TO_STORE
   DEPARTMENT_TO_DEPARTMENT
   WAREHOUSE_TO_STORE
+  USER_TO_USER
 }
 
 enum TransferStatus {
   DRAFT
   PENDING_APPROVAL
+  PENDING_DEPT_APPROVAL
+  PENDING_PAO_APPROVAL
   APPROVED
+  REJECTED
   IN_TRANSIT
   COMPLETED
   CANCELLED
@@ -1151,21 +1191,29 @@ model TransferRequest {
   transferNumber        String         @unique @map("transfer_number")
   transferType          TransferType   @default(STORE_TO_STORE) @map("transfer_type")
   status                TransferStatus @default(DRAFT)
-  sourceStoreId         String         @map("source_store_id")
-  destinationStoreId    String         @map("destination_store_id")
+  sourceStoreId         String?        @map("source_store_id")
+  destinationStoreId    String?        @map("destination_store_id")
   sourceLocationId      String?        @map("source_location_id")
   destinationLocationId String?        @map("destination_location_id")
+  sourceUserId          String?        @map("source_user_id")
+  destinationUserId     String?        @map("destination_user_id")
+  acknowledgedBy        String?        @map("acknowledged_by")
+  acknowledgedAt        DateTime?      @map("acknowledged_at")
   requestedBy           String         @map("requested_by")
+  deptApprovedBy        String?        @map("dept_approved_by")
+  deptApprovedAt        DateTime?      @map("dept_approved_at")
   approvedBy            String?        @map("approved_by")
   approvedAt            DateTime?      @map("approved_at")
   notes                 String?
   createdAt             DateTime       @default(now()) @map("created_at")
   updatedAt             DateTime       @updatedAt @map("updated_at")
 
-  sourceStore         Store          @relation("TransferSourceStore", fields: [sourceStoreId], references: [id], onDelete: Restrict)
-  destinationStore    Store          @relation("TransferDestinationStore", fields: [destinationStoreId], references: [id], onDelete: Restrict)
+  sourceStore         Store?         @relation("TransferSourceStore", fields: [sourceStoreId], references: [id], onDelete: Restrict)
+  destinationStore    Store?         @relation("TransferDestinationStore", fields: [destinationStoreId], references: [id], onDelete: Restrict)
   sourceLocation      Location?      @relation("TransferSourceLocation", fields: [sourceLocationId], references: [id], onDelete: SetNull)
   destinationLocation Location?      @relation("TransferDestinationLocation", fields: [destinationLocationId], references: [id], onDelete: SetNull)
+  sourceUser          User?          @relation("TransferSourceUser", fields: [sourceUserId], references: [id], onDelete: SetNull)
+  destinationUser     User?          @relation("TransferDestinationUser", fields: [destinationUserId], references: [id], onDelete: SetNull)
   requestedByUser     User           @relation("TransferRequestedBy", fields: [requestedBy], references: [id], onDelete: Restrict)
   approvedByUser      User?          @relation("TransferApprovedBy", fields: [approvedBy], references: [id], onDelete: SetNull)
   lines               TransferLine[]
@@ -1173,26 +1221,31 @@ model TransferRequest {
   @@index([transferNumber])
   @@index([sourceStoreId])
   @@index([destinationStoreId])
+  @@index([sourceUserId])
+  @@index([destinationUserId])
   @@index([status])
   @@map("transfer_requests")
 }
 
 model TransferLine {
-  id                  String   @id @default(uuid())
-  transferId          String   @map("transfer_id")
-  itemId              String   @map("item_id")
-  quantityRequested   Int      @map("quantity_requested")
-  quantityTransferred Int?     @default(0) @map("quantity_transferred")
+  id                  String      @id @default(uuid())
+  transferId          String      @map("transfer_id")
+  itemId              String      @map("item_id")
+  assetId             String?     @map("asset_id")
+  quantityRequested   Int         @map("quantity_requested")
+  quantityTransferred Int?        @default(0) @map("quantity_transferred")
   remarks             String?
-  createdAt           DateTime @default(now()) @map("created_at")
-  updatedAt           DateTime @updatedAt @map("updated_at")
+  createdAt           DateTime    @default(now()) @map("created_at")
+  updatedAt           DateTime    @updatedAt @map("updated_at")
 
   transfer TransferRequest @relation(fields: [transferId], references: [id], onDelete: Cascade)
   item     Item            @relation(fields: [itemId], references: [id], onDelete: Restrict)
+  asset    FixedAsset?     @relation(fields: [assetId], references: [id], onDelete: SetNull)
 
   @@unique([transferId, itemId], name: "uq_transfer_line_item")
   @@index([transferId])
   @@index([itemId])
+  @@index([assetId])
   @@map("transfer_lines")
 }
 
@@ -1202,11 +1255,12 @@ model TransferLine {
 // Design notes:
 // - Tracks fixed assets (equipment, vehicles, furniture, etc.).
 // - Linked to items, GRNs, custodians, departments, and locations.
-// - Status workflow: REGISTERED -> IN_USE -> UNDER_REPAIR -> RETIRED -> DISPOSED
+// - Status workflow: REGISTERED -> IN_USE / IN_SERVICE -> UNDER_REPAIR -> RETIRED -> DISPOSED
 // ────────────────────────────────────────────────────────────────
 enum AssetStatus {
   REGISTERED
   IN_USE
+  IN_SERVICE
   UNDER_REPAIR
   RETIRED
   DISPOSED
@@ -1231,11 +1285,13 @@ model FixedAsset {
   createdAt    DateTime    @default(now()) @map("created_at")
   updatedAt    DateTime    @updatedAt @map("updated_at")
 
-  item       Item?       @relation(fields: [itemId], references: [id], onDelete: SetNull)
-  grn        GRN?        @relation(fields: [grnId], references: [id], onDelete: SetNull)
-  custodian  User?       @relation("FixedAssetCustodian", fields: [custodianId], references: [id], onDelete: SetNull)
-  department Department? @relation(fields: [departmentId], references: [id], onDelete: SetNull)
-  location   Location?   @relation(fields: [locationId], references: [id], onDelete: SetNull)
+  item          Item?          @relation(fields: [itemId], references: [id], onDelete: SetNull)
+  grn           GRN?           @relation(fields: [grnId], references: [id], onDelete: SetNull)
+  custodian     User?          @relation("FixedAssetCustodian", fields: [custodianId], references: [id], onDelete: SetNull)
+  department    Department?    @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  location      Location?      @relation(fields: [locationId], references: [id], onDelete: SetNull)
+  sivLines      SIVLine[]
+  transferLines TransferLine[]
 
   @@index([assetTag])
   @@index([status])
@@ -1301,10 +1357,14 @@ enum DisposalMethod {
   SALE
   RECYCLING
   OTHER
+  AUCTION
+  TRANSFER_OUT
+  WRITE_OFF
 }
 
 enum DisposalStatus {
   DRAFT
+  SUBMITTED
   UNDER_EVALUATION
   APPROVED
   REJECTED
@@ -1329,6 +1389,20 @@ model DisposalRequest {
 
   reason    String?
   notes     String?
+
+  // BE-141 / Directive 1095/2017: TRANSFER_OUT disposal handover fields
+  // Stored as proper auditable columns (not packed into notes text)
+  receivingPublicBody String? @map("receiving_public_body")
+  authorizationRef    String? @map("authorization_ref")
+
+  // Execution evidence fields — populated by the Storekeeper at actual disposal execution
+  handoverDocRef   String? @map("handover_doc_ref")
+  recipientOfficer String? @map("recipient_officer")
+  witnessName      String? @map("witness_name")
+  certificateNumber String? @map("certificate_number")
+  disposalLocation String? @map("disposal_location")
+  executionNotes   String? @map("execution_notes")
+
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
@@ -1525,6 +1599,7 @@ model Notification {
   title         String
   message       String
   type          String    @default("INFO")
+  priority      String    @default("MEDIUM")
   referenceId   String?   @map("reference_id")
   referenceType String?   @map("reference_type")
   isRead        Boolean   @default(false) @map("is_read")
@@ -1534,7 +1609,8 @@ model Notification {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
-  @@index([isRead])
+  @@index([userId, isRead])
+  @@index([userId, isRead, createdAt])
   @@index([type])
   @@index([createdAt])
   @@map("notifications")

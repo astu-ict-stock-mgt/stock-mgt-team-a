@@ -47,6 +47,7 @@ router.post('/transactions', authorize(PERMISSIONS.INVENTORY_POST), inventoryCon
 router.get('/transactions/history', authorize(PERMISSIONS.INVENTORY_READ), inventoryController.getTransactionHistory)
 
 // Stock Balance
+router.get('/stock/all', authorize(PERMISSIONS.INVENTORY_READ), inventoryController.getAllStock)
 router.get('/stock/store/:storeId', authorize(PERMISSIONS.INVENTORY_READ), inventoryController.getStockByStore)
 router.get('/stock/item/:itemId', authorize(PERMISSIONS.INVENTORY_READ), inventoryController.getStockByItem)
 router.get('/stock/value/:storeId', authorize(PERMISSIONS.INVENTORY_READ), inventoryController.getStockValue)

@@ -34,14 +34,20 @@ describe('BE-127: Transfer Source/Destination Validation Tests', () => {
     it('verifies TransferType and TransferStatus enum values', () => {
       expect(TransferTypeEnum.options).toEqual([
         'STORE_TO_STORE',
+        'DEPARTMENT_TO_DEPARTMENT',
+        'WAREHOUSE_TO_STORE',
         'BIN_TO_BIN',
         'STORE_TO_DEPT',
         'DEPT_TO_STORE',
+        'USER_TO_USER',
       ])
 
       expect(TransferStatusEnum.options).toEqual([
         'DRAFT',
         'SUBMITTED',
+        'PENDING_APPROVAL',
+        'PENDING_DEPT_APPROVAL',
+        'PENDING_PAO_APPROVAL',
         'APPROVED',
         'REJECTED',
         'IN_TRANSIT',
@@ -443,6 +449,148 @@ describe('BE-127: Transfer Source/Destination Validation Tests', () => {
       )
       expect(result.isValid).toBe(true)
       expect(result.transferRequest.id).toBe(validTransfer.id)
+    })
+  })
+
+  describe('Directive 1095/2017 Article 19: USER_TO_USER Transfer Validation & Custody', () => {
+    const activeSourceUser = { id: 'usr-source-01', fullName: 'Abebe Kebede', status: 'ACTIVE' }
+    const activeDestUser = { id: 'usr-dest-02', fullName: 'Almaz Tesfaye', status: 'ACTIVE' }
+
+    it('rejects user-to-user transfer if sourceUserId is missing', async () => {
+      const transfer = {
+        transferType: 'USER_TO_USER',
+        destinationUserId: 'usr-dest-02',
+      }
+      await expect(
+        TransferValidationService.validateSourceAndDestination(transfer)
+      ).rejects.toThrow(InvalidSourceError)
+    })
+
+    it('rejects user-to-user transfer if destinationUserId is missing', async () => {
+      const transfer = {
+        transferType: 'USER_TO_USER',
+        sourceUserId: 'usr-source-01',
+      }
+      await expect(
+        TransferValidationService.validateSourceAndDestination(transfer)
+      ).rejects.toThrow(InvalidDestinationError)
+    })
+
+    it('rejects user-to-user transfer if source and destination users are identical', async () => {
+      const transfer = {
+        transferType: 'USER_TO_USER',
+        sourceUserId: 'usr-same-01',
+        destinationUserId: 'usr-same-01',
+      }
+      await expect(
+        TransferValidationService.validateSourceAndDestination(transfer)
+      ).rejects.toThrow(InvalidDestinationError)
+    })
+
+    it('rejects user-to-user transfer if source user is inactive or not found', async () => {
+      const mockDb = {
+        user: {
+          findUnique: vi.fn().mockResolvedValue(null),
+        },
+      }
+      const transfer = {
+        transferType: 'USER_TO_USER',
+        sourceUserId: 'usr-inactive',
+        destinationUserId: 'usr-dest-02',
+      }
+      await expect(
+        TransferValidationService.validateSourceAndDestination(transfer, mockDb)
+      ).rejects.toThrow(InvalidSourceError)
+    })
+
+    it('rejects user-to-user transfer if asset has no assigned custodian', async () => {
+      const mockDb = {
+        user: {
+          findUnique: vi.fn().mockImplementation(({ where }) => {
+            if (where.id === activeSourceUser.id) return Promise.resolve(activeSourceUser)
+            if (where.id === activeDestUser.id) return Promise.resolve(activeDestUser)
+            return Promise.resolve(null)
+          }),
+        },
+        fixedAsset: {
+          findUnique: vi.fn().mockResolvedValue({
+            id: 'fa-unassigned',
+            assetTag: 'ASTU-AST-0001',
+            custodianId: null, // unassigned
+          }),
+        },
+      }
+
+      const transfer = {
+        transferType: 'USER_TO_USER',
+        sourceUserId: activeSourceUser.id,
+        destinationUserId: activeDestUser.id,
+        lines: [{ itemId: 'item-1', assetId: 'fa-unassigned' }],
+      }
+
+      await expect(
+        TransferValidationService.validateSourceAndDestination(transfer, mockDb)
+      ).rejects.toThrow(ValidationError)
+    })
+
+    it('rejects user-to-user transfer if asset custodian is not source user', async () => {
+      const mockDb = {
+        user: {
+          findUnique: vi.fn().mockImplementation(({ where }) => {
+            if (where.id === activeSourceUser.id) return Promise.resolve(activeSourceUser)
+            if (where.id === activeDestUser.id) return Promise.resolve(activeDestUser)
+            return Promise.resolve(null)
+          }),
+        },
+        fixedAsset: {
+          findUnique: vi.fn().mockResolvedValue({
+            id: 'fa-other-user',
+            assetTag: 'ASTU-AST-0002',
+            custodianId: 'usr-different-person', // Not source user!
+          }),
+        },
+      }
+
+      const transfer = {
+        transferType: 'USER_TO_USER',
+        sourceUserId: activeSourceUser.id,
+        destinationUserId: activeDestUser.id,
+        lines: [{ itemId: 'item-1', assetId: 'fa-other-user' }],
+      }
+
+      await expect(
+        TransferValidationService.validateSourceAndDestination(transfer, mockDb)
+      ).rejects.toThrow(InvalidSourceError)
+    })
+
+    it('passes user-to-user validation when users are active and asset is assigned to source user', async () => {
+      const mockDb = {
+        user: {
+          findUnique: vi.fn().mockImplementation(({ where }) => {
+            if (where.id === activeSourceUser.id) return Promise.resolve(activeSourceUser)
+            if (where.id === activeDestUser.id) return Promise.resolve(activeDestUser)
+            return Promise.resolve(null)
+          }),
+        },
+        fixedAsset: {
+          findUnique: vi.fn().mockResolvedValue({
+            id: 'fa-valid',
+            assetTag: 'ASTU-AST-0003',
+            custodianId: activeSourceUser.id,
+          }),
+        },
+      }
+
+      const transfer = {
+        transferType: 'USER_TO_USER',
+        sourceUserId: activeSourceUser.id,
+        destinationUserId: activeDestUser.id,
+        lines: [{ itemId: 'item-1', assetId: 'fa-valid' }],
+      }
+
+      await expect(
+        TransferValidationService.validateSourceAndDestination(transfer, mockDb)
+      ).resolves.not.toThrow()
     })
   })
 })

@@ -4,7 +4,7 @@
  */
 
 import { Router } from 'express'
-import { getRoles, getPermissions, getMatrix, getMyPermissions, getRoleByCode, login, logout } from './auth.controller.js'
+import { getRoles, getPermissions, getMatrix, getMyPermissions, getRoleByCode, login, logout, changePassword } from './auth.controller.js'
 import { validateRequest } from '../../middleware/validate.middleware.js'
 import { authenticate } from '../../middleware/auth.middleware.js'
 import { authorize } from '../../middleware/rbac.middleware.js'
@@ -63,6 +63,7 @@ router.post('/login', validateRequest({ body: loginSchema }), login)
  *         description: Missing or invalid token
  */
 router.post('/logout', authenticate, logout)
+router.post('/change-password', authenticate, changePassword)
 
 /**
  * @openapi

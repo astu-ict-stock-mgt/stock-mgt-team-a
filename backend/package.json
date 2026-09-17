@@ -16,6 +16,7 @@
     "type-check": "tsc --noEmit",
     "lint": "eslint src/",
     "seed": "prisma db seed",
+    "healthcheck": "node src/utils/healthcheck.js",
     "install-deps": "npm install"
   },
   "prisma": {

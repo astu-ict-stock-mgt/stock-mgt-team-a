@@ -2,10 +2,15 @@
  * Central Requisition Service & Workflow Engine
  * Tasks: BE-096, BE-097, BE-098, BE-102 (Implement Requisition History)
  * SRS Traceability: Section 6 (Requisition & Issue Module), Section 13 (Auditability), Clarification Register C-01
+ * BE-150: Notification events integrated — all calls are fire-and-forget.
  */
 
 import { prisma } from '../../config/database.js'
 import { NotFoundError, ValidationError, ConflictError } from '../../utils/errors.js'
+import {
+  notifyApprovalPending,
+  notifyStatusChange,
+} from '../notifications/notification-events.service.js'
 
 /**
  * Generate sequential Requisition Number REQ-YYYY-XXXXX
@@ -24,7 +29,24 @@ export async function generateRequisitionNumber() {
  * @returns {Promise<Object>} Created Requisition record
  */
 export async function createRequisition({ requesterId, departmentId, storeId, purpose, lines }) {
-  if (!requesterId || !departmentId || !storeId || !purpose) {
+  // Validate requester exists (prevents FK constraint crash from stale JWT)
+  const requesterUser = await prisma.user.findUnique({ where: { id: requesterId }, select: { id: true } })
+  if (!requesterUser) {
+    throw new ConflictError('Your session user no longer exists in the system. Please log out and log back in.')
+  }
+
+  let finalDeptId = departmentId
+  if (departmentId === '00000000-0000-0000-0000-000000000000' || !departmentId) {
+    const firstDept = await prisma.department.findFirst({
+      where: { status: 'ACTIVE' },
+      select: { id: true },
+    })
+    if (firstDept) {
+      finalDeptId = firstDept.id
+    }
+  }
+
+  if (!requesterId || !finalDeptId || !storeId || !purpose) {
     throw new ValidationError('Requester, department, store, and purpose are required')
   }
 
@@ -40,33 +62,39 @@ export async function createRequisition({ requesterId, departmentId, storeId, pu
 
   const requisitionNumber = await generateRequisitionNumber()
 
-  return prisma.$transaction(async (tx) => {
-    const requisition = await tx.requisition.create({
-      data: {
-        requisitionNumber,
-        requesterId,
-        departmentId,
-        storeId,
-        purpose,
-        status: 'SUBMITTED',
-        lines: {
-          create: lines.map((l) => ({
-            itemId: l.itemId,
-            requestedQuantity: l.requestedQuantity,
-            remarks: l.remarks || null,
-          })),
-        },
+  const requisition = await prisma.requisition.create({
+    data: {
+      requisitionNumber,
+      requesterId,
+      departmentId: finalDeptId,
+      storeId,
+      purpose,
+      status: 'SUBMITTED',
+      lines: {
+        create: lines.map((l) => ({
+          itemId: l.itemId,
+          requestedQuantity: l.requestedQuantity,
+          remarks: l.remarks || null,
+        })),
       },
-      include: {
-        requester: { select: { id: true, fullName: true, email: true } },
-        department: { select: { id: true, name: true, code: true } },
-        store: { select: { id: true, name: true, code: true } },
-        lines: { include: { item: { select: { id: true, name: true, code: true } } } },
-      },
-    })
-
-    return requisition
+    },
+    include: {
+      requester: { select: { id: true, fullName: true, email: true } },
+      department: { select: { id: true, name: true, code: true } },
+      store: { select: { id: true, name: true, code: true } },
+      lines: { include: { item: { select: { id: true, name: true, code: true } } } },
+    },
   })
+
+  // BE-150: Notify approvers — fire-and-forget, cannot break main workflow
+  notifyApprovalPending({
+    entityType: 'REQUISITION',
+    entityId: requisition.id,
+    entityNumber: requisition.requisitionNumber,
+    submitterId: requesterId,
+  }).catch(() => {})
+
+  return requisition
 }
 
 /**
@@ -142,13 +170,19 @@ export async function listRequisitions(filters = {}) {
  * @param {Object} params - { id, approverId, lineApprovals }
  */
 export async function approveDepartmentRequisition({ id, approverId, lineApprovals }) {
+  // Validate approver exists (prevents FK constraint crash from stale JWT)
+  const approverUser = await prisma.user.findUnique({ where: { id: approverId }, select: { id: true } })
+  if (!approverUser) {
+    throw new ConflictError('Your session user no longer exists in the system. Please log out and log back in.')
+  }
+
   const requisition = await getRequisitionById(id)
 
   if (requisition.status !== 'SUBMITTED') {
     throw new ConflictError(`Requisition cannot be department-approved from current state '${requisition.status}'`)
   }
 
-  return prisma.$transaction(async (tx) => {
+  const updated = await prisma.$transaction(async (tx) => {
     if (Array.isArray(lineApprovals) && lineApprovals.length > 0) {
       for (const lineApp of lineApprovals) {
         if (lineApp.lineId && typeof lineApp.approvedQuantity === 'number') {
@@ -160,7 +194,7 @@ export async function approveDepartmentRequisition({ id, approverId, lineApprova
       }
     }
 
-    return tx.requisition.update({
+    const record = await tx.requisition.update({
       where: { id },
       data: {
         status: 'DEPARTMENT_APPROVED',
@@ -169,7 +203,21 @@ export async function approveDepartmentRequisition({ id, approverId, lineApprova
       },
       include: { lines: true },
     })
+
+    return record
   })
+
+  // BE-150: Notify requester of department approval
+  notifyStatusChange({
+    userId: requisition.requesterId,
+    entityType: 'REQUISITION',
+    entityId: requisition.id,
+    entityNumber: requisition.requisitionNumber,
+    oldStatus: 'SUBMITTED',
+    newStatus: 'DEPARTMENT_APPROVED',
+  }).catch(() => {})
+
+  return updated
 }
 
 /**
@@ -177,13 +225,19 @@ export async function approveDepartmentRequisition({ id, approverId, lineApprova
  * @param {Object} params - { id, paoUserId, lineApprovals }
  */
 export async function approvePAORequisition({ id, paoUserId, lineApprovals }) {
+  // Validate PAO user exists (prevents FK constraint crash from stale JWT)
+  const paoUser = await prisma.user.findUnique({ where: { id: paoUserId }, select: { id: true } })
+  if (!paoUser) {
+    throw new ConflictError('Your session user no longer exists in the system. Please log out and log back in.')
+  }
+
   const requisition = await getRequisitionById(id)
 
   if (requisition.status !== 'DEPARTMENT_APPROVED') {
     throw new ConflictError(`Requisition cannot be PAO-approved from current state '${requisition.status}'. It must first be approved at Department level (DEPARTMENT_APPROVED).`)
   }
 
-  return prisma.$transaction(async (tx) => {
+  const updated = await prisma.$transaction(async (tx) => {
     if (Array.isArray(lineApprovals) && lineApprovals.length > 0) {
       for (const lineApp of lineApprovals) {
         if (lineApp.lineId && typeof lineApp.approvedQuantity === 'number') {
@@ -195,7 +249,7 @@ export async function approvePAORequisition({ id, paoUserId, lineApprovals }) {
       }
     }
 
-    return tx.requisition.update({
+    const record = await tx.requisition.update({
       where: { id },
       data: {
         status: 'PAO_APPROVED',
@@ -204,7 +258,21 @@ export async function approvePAORequisition({ id, paoUserId, lineApprovals }) {
       },
       include: { lines: true },
     })
+
+    return record
   })
+
+  // BE-150: Notify requester of PAO final approval
+  notifyStatusChange({
+    userId: requisition.requesterId,
+    entityType: 'REQUISITION',
+    entityId: requisition.id,
+    entityNumber: requisition.requisitionNumber,
+    oldStatus: requisition.status,
+    newStatus: 'PAO_APPROVED',
+  }).catch(() => {})
+
+  return updated
 }
 
 /**
@@ -220,13 +288,25 @@ export async function rejectRequisition({ id, rejectedByUserId, reason, level = 
 
   const targetStatus = level === 'PAO' ? 'PAO_REJECTED' : 'DEPARTMENT_REJECTED'
 
-  return prisma.requisition.update({
+  const updated = await prisma.requisition.update({
     where: { id },
     data: {
       status: targetStatus,
       rejectionReason: reason || 'Requisition request rejected',
     },
   })
+
+  // BE-150: Notify requester of rejection
+  notifyStatusChange({
+    userId: requisition.requesterId,
+    entityType: 'REQUISITION',
+    entityId: requisition.id,
+    entityNumber: requisition.requisitionNumber,
+    oldStatus: requisition.status,
+    newStatus: targetStatus,
+  }).catch(() => {})
+
+  return updated
 }
 
 /**
