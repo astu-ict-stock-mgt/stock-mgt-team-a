@@ -124,6 +124,10 @@ export const execute = async (req, res, next) => {
       witnessName: req.body.witnessName,
       certificateNumber: req.body.certificateNumber,
       disposalLocation: req.body.disposalLocation,
+      receivingPublicBody: req.body.receivingPublicBody,
+      authorizationRef: req.body.authorizationRef,
+      handoverDocRef: req.body.handoverDocRef,
+      recipientOfficer: req.body.recipientOfficer,
     })
     return sendSuccess(res, disposal)
   } catch (err) {

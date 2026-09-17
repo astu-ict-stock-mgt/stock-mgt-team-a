@@ -19,6 +19,7 @@ export const sivLineSchema = z.object({
     .positive('quantityIssued must be greater than zero'),
 
   unitCost: z.number().positive('unitCost must be positive').optional(),
+  assetId: z.string().optional().nullable(),
   remarks: z.string().optional(),
 })
 

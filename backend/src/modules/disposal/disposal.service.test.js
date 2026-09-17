@@ -356,6 +356,113 @@ describe('Disposal Execution Service (BE-139)', () => {
         data: expect.objectContaining({ status: 'EXECUTED' }),
       })
     })
+
+    it('should successfully execute disposal for TRANSFER_OUT and persist handover metadata in proper DB columns (Directive 1095/2017)', async () => {
+      const currentYear = new Date().getFullYear()
+      const mockTransferDisposal = {
+        id: 'disp-transfer-1',
+        disposalNumber: `DISP-${currentYear}-00088`,
+        storeId: 'store-1',
+        requestedBy: 'usr-pao',
+        status: 'APPROVED',
+        disposalMethod: 'TRANSFER_OUT',
+        // Existing proposal-time fields already stored as DB columns
+        receivingPublicBody: null,
+        authorizationRef: null,
+        lines: [
+          {
+            id: 'line-1',
+            itemId: 'item-1',
+            locationId: 'loc-1',
+            quantity: 8,
+            item: { name: 'Laboratory Microscope' },
+          },
+        ],
+      }
+
+      prisma.disposalRequest.findUnique.mockResolvedValue(mockTransferDisposal)
+
+      prisma.stockCard.findUnique.mockResolvedValue({
+        id: 'sc-1',
+        itemId: 'item-1',
+        storeId: 'store-1',
+        quantity: 15,
+        availableQty: 15,
+      })
+
+      prisma.binCard.findUnique.mockResolvedValue({
+        id: 'bin-1',
+        itemId: 'item-1',
+        locationId: 'loc-1',
+        quantity: 15,
+      })
+
+      const mockExecutedRecord = {
+        ...mockTransferDisposal,
+        status: 'EXECUTED',
+        executedBy: 'usr-storekeeper',
+        executedAt: new Date(),
+        // Structured DB columns — NOT crammed into notes string
+        receivingPublicBody: 'Regional Tech Center',
+        authorizationRef: 'ASTU/DIR/2026/01',
+        handoverDocRef: 'TR-VOUCH-101',
+        recipientOfficer: 'Ato Dawit',
+        witnessName: 'Store Head',
+        executionNotes: 'Transferred in good condition',
+        notes: 'Transferred in good condition',
+      }
+
+      prisma.disposalRequest.update.mockResolvedValue(mockExecutedRecord)
+
+      const result = await executeDisposal({
+        id: 'disp-transfer-1',
+        executedBy: 'usr-storekeeper',
+        executionNotes: 'Transferred in good condition',
+        receivingPublicBody: 'Regional Tech Center',
+        authorizationRef: 'ASTU/DIR/2026/01',
+        handoverDocRef: 'TR-VOUCH-101',
+        recipientOfficer: 'Ato Dawit',
+        witnessName: 'Store Head',
+      })
+
+      expect(result.status).toBe('EXECUTED')
+      expect(result.disposalMethod).toBe('TRANSFER_OUT')
+      // Verify structured DB columns are persisted (Directive 1095/2017 audit traceability)
+      expect(result.receivingPublicBody).toBe('Regional Tech Center')
+      expect(result.authorizationRef).toBe('ASTU/DIR/2026/01')
+      expect(result.handoverDocRef).toBe('TR-VOUCH-101')
+      expect(result.recipientOfficer).toBe('Ato Dawit')
+      expect(prisma.stockCard.update).toHaveBeenCalledWith({
+        where: { id: 'sc-1' },
+        data: expect.objectContaining({
+          quantity: 7,
+          availableQty: 7,
+        }),
+      })
+      // notes on transaction should contain only free-text executionNotes, NOT crammed handover text
+      expect(prisma.stockCardTransaction.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          stockCardId: 'sc-1',
+          transactionType: 'DISPOSAL',
+          quantity: -8,
+          notes: 'Transferred in good condition',
+        }),
+      })
+      // Verify DisposalRequest.update was called with proper DB column fields
+      expect(prisma.disposalRequest.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            status: 'EXECUTED',
+            receivingPublicBody: 'Regional Tech Center',
+            authorizationRef: 'ASTU/DIR/2026/01',
+            handoverDocRef: 'TR-VOUCH-101',
+            recipientOfficer: 'Ato Dawit',
+            witnessName: 'Store Head',
+            executionNotes: 'Transferred in good condition',
+          }),
+        })
+      )
+    })
   })
 
   describe('getDisposalAuditHistory (BE-140)', () => {

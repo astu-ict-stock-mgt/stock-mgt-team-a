@@ -239,7 +239,7 @@ export default function App() {
           case 'gate-control':
             return hasPermission(userRoles, PERMISSIONS.DISPATCH_VERIFY)
           case 'stock-transfer':
-            return hasPermission(userRoles, PERMISSIONS.TRANSFERS_CREATE) || hasPermission(userRoles, PERMISSIONS.TRANSFERS_APPROVE)
+            return hasPermission(userRoles, PERMISSIONS.TRANSFERS_CREATE) || hasPermission(userRoles, PERMISSIONS.TRANSFERS_APPROVE) || hasPermission(userRoles, PERMISSIONS.TRANSFERS_READ)
           case 'stock-tracking':
             return hasPermission(userRoles, PERMISSIONS.STOCK_CARDS_READ)
           case 'stock-taking':
@@ -677,7 +677,7 @@ export default function App() {
             {screen === "material-evaluation" && (hasPermission(userRoles, PERMISSIONS.EVALUATIONS_DECIDE) || hasPermission(userRoles, PERMISSIONS.EVALUATIONS_CREATE)) && <MaterialEvaluation />}
             {screen === "stock-issuing" && (hasPermission(userRoles, PERMISSIONS.REQUISITIONS_CREATE) || hasPermission(userRoles, PERMISSIONS.REQUISITIONS_APPROVE) || hasPermission(userRoles, PERMISSIONS.SIV_PREPARE)) && <StockIssuing />}
             {screen === "gate-control" && hasPermission(userRoles, PERMISSIONS.DISPATCH_VERIFY) && <GateControl />}
-            {screen === "stock-transfer" && (hasPermission(userRoles, PERMISSIONS.TRANSFERS_CREATE) || hasPermission(userRoles, PERMISSIONS.TRANSFERS_APPROVE)) && <StockTransfer />}
+            {screen === "stock-transfer" && (hasPermission(userRoles, PERMISSIONS.TRANSFERS_CREATE) || hasPermission(userRoles, PERMISSIONS.TRANSFERS_APPROVE) || hasPermission(userRoles, PERMISSIONS.TRANSFERS_READ)) && <StockTransfer />}
             {screen === "stock-tracking" && hasPermission(userRoles, PERMISSIONS.STOCK_CARDS_READ) && <StockTracking />}
             {screen === "stock-taking" && (hasPermission(userRoles, PERMISSIONS.RECONCILIATION_CREATE) || hasPermission(userRoles, PERMISSIONS.RECONCILIATION_APPROVE)) && <StockTaking />}
             {screen === "disposal-requests" && (hasPermission(userRoles, PERMISSIONS.SHELFLIFE_READ) || hasPermission(userRoles, PERMISSIONS.DISPOSAL_REQUEST)) && <DisposalManagement />}

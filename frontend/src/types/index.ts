@@ -354,13 +354,19 @@ export interface ReturnLine {
 export interface TransferRequest {
   id: string
   transferNumber: string
-  transferType: 'STORE_TO_STORE' | 'DEPARTMENT_TO_DEPARTMENT'
-  status: 'SUBMITTED' | 'APPROVED' | 'REJECTED' | 'IN_TRANSIT' | 'COMPLETED'
-  sourceStoreId: string
-  destinationStoreId: string
-  sourceLocationId: string | null
-  destinationLocationId: string | null
+  transferType: 'STORE_TO_STORE' | 'DEPARTMENT_TO_DEPARTMENT' | 'USER_TO_USER' | string
+  status: 'DRAFT' | 'PENDING_APPROVAL' | 'PENDING_DEPT_APPROVAL' | 'PENDING_PAO_APPROVAL' | 'SUBMITTED' | 'APPROVED' | 'REJECTED' | 'CANCELLED' | 'IN_TRANSIT' | 'COMPLETED'
+  sourceStoreId?: string | null
+  destinationStoreId?: string | null
+  sourceLocationId?: string | null
+  destinationLocationId?: string | null
+  sourceUserId?: string | null
+  destinationUserId?: string | null
+  acknowledgedBy?: string | null
+  acknowledgedAt?: string | null
   requestedBy: string
+  deptApprovedBy?: string | null
+  deptApprovedAt?: string | null
   approvedBy: string | null
   approvedAt: string | null
   notes: string | null
@@ -368,6 +374,8 @@ export interface TransferRequest {
   updatedAt: string
   sourceStore?: Store
   destinationStore?: Store
+  sourceUser?: { id: string; fullName: string; email?: string } | null
+  destinationUser?: { id: string; fullName: string; email?: string } | null
   requestedByUser?: { id: string; fullName: string; email: string }
   approvedByUser?: { id: string; fullName: string } | null
   lines?: TransferLine[]
@@ -375,12 +383,15 @@ export interface TransferRequest {
 
 export interface TransferLine {
   id: string
-  transferRequestId: string
+  transferRequestId?: string
+  transferId?: string
   itemId: string
+  assetId?: string | null
   quantityRequested: number
   quantityTransferred: number | null
   remarks: string | null
   item?: Item
+  asset?: { id: string; assetTag: string; serialNumber?: string | null; status?: string; custodianId?: string | null } | null
 }
 
 export interface StockTake {

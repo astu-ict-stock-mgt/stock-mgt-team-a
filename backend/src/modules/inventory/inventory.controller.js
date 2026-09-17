@@ -53,6 +53,15 @@ class InventoryController {
     }
   }
 
+  async getAllStock(req, res, next) {
+    try {
+      const stock = await inventoryLedgerService.getAllStock(req.query);
+      return sendSuccess(res, stock);
+    } catch (error) {
+      return sendError(res, error);
+    }
+  }
+
   async getStockByItem(req, res, next) {
     try {
       const stock = await inventoryLedgerService.getStockByItem(req.params.itemId);

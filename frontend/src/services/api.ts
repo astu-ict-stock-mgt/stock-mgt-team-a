@@ -227,6 +227,13 @@ export const itemsApi = {
 }
 
 export const inventoryApi = {
+  getAllStock: (params?: { categoryId?: string; search?: string; lowStock?: boolean }) => {
+    const q = new URLSearchParams()
+    if (params?.categoryId) q.set('categoryId', params.categoryId)
+    if (params?.search) q.set('search', params.search)
+    if (params?.lowStock) q.set('lowStock', 'true')
+    return api.get<ApiResponse<StockCard[]>>(`/inventory/stock/all?${q.toString()}`)
+  },
   getStockByStore: (storeId: string, params?: { categoryId?: string; search?: string; lowStock?: boolean }) => {
     const q = new URLSearchParams()
     if (params?.categoryId) q.set('categoryId', params.categoryId)
@@ -256,20 +263,40 @@ export const inventoryApi = {
 }
 
 export const transfersApi = {
-  getAll: (params?: { status?: string; transferType?: string; page?: number; limit?: number }) => {
+  getAll: (params?: { status?: string; transferType?: string; sourceStoreId?: string; destinationStoreId?: string; sourceUserId?: string; destinationUserId?: string; page?: number; limit?: number }) => {
     const q = new URLSearchParams()
     if (params?.status) q.set('status', params.status)
     if (params?.transferType) q.set('transferType', params.transferType)
+    if (params?.sourceStoreId) q.set('sourceStoreId', params.sourceStoreId)
+    if (params?.destinationStoreId) q.set('destinationStoreId', params.destinationStoreId)
+    if (params?.sourceUserId) q.set('sourceUserId', params.sourceUserId)
+    if (params?.destinationUserId) q.set('destinationUserId', params.destinationUserId)
     if (params?.page) q.set('page', String(params.page))
     if (params?.limit) q.set('limit', String(params.limit))
     return api.get<ApiResponse<TransferRequest[]>>(`/transfers?${q.toString()}`)
   },
   getById: (id: string) => api.get<ApiResponse<TransferRequest>>(`/transfers/${id}`),
-  create: (data: { sourceStoreId: string; destinationStoreId: string; transferType?: string; notes?: string; lines: Array<{ itemId: string; quantityRequested: number }> }) =>
-    api.post<ApiResponse<TransferRequest>>('/transfers', data),
+  create: (data: {
+    sourceStoreId?: string | null
+    destinationStoreId?: string | null
+    sourceUserId?: string | null
+    destinationUserId?: string | null
+    transferType?: string
+    reason?: string
+    notes?: string
+    lines: Array<{
+      itemId: string
+      assetId?: string | null
+      quantityRequested: number
+      quantity?: number
+      remarks?: string
+    }>
+  }) => api.post<ApiResponse<TransferRequest>>('/transfers', data),
   approve: (id: string, data?: { isApproved?: boolean; notes?: string }) =>
     api.patch<ApiResponse<TransferRequest>>(`/transfers/${id}/approve`, data),
   dispatch: (id: string) => api.patch<ApiResponse<TransferRequest>>(`/transfers/${id}/dispatch`),
+  acknowledge: (id: string, data?: { notes?: string }) =>
+    api.patch<ApiResponse<TransferRequest>>(`/transfers/${id}/acknowledge`, data),
   complete: (id: string) => api.patch<ApiResponse<TransferRequest>>(`/transfers/${id}/complete`),
 }
 
@@ -386,7 +413,16 @@ export const evaluationsApi = {
 }
 
 export const assetsApi = {
-  getAll: (params?: any) => api.get<ApiResponse<any[]>>('/assets'),
+  getAll: (params?: { status?: string; custodianId?: string; departmentId?: string; search?: string; page?: number; limit?: number }) => {
+    const q = new URLSearchParams()
+    if (params?.status) q.set('status', params.status)
+    if (params?.custodianId) q.set('custodianId', params.custodianId)
+    if (params?.departmentId) q.set('departmentId', params.departmentId)
+    if (params?.search) q.set('search', params.search)
+    if (params?.page) q.set('page', String(params.page))
+    if (params?.limit) q.set('limit', String(params.limit))
+    return api.get<ApiResponse<any[]>>(`/assets?${q.toString()}`)
+  },
   getById: (id: string) => api.get<ApiResponse<any>>(`/assets/${id}`),
   register: (data: { name: string; itemId?: string; serialNumber?: string; assetTag?: string; category?: string; purchaseCost?: number; location?: string; grnId?: string; notes?: string }) =>
     api.post<ApiResponse<any>>('/assets', data),
@@ -403,7 +439,16 @@ export const disposalsApi = {
     return api.get<ApiResponse<any[]>>(`/disposals?${q.toString()}`)
   },
   getById: (id: string) => api.get<ApiResponse<any>>(`/disposals/${id}`),
-  create: (data: { storeId: string; disposalMethod: string; reason?: string; notes?: string; lines?: Array<{ itemId: string; quantity: number; locationId?: string | null; remarks?: string | null; condition?: string | null; batchNumber?: string | null; expiryDate?: string | null }> }) =>
+  create: (data: {
+    storeId: string
+    disposalMethod: string
+    reason?: string
+    notes?: string
+    // Directive 1095/2017: TRANSFER_OUT proposal fields
+    receivingPublicBody?: string
+    authorizationRef?: string
+    lines?: Array<{ itemId: string; quantity: number; locationId?: string | null; remarks?: string | null; condition?: string | null; batchNumber?: string | null; expiryDate?: string | null }>
+  }) =>
     api.post<ApiResponse<any>>('/disposals', data),
   evaluate: (id: string, data: { notes: string }) =>
     api.patch<ApiResponse<any>>(`/disposals/${id}/evaluate`, data),
@@ -411,7 +456,17 @@ export const disposalsApi = {
     api.patch<ApiResponse<any>>(`/disposals/${id}/approve`, data),
   reject: (id: string, data: { reason: string }) =>
     api.patch<ApiResponse<any>>(`/disposals/${id}/reject`, data),
-  execute: (id: string, data: { executionNotes?: string; witnessName?: string; certificateNumber?: string; disposalLocation?: string }) =>
+  execute: (id: string, data: {
+    executionNotes?: string
+    witnessName?: string
+    certificateNumber?: string
+    disposalLocation?: string
+    // Directive 1095/2017: TRANSFER_OUT handover execution fields
+    receivingPublicBody?: string
+    authorizationRef?: string
+    handoverDocRef?: string
+    recipientOfficer?: string
+  }) =>
     api.post<ApiResponse<any>>(`/disposals/${id}/execute`, data),
   getHistory: (id: string) => api.get<ApiResponse<any>>(`/disposals/${id}/history`),
 }

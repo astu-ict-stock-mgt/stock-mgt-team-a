@@ -67,6 +67,49 @@ export class TransferValidationService {
       destinationLocationId,
     } = transferRequest
 
+    // 0. User-to-User Validation (Directive 1095/2017 Article 19)
+    if (transferType === 'USER_TO_USER') {
+      const { sourceUserId, destinationUserId } = transferRequest
+      if (!sourceUserId) {
+        throw new InvalidSourceError('Source user is required for user-to-user property transfer')
+      }
+      if (!destinationUserId) {
+        throw new InvalidDestinationError('Destination user is required for user-to-user property transfer')
+      }
+      if (sourceUserId === destinationUserId) {
+        throw new InvalidDestinationError('Source user and destination user must be distinct')
+      }
+
+      const sourceUser = await dbClient.user.findUnique({ where: { id: sourceUserId } })
+      if (!sourceUser || sourceUser.status !== 'ACTIVE') {
+        throw new InvalidSourceError(`Source user ${sourceUserId} is inactive or not found`)
+      }
+
+      const destinationUser = await dbClient.user.findUnique({ where: { id: destinationUserId } })
+      if (!destinationUser || destinationUser.status !== 'ACTIVE') {
+        throw new InvalidDestinationError(`Destination user ${destinationUserId} is inactive or not found`)
+      }
+
+      // Check that any specified asset has sourceUserId as custodian
+      if (transferRequest.lines && Array.isArray(transferRequest.lines)) {
+        for (const line of transferRequest.lines) {
+          if (line.assetId) {
+            const asset = await dbClient.fixedAsset.findUnique({ where: { id: line.assetId } })
+            if (!asset) {
+              throw new NotFoundError(`Fixed asset '${line.assetId}' not found`)
+            }
+            if (!asset.custodianId) {
+              throw new ValidationError(`Fixed asset '${asset.assetTag || asset.id}' has no assigned custodian and cannot be transferred user-to-user`)
+            }
+            if (asset.custodianId !== sourceUserId) {
+              throw new InvalidSourceError(`Fixed asset '${asset.assetTag || asset.id}' is not currently assigned to source user`)
+            }
+          }
+        }
+      }
+      return
+    }
+
     // 1. Store Validation (for store-level transfers)
     if (transferType === 'STORE_TO_STORE' || sourceStoreId || destinationStoreId) {
       if (!sourceStoreId) {

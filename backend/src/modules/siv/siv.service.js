@@ -66,6 +66,7 @@ export async function createSIV({ requisitionId, storeId, issuedToUserId, prepar
         lines: {
           create: lines.map((l) => ({
             itemId: l.itemId,
+            assetId: l.assetId || null,
             quantityIssued: l.quantityIssued,
             unitCost: l.unitCost || null,
             totalCost: l.unitCost ? l.unitCost * l.quantityIssued : null,
@@ -100,7 +101,12 @@ export async function getSivById(id) {
       issuedToUser: { select: { id: true, fullName: true, email: true } },
       preparedByUser: { select: { id: true, fullName: true } },
       approvedByUser: { select: { id: true, fullName: true } },
-      lines: { include: { item: { select: { id: true, name: true, code: true } } } },
+      lines: {
+        include: {
+          item: { select: { id: true, name: true, code: true } },
+          asset: { select: { id: true, assetTag: true, serialNumber: true, name: true, status: true } },
+        },
+      },
     },
   })
 
@@ -269,6 +275,42 @@ export async function finalizeSIV({ id, finalizerId }) {
           issuedQuantity: { increment: line.quantityIssued },
         },
       })
+
+      // PHASE 1: Connect Finalized SIV Issue to Initial FixedAsset Custody Assignment
+      let targetAsset = null
+      if (line.assetId) {
+        targetAsset = await tx.fixedAsset.findUnique({ where: { id: line.assetId } })
+      } else if (line.itemId) {
+        // Automatically check if an unassigned registered asset exists for this item
+        targetAsset = await tx.fixedAsset.findFirst({
+          where: {
+            itemId: line.itemId,
+            custodianId: null,
+            status: 'REGISTERED',
+          },
+        })
+      }
+
+      if (targetAsset) {
+        await tx.fixedAsset.update({
+          where: { id: targetAsset.id },
+          data: {
+            custodianId: siv.issuedToUserId,
+            status: 'IN_USE',
+            notes: targetAsset.notes
+              ? `${targetAsset.notes} | Initial issue via SIV ${siv.sivNumber}`
+              : `Initial issue via SIV ${siv.sivNumber}`,
+          },
+        })
+
+        // Also ensure SIVLine links to this assetId for audit traceability
+        if (!line.assetId) {
+          await tx.sIVLine.update({
+            where: { id: line.id },
+            data: { assetId: targetAsset.id },
+          })
+        }
+      }
     }
 
     // Update parent requisition lifecycle state based on fulfilled line quantities

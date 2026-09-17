@@ -21,7 +21,7 @@ export async function generateDisposalNumber() {
 
 /**
  * Create a new Disposal Request (BE-137)
- * @param {Object} data - { storeId, requestedBy, disposalMethod, reason, notes, lines }
+ * @param {Object} data - { storeId, requestedBy, disposalMethod, reason, notes, receivingPublicBody, authorizationRef, lines }
  * @returns {Promise<Object>} Created Disposal Request record
  */
 export async function createDisposalRequest({
@@ -30,6 +30,8 @@ export async function createDisposalRequest({
   disposalMethod = 'WRITE_OFF',
   reason,
   notes,
+  receivingPublicBody,
+  authorizationRef,
   lines,
 }) {
   if (!requestedBy) {
@@ -122,6 +124,9 @@ export async function createDisposalRequest({
       requestedBy,
       reason: reason || null,
       notes: notes || null,
+      // Directive 1095/2017: TRANSFER_OUT proposal fields stored as proper auditable DB columns
+      receivingPublicBody: receivingPublicBody || null,
+      authorizationRef: authorizationRef || null,
       lines: {
         create: populatedLines
       }
@@ -323,6 +328,10 @@ export async function executeDisposal({
   witnessName,
   certificateNumber,
   disposalLocation,
+  receivingPublicBody,
+  authorizationRef,
+  handoverDocRef,
+  recipientOfficer,
 }) {
   const disposal = await getDisposalById(id)
 
@@ -339,6 +348,9 @@ export async function executeDisposal({
   if (!Array.isArray(disposal.lines) || disposal.lines.length === 0) {
     throw new ValidationError('Disposal request has no line items to execute')
   }
+
+  // Construct detailed handover / execution notes (free-text only, structured fields stored as DB columns)
+  const finalNotes = executionNotes || null
 
   return prisma.$transaction(async (tx) => {
     for (const line of disposal.lines) {
@@ -397,7 +409,7 @@ export async function executeDisposal({
           referenceType: 'DISPOSAL_REQUEST',
           referenceId: disposal.id,
           referenceNumber: disposal.disposalNumber,
-          notes: executionNotes || `Disposal execution for request ${disposal.disposalNumber}`,
+          notes: finalNotes || `Disposal execution for request ${disposal.disposalNumber}`,
           createdBy: executedBy || disposal.requestedBy,
         },
       })
@@ -429,7 +441,7 @@ export async function executeDisposal({
               referenceType: 'DISPOSAL_REQUEST',
               referenceId: disposal.id,
               referenceNumber: disposal.disposalNumber,
-              notes: executionNotes || `Disposal execution for ${disposal.disposalNumber}`,
+              notes: finalNotes || `Disposal execution for ${disposal.disposalNumber}`,
               createdBy: executedBy || disposal.requestedBy,
             },
           })
@@ -452,7 +464,17 @@ export async function executeDisposal({
         status: 'EXECUTED',
         executedBy: executedBy || null,
         executedAt: new Date(),
-        notes: executionNotes || null,
+        // Directive 1095/2017: all execution evidence stored as proper auditable DB columns
+        executionNotes: executionNotes || null,
+        witnessName: witnessName || null,
+        certificateNumber: certificateNumber || null,
+        disposalLocation: disposalLocation || null,
+        // TRANSFER_OUT handover fields: supplement proposal-time values if provided at execution
+        receivingPublicBody: receivingPublicBody || disposal.receivingPublicBody || null,
+        authorizationRef: authorizationRef || disposal.authorizationRef || null,
+        handoverDocRef: handoverDocRef || null,
+        recipientOfficer: recipientOfficer || null,
+        notes: finalNotes || null,
       },
       include: {
         store: { select: { id: true, name: true, code: true } },
@@ -517,7 +539,7 @@ export async function getDisposalAuditHistory(id) {
       actor: disposal.approvedByUser
         ? { id: disposal.approvedByUser.id, fullName: disposal.approvedByUser.fullName }
         : null,
-      details: `Disposal request approved.`,
+      details: `Disposal request approved. Method: ${disposal.disposalMethod}.`,
     })
   }
 
@@ -534,14 +556,28 @@ export async function getDisposalAuditHistory(id) {
   }
 
   if (disposal.status === 'EXECUTED') {
+    const isTransferOut = disposal.disposalMethod === 'TRANSFER_OUT'
+    // Build structured handover detail from dedicated DB columns (Directive 1095/2017)
+    let transferOutDetail = ''
+    if (isTransferOut) {
+      const parts = []
+      if (disposal.receivingPublicBody) parts.push(`Receiving Body: ${disposal.receivingPublicBody}`)
+      if (disposal.authorizationRef) parts.push(`Auth Ref: ${disposal.authorizationRef}`)
+      if (disposal.handoverDocRef) parts.push(`Handover Doc: ${disposal.handoverDocRef}`)
+      if (disposal.recipientOfficer) parts.push(`Recipient Officer: ${disposal.recipientOfficer}`)
+      if (disposal.witnessName) parts.push(`Witness: ${disposal.witnessName}`)
+      if (parts.length > 0) transferOutDetail = ` [${parts.join(' | ')}]`
+    }
     events.push({
-      eventType: 'DISPOSAL_EXECUTED',
+      eventType: isTransferOut ? 'DISPOSAL_TRANSFER_OUT_EXECUTED' : 'DISPOSAL_EXECUTED_AND_STOCK_DEDUCTED',
       status: 'EXECUTED',
       timestamp: disposal.executedAt || disposal.updatedAt,
       actor: disposal.executedByUser
         ? { id: disposal.executedByUser.id, fullName: disposal.executedByUser.fullName }
         : null,
-      details: `Disposal executed. Stock deducted for ${disposal.lines?.length || 0} line item(s).`,
+      details: isTransferOut
+        ? `Disposal transfer out executed to receiving public body. Stock deducted for ${disposal.lines?.length || 0} line item(s).${transferOutDetail}`.trim()
+        : `Disposal executed. Stock deducted for ${disposal.lines?.length || 0} line item(s).`,
     })
   }
 

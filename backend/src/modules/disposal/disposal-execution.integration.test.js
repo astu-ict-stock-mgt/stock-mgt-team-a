@@ -136,6 +136,7 @@ describe('Disposal Execution REST API Integration Tests (BE-139)', () => {
         witnessName: 'Inspector Gadget',
         certificateNumber: 'CERT-001',
         disposalLocation: 'Facility Zone B',
+        executionNotes: 'Safely incinerated in certified facility',
         lines: [
           {
             id: 'line-1',
@@ -227,6 +228,57 @@ describe('Disposal Execution REST API Integration Tests (BE-139)', () => {
       expect(res.status).toBe(200)
       expect(res.body.success).toBe(true)
       expect(res.body.data?.events.length).toBe(3)
+    })
+  })
+
+  describe('TRANSFER_OUT Workflow Alignment (Directive 1095/2017)', () => {
+    it('should execute TRANSFER_OUT disposal with receiving public body and handover evidence stored as proper DB columns', async () => {
+      // Directive 1095/2017 requires handover fields to be stored as auditable DB columns,
+      // not crammed into the notes text field.
+      const mockTransferOutExecuted = {
+        id: 'disp-transfer-01',
+        disposalNumber: 'DISP-2026-00099',
+        status: 'EXECUTED',
+        disposalMethod: 'TRANSFER_OUT',
+        // Structured DB columns (not packed into notes string)
+        receivingPublicBody: 'Ministry of Innovation',
+        authorizationRef: 'MOF/DIR/2026/10',
+        handoverDocRef: 'TR-VOUCHER-01',
+        recipientOfficer: 'Ato Abebe',
+        witnessName: 'Main Storekeeper',
+        executionNotes: 'Inter-agency property transfer completed',
+        // notes field is free-text only, NOT used for structured handover data
+        notes: null,
+        executedBy: 'usr-storekeeper-01',
+        executedAt: new Date().toISOString(),
+        lines: [{ id: 'l1', itemId: 'item-1', quantity: 10, status: 'EXECUTED' }],
+      }
+
+      vi.spyOn(disposalService, 'executeDisposal').mockResolvedValue(mockTransferOutExecuted)
+
+      const res = await request(app)
+        .post('/api/disposal-requests/disp-transfer-01/execute')
+        .set('Authorization', `Bearer ${storekeeperToken}`)
+        .send({
+          receivingPublicBody: 'Ministry of Innovation',
+          authorizationRef: 'MOF/DIR/2026/10',
+          handoverDocRef: 'TR-VOUCHER-01',
+          recipientOfficer: 'Ato Abebe',
+          witnessName: 'Main Storekeeper',
+          executionNotes: 'Inter-agency property transfer completed',
+        })
+
+      expect(res.status).toBe(200)
+      expect(res.body.success).toBe(true)
+      expect(res.body.data?.status).toBe('EXECUTED')
+      expect(res.body.data?.disposalMethod).toBe('TRANSFER_OUT')
+      // Assert structured DB columns are returned (Directive 1095/2017 traceability)
+      expect(res.body.data?.receivingPublicBody).toBe('Ministry of Innovation')
+      expect(res.body.data?.authorizationRef).toBe('MOF/DIR/2026/10')
+      expect(res.body.data?.handoverDocRef).toBe('TR-VOUCHER-01')
+      expect(res.body.data?.recipientOfficer).toBe('Ato Abebe')
+      // notes field must NOT contain crammed handover text
+      expect(res.body.data?.notes).toBeNull()
     })
   })
 })

@@ -68,8 +68,8 @@ export default function ReturnsManagement() {
   const [isEditingDecision, setIsEditingDecision] = useState(false)
 
   // Fetch Returns
-  const fetchReturns = async () => {
-    setLoadingList(true)
+  const fetchReturns = async (silent = false) => {
+    if (!silent) setLoadingList(true)
     try {
       const res = await returnsApi.getAll({
         status: activeTab === 'all' ? undefined : activeTab,
@@ -77,14 +77,21 @@ export default function ReturnsManagement() {
       })
       setReturnsList(Array.isArray(res.data) ? res.data : [])
     } catch {
-      toast.error('Failed to load return requests')
+      if (!silent) toast.error('Failed to load return requests')
     } finally {
-      setLoadingList(false)
+      if (!silent) setLoadingList(false)
     }
   }
 
   useEffect(() => {
-    fetchReturns()
+    fetchReturns(false)
+    const interval = setInterval(() => fetchReturns(true), 3000)
+    const onFocus = () => fetchReturns(true)
+    window.addEventListener('focus', onFocus)
+    return () => {
+      clearInterval(interval)
+      window.removeEventListener('focus', onFocus)
+    }
   }, [activeTab])
 
   // Fetch Finalized SIVs for setup form

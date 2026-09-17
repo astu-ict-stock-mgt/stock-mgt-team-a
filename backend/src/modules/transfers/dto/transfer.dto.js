@@ -13,14 +13,20 @@ import { z } from 'zod'
 
 export const TransferTypeEnum = z.enum([
   'STORE_TO_STORE',
+  'DEPARTMENT_TO_DEPARTMENT',
+  'WAREHOUSE_TO_STORE',
   'BIN_TO_BIN',
   'STORE_TO_DEPT',
   'DEPT_TO_STORE',
+  'USER_TO_USER',
 ])
 
 export const TransferStatusEnum = z.enum([
   'DRAFT',
   'SUBMITTED',
+  'PENDING_APPROVAL',
+  'PENDING_DEPT_APPROVAL',
+  'PENDING_PAO_APPROVAL',
   'APPROVED',
   'REJECTED',
   'IN_TRANSIT',
@@ -36,15 +42,23 @@ export const transferLineSchema = z.object({
     .min(1, 'itemId cannot be empty'),
 
   quantity: z
-    .number({
-      required_error: 'quantity is required',
-    })
+    .number()
     .int('quantity must be an integer')
-    .positive('quantity must be greater than zero'),
+    .positive('quantity must be greater than zero')
+    .optional(),
 
+  quantityRequested: z
+    .number()
+    .int('quantityRequested must be an integer')
+    .positive('quantityRequested must be greater than zero')
+    .optional(),
+
+  assetId: z.string().min(1, 'assetId cannot be empty').optional().nullable(),
   sourceLocationId: z.string().min(1, 'sourceLocationId cannot be empty').optional().nullable(),
   destinationLocationId: z.string().min(1, 'destinationLocationId cannot be empty').optional().nullable(),
   remarks: z.string().max(1000).optional().nullable(),
+}).refine((d) => (d.quantity && d.quantity > 0) || (d.quantityRequested && d.quantityRequested > 0), {
+  message: 'Valid positive quantity is required',
 })
 
 export const createTransferSchema = z
@@ -56,13 +70,16 @@ export const createTransferSchema = z
     destinationLocationId: z.string().min(1, 'destinationLocationId cannot be empty').optional().nullable(),
     sourceDepartmentId: z.string().min(1, 'sourceDepartmentId cannot be empty').optional().nullable(),
     destinationDepartmentId: z.string().min(1, 'destinationDepartmentId cannot be empty').optional().nullable(),
+    sourceUserId: z.string().min(1, 'sourceUserId cannot be empty').optional().nullable(),
+    destinationUserId: z.string().min(1, 'destinationUserId cannot be empty').optional().nullable(),
     requestedBy: z.string().min(1, 'requestedBy cannot be empty').optional(),
     reason: z
-      .string({
-        required_error: 'reason is required',
-      })
-      .min(3, 'reason must be at least 3 characters long')
-      .max(1000, 'reason must not exceed 1000 characters'),
+      .string()
+      .min(1)
+      .max(1000)
+      .optional()
+      .nullable()
+      .default('Standard Stock Transfer'),
     notes: z.string().max(2000).optional().nullable(),
     lines: z
       .array(transferLineSchema, {
@@ -72,6 +89,15 @@ export const createTransferSchema = z
   })
   .refine(
     (data) => {
+      // Validate user-to-user distinctness and presence
+      if (data.transferType === 'USER_TO_USER') {
+        if (!data.sourceUserId || !data.destinationUserId) {
+          return false
+        }
+        if (data.sourceUserId === data.destinationUserId) {
+          return false
+        }
+      }
       // Validate store-to-store distinctness
       if (data.transferType === 'STORE_TO_STORE') {
         if (data.sourceStoreId && data.destinationStoreId && data.sourceStoreId === data.destinationStoreId) {
@@ -103,8 +129,10 @@ export const createTransferSchema = z
   )
 
 export const approveTransferSchema = z.object({
+  isApproved: z.boolean().optional().default(true),
   approvedBy: z.string().min(1, 'approvedBy cannot be empty').optional(),
   notes: z.string().max(1000).optional().nullable(),
+  rejectionReason: z.string().max(1000).optional().nullable(),
 })
 
 export const rejectTransferSchema = z.object({

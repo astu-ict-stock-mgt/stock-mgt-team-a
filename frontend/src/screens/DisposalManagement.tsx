@@ -6,6 +6,7 @@ import { hasPermission, PERMISSIONS } from '../lib/permissions'
 
 const statusColors: Record<string, 'default' | 'warning' | 'primary' | 'success' | 'danger'> = {
   DRAFT: 'default',
+  SUBMITTED: 'warning',
   UNDER_EVALUATION: 'warning',
   APPROVED: 'primary',
   REJECTED: 'danger',
@@ -15,6 +16,7 @@ const statusColors: Record<string, 'default' | 'warning' | 'primary' | 'success'
 
 const statusLabels: Record<string, string> = {
   DRAFT: 'Draft',
+  SUBMITTED: 'Submitted',
   UNDER_EVALUATION: 'Under Evaluation',
   APPROVED: 'Approved',
   REJECTED: 'Rejected',
@@ -30,17 +32,17 @@ const methodLabels: Record<string, string> = {
   OTHER: 'Other',
   WRITE_OFF: 'Write Off',
   AUCTION: 'Auction',
-  TRANSFER_OUT: 'Transfer Out',
+  TRANSFER_OUT: 'Transfer Out to Public Body',
 }
 
 export default function DisposalManagement() {
   const { stores, inventoryItems, userRoles, refreshData } = useApp()
   const { toast } = useToast()
 
-  const canRequest = hasPermission(userRoles, PERMISSIONS.DISPOSAL_REQUEST)
-  const canEvaluate = hasPermission(userRoles, PERMISSIONS.DISPOSAL_APPROVE) || userRoles.includes('TEC')
-  const canApprove = hasPermission(userRoles, PERMISSIONS.DISPOSAL_APPROVE)
-  const canExecute = hasPermission(userRoles, PERMISSIONS.DISPOSAL_EXECUTE)
+  const canRequest = hasPermission(userRoles, PERMISSIONS.DISPOSAL_REQUEST) || userRoles.includes('PAO') || userRoles.includes('STOREKEEPER') || userRoles.includes('ADMIN')
+  const canEvaluate = userRoles.includes('TEC') || userRoles.includes('ADMIN')
+  const canApprove = (hasPermission(userRoles, PERMISSIONS.DISPOSAL_APPROVE) || userRoles.includes('PAO') || userRoles.includes('ADMIN')) && !userRoles.includes('TEC')
+  const canExecute = hasPermission(userRoles, PERMISSIONS.DISPOSAL_EXECUTE) || userRoles.includes('STOREKEEPER') || userRoles.includes('ADMIN')
 
   const [phase, setPhase] = useState<'list' | 'setup' | 'detail'>('list')
   const [disposals, setDisposals] = useState<any[]>([])
@@ -56,6 +58,10 @@ export default function DisposalManagement() {
   const [disposalMethod, setDisposalMethod] = useState('DESTRUCTION')
   const [reason, setReason] = useState('')
   const [notes, setNotes] = useState('')
+  const [receivingPublicBody, setReceivingPublicBody] = useState('')
+  const [authorizationRef, setAuthorizationRef] = useState('')
+  const [handoverDocRef, setHandoverDocRef] = useState('')
+  const [recipientOfficer, setRecipientOfficer] = useState('')
   const [newLines, setNewLines] = useState<Array<{ itemId: string; quantity: number; remarks: string }>>([])
   const [localStockCards, setLocalStockCards] = useState<any[]>([])
   const [loadingCards, setLoadingCards] = useState(false)
@@ -73,8 +79,8 @@ export default function DisposalManagement() {
   const [actionLoading, setActionLoading] = useState(false)
 
   // Fetch Disposals
-  const fetchDisposals = async () => {
-    setLoadingList(true)
+  const fetchDisposals = async (silent = false) => {
+    if (!silent) setLoadingList(true)
     try {
       const res = await disposalsApi.getAll({
         status: activeTab === 'all' ? undefined : activeTab,
@@ -83,14 +89,21 @@ export default function DisposalManagement() {
       setDisposals(Array.isArray(res.data) ? res.data : [])
       setTotalCount(res.meta?.totalItems || 0)
     } catch {
-      toast.error('Failed to load disposal requests')
+      if (!silent) toast.error('Failed to load disposal requests')
     } finally {
-      setLoadingList(false)
+      if (!silent) setLoadingList(false)
     }
   }
 
   useEffect(() => {
-    fetchDisposals()
+    fetchDisposals(false)
+    const interval = setInterval(() => fetchDisposals(true), 3000)
+    const onFocus = () => fetchDisposals(true)
+    window.addEventListener('focus', onFocus)
+    return () => {
+      clearInterval(interval)
+      window.removeEventListener('focus', onFocus)
+    }
   }, [activeTab])
 
   // Initialize Default Store Selection
@@ -166,6 +179,11 @@ export default function DisposalManagement() {
     setWitnessName('')
     setCertificateNumber('')
     setDisposalLocation('')
+    // Pre-populate TRANSFER_OUT handover fields from existing DB columns if already set
+    setReceivingPublicBody(d.receivingPublicBody || '')
+    setAuthorizationRef(d.authorizationRef || '')
+    setHandoverDocRef(d.handoverDocRef || '')
+    setRecipientOfficer(d.recipientOfficer || '')
   }
 
   const handleAddLine = () => {
@@ -203,6 +221,8 @@ export default function DisposalManagement() {
         disposalMethod,
         reason,
         notes: notes || undefined,
+        receivingPublicBody: disposalMethod === 'TRANSFER_OUT' ? (receivingPublicBody || undefined) : undefined,
+        authorizationRef: disposalMethod === 'TRANSFER_OUT' ? (authorizationRef || undefined) : undefined,
         lines: newLines.map(l => ({
           itemId: l.itemId,
           quantity: l.quantity,
@@ -215,6 +235,8 @@ export default function DisposalManagement() {
       setNewLines([])
       setReason('')
       setNotes('')
+      setReceivingPublicBody('')
+      setAuthorizationRef('')
     } catch (err: any) {
       toast.error(err.message || 'Failed to initiate disposal request')
     } finally {
@@ -284,21 +306,34 @@ export default function DisposalManagement() {
     }
   }
 
-  // Storekeeper Execution
+  // Storekeeper / Execution Officer Execution
   const handleExecute = async () => {
-    if (!certificateNumber || !witnessName || !disposalLocation) {
-      toast.error('Witness Name, Certificate Number, and Location are required')
-      return
+    const isTransferOut = selectedDisposal.disposalMethod === 'TRANSFER_OUT'
+    if (isTransferOut) {
+      if (!receivingPublicBody || !authorizationRef || !handoverDocRef) {
+        toast.error('Receiving Public Body, Authorization Reference, and Handover Document Reference are required for transfer out')
+        return
+      }
+    } else {
+      if (!certificateNumber || !witnessName || !disposalLocation) {
+        toast.error('Witness Name, Certificate Number, and Location are required')
+        return
+      }
     }
+
     setActionLoading(true)
     try {
       await disposalsApi.execute(selectedDisposal.id, {
         executionNotes: execNotes || undefined,
-        witnessName,
-        certificateNumber,
-        disposalLocation,
+        witnessName: witnessName || undefined,
+        certificateNumber: certificateNumber || undefined,
+        disposalLocation: disposalLocation || undefined,
+        receivingPublicBody: isTransferOut ? receivingPublicBody : undefined,
+        authorizationRef: isTransferOut ? authorizationRef : undefined,
+        handoverDocRef: isTransferOut ? handoverDocRef : undefined,
+        recipientOfficer: isTransferOut ? recipientOfficer : undefined,
       })
-      toast.success('Disposal executed successfully. Stock deducted.')
+      toast.success(isTransferOut ? 'Transfer-out handover executed. Stock deducted.' : 'Disposal executed successfully. Stock deducted.')
       refreshData().catch(() => {})
       const updated = await disposalsApi.getById(selectedDisposal.id)
       setSelectedDisposal(updated.data)
@@ -316,7 +351,7 @@ export default function DisposalManagement() {
       <div>
         <SectionHeader
           title="Initiate Disposal Request"
-          subtitle="Flag candidates for physical disposal and write-off"
+          subtitle="Flag candidates for physical disposal, transfer-out, or write-off"
           actions={
             <div className="flex gap-2">
               <Button variant="secondary" onClick={() => { setPhase('list'); setNewLines([]) }}>← Cancel</Button>
@@ -339,11 +374,18 @@ export default function DisposalManagement() {
                     { value: 'DONATION', label: 'Donation' },
                     { value: 'SALE', label: 'Sale' },
                     { value: 'RECYCLING', label: 'Recycling' },
+                    { value: 'TRANSFER_OUT', label: 'Transfer Out to Public Body' },
                     { value: 'OTHER', label: 'Other (Write Off)' },
                   ]}
                   value={disposalMethod} onChange={e => setDisposalMethod(e.target.value)} />
               </FormGroup>
-              <Input label="Reason for Disposal" placeholder="e.g. Items expired or physically damaged beyond repair" value={reason} onChange={e => setReason(e.target.value)} />
+              {disposalMethod === 'TRANSFER_OUT' && (
+                <FormGroup columns={2}>
+                  <Input label="Receiving Public Body" placeholder="e.g. Ministry / Regional Bureau" value={receivingPublicBody} onChange={e => setReceivingPublicBody(e.target.value)} />
+                  <Input label="Legal Authorization Reference" placeholder="e.g. Min-Directive/Ref-2026/09" value={authorizationRef} onChange={e => setAuthorizationRef(e.target.value)} />
+                </FormGroup>
+              )}
+              <Input label="Reason for Disposal / Transfer" placeholder="e.g. Inter-agency transfer under Directive 1095/2017 or items damaged beyond repair" value={reason} onChange={e => setReason(e.target.value)} />
               <Input label="Additional Notes" placeholder="Optional notes" value={notes} onChange={e => setNotes(e.target.value)} />
             </div>
           </Card>
@@ -427,6 +469,34 @@ export default function DisposalManagement() {
                   <p className="text-xs text-[#94A3B8]">Reason</p>
                   <p className="font-medium text-[#1E293B] mt-0.5">{selectedDisposal.reason || 'Not specified'}</p>
                 </div>
+                {/* Directive 1095/2017: Show structured TRANSFER_OUT handover fields from DB columns */}
+                {selectedDisposal.disposalMethod === 'TRANSFER_OUT' && (
+                  <div className="col-span-2 p-3 bg-blue-50 border border-blue-100 rounded-lg space-y-2">
+                    <p className="text-xs font-semibold text-blue-700">Transfer-Out / Handover Information (Directive 1095/2017)</p>
+                    <div className="grid grid-cols-2 gap-2 text-xs text-blue-900">
+                      <div>
+                        <span className="text-blue-500">Receiving Public Body: </span>
+                        <span className="font-medium">{selectedDisposal.receivingPublicBody || '—'}</span>
+                      </div>
+                      <div>
+                        <span className="text-blue-500">Authorization Ref: </span>
+                        <span className="font-medium">{selectedDisposal.authorizationRef || '—'}</span>
+                      </div>
+                      {selectedDisposal.handoverDocRef && (
+                        <div>
+                          <span className="text-blue-500">Handover Doc Ref: </span>
+                          <span className="font-medium">{selectedDisposal.handoverDocRef}</span>
+                        </div>
+                      )}
+                      {selectedDisposal.recipientOfficer && (
+                        <div>
+                          <span className="text-blue-500">Recipient Officer: </span>
+                          <span className="font-medium">{selectedDisposal.recipientOfficer}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
                 {selectedDisposal.rejectionReason && (
                   <div className="col-span-2 p-3 bg-red-50 border border-red-100 rounded-lg text-red-700">
                     <p className="text-xs font-semibold">Rejection Reason</p>
@@ -450,16 +520,19 @@ export default function DisposalManagement() {
                     </tr>
                   </thead>
                   <tbody>
-                    {selectedDisposal.lines?.map((line: any) => (
-                      <tr key={line.id} className="border-b border-[#F8FAFC] hover:bg-[#F8FAFC]">
-                        <td className="px-4 py-3 font-medium text-[#1E293B]">{line.item?.name || 'Unknown'}</td>
-                        <td className="px-4 py-3 font-mono text-xs text-[#64748B]">{line.item?.code || ''}</td>
-                        <td className="px-4 py-3 font-mono">{line.quantity}</td>
-                        <td className="px-4 py-3 font-mono">${Number(line.unitCost || 0).toFixed(2)}</td>
-                        <td className="px-4 py-3 font-mono font-semibold">${Number(line.totalCost || 0).toFixed(2)}</td>
-                        <td className="px-4 py-3 text-xs text-[#64748B]">{line.remarks || '—'}</td>
-                      </tr>
-                    ))}
+                    {selectedDisposal.lines?.map((line: any) => {
+                      const itemObj = line.item || inventoryItems.find(i => i.id === line.itemId)
+                      return (
+                        <tr key={line.id} className="border-b border-[#F8FAFC] hover:bg-[#F8FAFC]">
+                          <td className="px-4 py-3 font-medium text-[#1E293B]">{itemObj?.name || 'Unknown Item'}</td>
+                          <td className="px-4 py-3 font-mono text-xs text-[#64748B]">{itemObj?.code || '—'}</td>
+                          <td className="px-4 py-3 font-mono">{line.quantity}</td>
+                          <td className="px-4 py-3 font-mono">${Number(line.unitCost || 0).toFixed(2)}</td>
+                          <td className="px-4 py-3 font-mono font-semibold">${Number(line.totalCost || 0).toFixed(2)}</td>
+                          <td className="px-4 py-3 text-xs text-[#64748B]">{line.remarks || '—'}</td>
+                        </tr>
+                      )
+                    })}
                     {(!selectedDisposal.lines || selectedDisposal.lines.length === 0) && (
                       <tr><td colSpan={6} className="text-center py-8 text-sm text-[#94A3B8]">No items loaded.</td></tr>
                     )}
@@ -473,7 +546,7 @@ export default function DisposalManagement() {
               <h3 className="text-base font-semibold text-[#0F172A] mb-4">Workflow Authorization Panel</h3>
 
               {/* 1. TEC Evaluation Action */}
-              {selectedDisposal.status === 'SUBMITTED' && canEvaluate && (
+              {['SUBMITTED', 'DRAFT'].includes(selectedDisposal.status) && canEvaluate && (
                 <div className="space-y-3 p-4 bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl">
                   <h4 className="text-sm font-semibold text-[#334155]">Committee Evaluation Action (TEC)</h4>
                   <Input label="Evaluation Notes" placeholder="Input structural condition, expiry verification details..." value={evalNotes} onChange={e => setEvalNotes(e.target.value)} />
@@ -481,10 +554,21 @@ export default function DisposalManagement() {
                 </div>
               )}
 
-              {/* 2. PAO Approval/Rejection Actions */}
-              {['SUBMITTED', 'UNDER_EVALUATION'].includes(selectedDisposal.status) && canApprove && (
+              {/* 2. PAO Awaiting Evaluation Notice */}
+              {['SUBMITTED', 'DRAFT'].includes(selectedDisposal.status) && canApprove && !canEvaluate && (
+                <div className="p-4 bg-[#FFFBEB] border border-[#FDE68A] rounded-xl text-[#92400E] text-sm flex items-center gap-3">
+                  <span className="text-xl">⏳</span>
+                  <div>
+                    <p className="font-semibold text-[#92400E]">Awaiting Technical Evaluation</p>
+                    <p className="text-xs text-[#92400E] mt-0.5">This disposal request must be evaluated by the Technical Evaluation Committee (TEC) before the PAO can register final approval decisions.</p>
+                  </div>
+                </div>
+              )}
+
+              {/* 3. PAO Approval/Rejection Actions */}
+              {selectedDisposal.status === 'UNDER_EVALUATION' && canApprove && (
                 <div className="space-y-4 p-4 bg-[#F0F9FF] border border-[#BAE6FD] rounded-xl">
-                  <h4 className="text-sm font-semibold text-[#0369A1]">Final Approval Action (PAO / Admin)</h4>
+                  <h4 className="text-sm font-semibold text-[#0369A1]">Final Approval Action (PAO / Approving Authority)</h4>
                   <FormGroup columns={2}>
                     <Select label="Approve Disposal Method"
                       options={[
@@ -492,6 +576,7 @@ export default function DisposalManagement() {
                         { value: 'DONATION', label: 'Donation' },
                         { value: 'SALE', label: 'Sale' },
                         { value: 'RECYCLING', label: 'Recycling' },
+                        { value: 'TRANSFER_OUT', label: 'Transfer Out to Public Body' },
                         { value: 'OTHER', label: 'Other (Write Off)' },
                       ]}
                       value={approveMethod || selectedDisposal.disposalMethod} onChange={e => setApproveMethod(e.target.value)} />
@@ -508,8 +593,43 @@ export default function DisposalManagement() {
                 </div>
               )}
 
-              {/* 3. Storekeeper Execution Action */}
-              {selectedDisposal.status === 'APPROVED' && canExecute && (
+              {/* TEC Evaluated Notice */}
+              {selectedDisposal.status === 'UNDER_EVALUATION' && canEvaluate && !canApprove && (
+                <div className="p-4 bg-[#F0FDF4] border border-[#BBF7D0] rounded-xl text-[#166534] text-sm flex items-center gap-3">
+                  <span className="text-xl">✓</span>
+                  <div>
+                    <p className="font-semibold text-[#166534]">Technical Evaluation Completed</p>
+                    <p className="text-xs text-[#166534] mt-0.5">Your evaluation notes have been submitted. This request is now routed to the Property Administration Officer (PAO) / Approving Authority for final disposal authorization.</p>
+                  </div>
+                </div>
+              )}
+
+              {/* 3. Execution Action for TRANSFER_OUT */}
+              {selectedDisposal.status === 'APPROVED' && canExecute && selectedDisposal.disposalMethod === 'TRANSFER_OUT' && (
+                <div className="space-y-4 p-4 bg-[#F0FDF4] border border-[#BBF7D0] rounded-xl">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-sm font-semibold text-[#16A34A]">Execute Transfer Handover & Stock Deduction (Storekeeper)</h4>
+                    <Badge variant="primary">Directive 1095/2017</Badge>
+                  </div>
+                  <p className="text-xs text-[#64748B]">Per Federal Directive No. 1095/2017, verify and record the authorized receiving public body, authorization reference, and handover document reference prior to stock deduction.</p>
+                  <FormGroup columns={2}>
+                    <Input label="Receiving Public Body *" placeholder="e.g. Adama Science & Tech / Oromia Bureau" value={receivingPublicBody} onChange={e => setReceivingPublicBody(e.target.value)} />
+                    <Input label="Official Authorization Ref *" placeholder="e.g. MOF/PAU/2026/78" value={authorizationRef} onChange={e => setAuthorizationRef(e.target.value)} />
+                  </FormGroup>
+                  <FormGroup columns={2}>
+                    <Input label="Handover Document / Voucher Ref *" placeholder="e.g. Transfer Voucher / Model 19 Ref" value={handoverDocRef} onChange={e => setHandoverDocRef(e.target.value)} />
+                    <Input label="Recipient / Receiving Officer" placeholder="e.g. Ato Abebe Tadesse" value={recipientOfficer} onChange={e => setRecipientOfficer(e.target.value)} />
+                  </FormGroup>
+                  <FormGroup columns={2}>
+                    <Input label="Handover Witness / Store Custodian" placeholder="e.g. Custodian / Witness Name" value={witnessName} onChange={e => setWitnessName(e.target.value)} />
+                    <Input label="Execution Details / Remarks" placeholder="Handover notes / vehicle / serial details" value={execNotes} onChange={e => setExecNotes(e.target.value)} />
+                  </FormGroup>
+                  <Button variant="primary" size="sm" onClick={handleExecute} loading={actionLoading}>Confirm Transfer Handover & Deduct Stock</Button>
+                </div>
+              )}
+
+              {/* 3. Execution Action for Non-Transfer Disposal Methods */}
+              {selectedDisposal.status === 'APPROVED' && canExecute && selectedDisposal.disposalMethod !== 'TRANSFER_OUT' && (
                 <div className="space-y-4 p-4 bg-[#F0FDF4] border border-[#BBF7D0] rounded-xl">
                   <h4 className="text-sm font-semibold text-[#16A34A]">Execute Physical Stock-Out (Storekeeper)</h4>
                   <FormGroup columns={3}>

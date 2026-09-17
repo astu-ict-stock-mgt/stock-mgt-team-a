@@ -179,35 +179,53 @@ export default function StockIssuing() {
     return options
   }, [reqForm.storeId, loadingWarehouseStock, warehouseStock, allItems])
 
-  const loadRequisitions = useCallback(async () => {
-    setLoadingReqs(true)
+  const loadRequisitions = useCallback(async (silent = false) => {
+    if (!silent) setLoadingReqs(true)
     try {
       const res = await requisitionsApi.getAll({ page: 1, limit: 50 })
       setRequisitions(Array.isArray(res.data) ? res.data : (res.data as any)?.requisitions || [])
     } catch (err: any) {
-      toast.error('Failed to load requisitions')
+      if (!silent) toast.error('Failed to load requisitions')
     } finally {
-      setLoadingReqs(false)
+      if (!silent) setLoadingReqs(false)
     }
   }, [])
 
-  const loadSivs = useCallback(async () => {
-    setLoadingSivs(true)
+  const loadSivs = useCallback(async (silent = false) => {
+    if (!silent) setLoadingSivs(true)
     try {
       const res = await sivApi.getAll({ page: 1, limit: 50 })
       setSivs(Array.isArray(res.data) ? res.data : (res.data as any)?.sivs || [])
     } catch (err: any) {
-      toast.error('Failed to load SIVs')
+      if (!silent) toast.error('Failed to load SIVs')
     } finally {
-      setLoadingSivs(false)
+      if (!silent) setLoadingSivs(false)
     }
   }, [])
 
   useEffect(() => { loadStores(); loadItems() }, [loadStores, loadItems])
+
+  // Real-time synchronization: Immediate fetch + periodic 3-second background polling & focus listener
   useEffect(() => {
-    if (activeTab === 'requisitions') loadRequisitions()
-    else if (activeTab === 'sivs') loadSivs()
-  }, [activeTab])
+    if (activeTab === 'requisitions') loadRequisitions(false)
+    else if (activeTab === 'sivs') loadSivs(false)
+
+    const interval = setInterval(() => {
+      if (activeTab === 'requisitions') loadRequisitions(true)
+      else if (activeTab === 'sivs') loadSivs(true)
+    }, 3000)
+
+    const onFocus = () => {
+      if (activeTab === 'requisitions') loadRequisitions(true)
+      else if (activeTab === 'sivs') loadSivs(true)
+    }
+    window.addEventListener('focus', onFocus)
+
+    return () => {
+      clearInterval(interval)
+      window.removeEventListener('focus', onFocus)
+    }
+  }, [activeTab, loadRequisitions, loadSivs])
 
   const handleCreateRequisition = async () => {
     if (!reqForm.storeId || !reqForm.purpose.trim()) {
@@ -344,7 +362,9 @@ export default function StockIssuing() {
       toast.success('SIV prepared and submitted for approval')
       setShowCreateSiv(false)
       setSelectedReq(null)
+      loadRequisitions()
       loadSivs()
+      setActiveTab('sivs')
       refreshData().catch(() => {})
     } catch (err: any) {
       toast.error(err.message || 'Failed to create SIV')
@@ -382,9 +402,41 @@ export default function StockIssuing() {
     }
   }
 
+  const [reqFilter, setReqFilter] = useState<'pending' | 'converted' | 'completed' | 'all'>('pending')
+
   const getItemName = (itemId: string) => allItems.find(i => i.id === itemId)?.name || itemId.slice(0, 8)
   const getItemCode = (itemId: string) => allItems.find(i => i.id === itemId)?.code || ''
   const getUserName = (id: string) => id === currentUser?.userId ? 'You' : id.slice(0, 8)
+
+  const reqFilterCounts = useMemo(() => {
+    let pending = 0
+    let converted = 0
+    let completed = 0
+    requisitions.forEach(req => {
+      const activeSiv = sivs.find(s => s.requisitionId === req.id && ['PREPARED', 'DRAFT', 'APPROVED'].includes(s.status))
+      const isDone = req.status === 'COMPLETED' || req.status === 'CANCELLED' || req.status === 'DEPARTMENT_REJECTED' || req.status === 'PAO_REJECTED'
+      if (activeSiv) {
+        converted++
+      } else if (isDone) {
+        completed++
+      } else {
+        pending++
+      }
+    })
+    return { pending, converted, completed, all: requisitions.length }
+  }, [requisitions, sivs])
+
+  const filteredRequisitions = useMemo(() => {
+    return requisitions.filter(req => {
+      const activeSiv = sivs.find(s => s.requisitionId === req.id && ['PREPARED', 'DRAFT', 'APPROVED'].includes(s.status))
+      const isDone = req.status === 'COMPLETED' || req.status === 'CANCELLED' || req.status === 'DEPARTMENT_REJECTED' || req.status === 'PAO_REJECTED'
+
+      if (reqFilter === 'pending') return !activeSiv && !isDone
+      if (reqFilter === 'converted') return !!activeSiv
+      if (reqFilter === 'completed') return isDone
+      return true
+    })
+  }, [requisitions, sivs, reqFilter])
 
   const tabItems = [
     { id: 'requisitions', label: `Requisitions (${requisitions.length})` },
@@ -402,8 +454,54 @@ export default function StockIssuing() {
 
       {activeTab === 'requisitions' && (
         <div>
-          <div className="flex justify-between items-center mb-4">
-            <p className="text-sm text-[#64748B]">{requisitions.length} requisition(s)</p>
+          <div className="flex flex-wrap justify-between items-center gap-3 mb-4">
+            <div className="flex items-center gap-1.5 bg-[#F8FAFC] p-1 rounded-xl border border-[#E2E8F0]">
+              <button
+                type="button"
+                onClick={() => setReqFilter('pending')}
+                className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all ${
+                  reqFilter === 'pending'
+                    ? 'bg-[#4F46E5] text-white shadow-sm'
+                    : 'text-[#64748B] hover:text-[#1E293B] hover:bg-[#F1F5F9]'
+                }`}
+              >
+                Awaiting SIV ({reqFilterCounts.pending})
+              </button>
+              <button
+                type="button"
+                onClick={() => setReqFilter('converted')}
+                className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all ${
+                  reqFilter === 'converted'
+                    ? 'bg-[#4F46E5] text-white shadow-sm'
+                    : 'text-[#64748B] hover:text-[#1E293B] hover:bg-[#F1F5F9]'
+                }`}
+              >
+                SIV In Progress ({reqFilterCounts.converted})
+              </button>
+              <button
+                type="button"
+                onClick={() => setReqFilter('completed')}
+                className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all ${
+                  reqFilter === 'completed'
+                    ? 'bg-[#4F46E5] text-white shadow-sm'
+                    : 'text-[#64748B] hover:text-[#1E293B] hover:bg-[#F1F5F9]'
+                }`}
+              >
+                Completed ({reqFilterCounts.completed})
+              </button>
+              <button
+                type="button"
+                onClick={() => setReqFilter('all')}
+                className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all ${
+                  reqFilter === 'all'
+                    ? 'bg-[#4F46E5] text-white shadow-sm'
+                    : 'text-[#64748B] hover:text-[#1E293B] hover:bg-[#F1F5F9]'
+                }`}
+              >
+                All ({reqFilterCounts.all})
+              </button>
+            </div>
+
             {canCreateRequisition && (
               <Button variant="primary" onClick={openCreateRequisitionModal}>+ New Requisition</Button>
             )}
@@ -411,11 +509,11 @@ export default function StockIssuing() {
 
           {loadingReqs ? (
             <Card><p className="text-center py-8 text-[#64748B]">Loading...</p></Card>
-          ) : requisitions.length === 0 ? (
-            <Card><p className="text-center py-8 text-[#64748B]">No requisitions found</p></Card>
+          ) : filteredRequisitions.length === 0 ? (
+            <Card><p className="text-center py-8 text-[#64748B]">No requisitions found in this view</p></Card>
           ) : (
             <div className="space-y-3">
-              {requisitions.map(req => (
+              {filteredRequisitions.map(req => (
                 <Card key={req.id}>
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
@@ -473,15 +571,31 @@ export default function StockIssuing() {
                         )
                       )}
                       {req.status === 'PAO_APPROVED' && (
-                        isStorekeeper ? (
-                          <Button variant="primary" size="sm" onClick={() => openCreateSiv(req)}>
-                            Create SIV
-                          </Button>
-                        ) : (
-                          <span className="text-xs text-[#059669] bg-[#ECFDF5] px-2.5 py-1 rounded-md border border-[#A7F3D0] font-medium">
-                            PAO Approved — Ready for SIV
-                          </span>
-                        )
+                        (() => {
+                          const activeSiv = sivs.find(s => s.requisitionId === req.id && ['PREPARED', 'DRAFT', 'APPROVED'].includes(s.status))
+                          if (activeSiv) {
+                            return (
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs text-[#4F46E5] bg-[#EEF2FF] px-2.5 py-1 rounded-md border border-[#C7D2FE] font-medium flex items-center gap-1">
+                                  <span>📋</span>
+                                  {activeSiv.status === 'APPROVED' ? `SIV Approved (${activeSiv.sivNumber})` : `SIV Generated (${activeSiv.sivNumber})`}
+                                </span>
+                                <Button variant="secondary" size="sm" onClick={() => setActiveTab('sivs')}>
+                                  View in SIVs →
+                                </Button>
+                              </div>
+                            )
+                          }
+                          return isStorekeeper ? (
+                            <Button variant="primary" size="sm" onClick={() => openCreateSiv(req)}>
+                              Create SIV
+                            </Button>
+                          ) : (
+                            <span className="text-xs text-[#059669] bg-[#ECFDF5] px-2.5 py-1 rounded-md border border-[#A7F3D0] font-medium">
+                              PAO Approved — Ready for SIV
+                            </span>
+                          )
+                        })()
                       )}
                       {req.status === 'PARTIALLY_ISSUED' && isStorekeeper && (
                         <Button variant="primary" size="sm" onClick={() => openCreateSiv(req)}>

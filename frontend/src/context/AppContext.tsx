@@ -179,12 +179,19 @@ export function AppProvider({ children }: { children: ReactNode }) {
       if (requisitionsData) setRequisitions(requisitionsData);
       if (stockMovementsData) setStockMovements(stockMovementsData);
 
-      if (hasAnyPermission(perms, [PERMISSIONS.INVENTORY_READ]) && storesData && storesData.length > 0) {
-        const firstStore = storesData[0];
+      if (hasAnyPermission(perms, [PERMISSIONS.INVENTORY_READ])) {
         try {
-          const stockRes = await inventoryApi.getStockByStore(firstStore.id);
-          setStockCards(stockRes.data);
-        } catch { /* store may have no stock */ }
+          const stockRes = await inventoryApi.getAllStock();
+          if (stockRes.data) setStockCards(stockRes.data);
+        } catch {
+          if (storesData && storesData.length > 0) {
+            const firstStore = storesData[0];
+            try {
+              const stockRes = await inventoryApi.getStockByStore(firstStore.id);
+              setStockCards(stockRes.data);
+            } catch { /* store may have no stock */ }
+          }
+        }
       }
     } catch (error) {
       console.error('Failed to load data:', error);
@@ -209,7 +216,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     checkApiAndLoadData();
   }, [checkApiAndLoadData]);
 
-  // ─── Notification polling: fast unread count refresh every 30s ───
+  // ─── Notification & Badge polling: fast unread count refresh every 5s ───
   useEffect(() => {
     if (!isAuthenticated || apiStatus !== 'connected') return;
 
@@ -217,13 +224,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
       try {
         const res = await notificationsApi.getUnreadCount();
         if (res?.data?.unreadCount !== undefined) {
-          setUnreadCount(res.data.unreadCount);
-          // If unread count increased, refresh full notification list
           setUnreadCount(prev => {
             if (res.data.unreadCount > prev) {
               notificationsApi.getAll({ limit: 50 })
                 .then(r => setNotifications(r.data))
                 .catch(() => {});
+              loadAllData().catch(() => {});
             }
             return res.data.unreadCount;
           });
@@ -233,9 +239,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
       }
     };
 
-    const interval = setInterval(refreshUnreadCount, 30_000);
-    return () => clearInterval(interval);
-  }, [isAuthenticated, apiStatus]);
+    const interval = setInterval(refreshUnreadCount, 5_000);
+    const onFocus = () => refreshUnreadCount();
+    window.addEventListener('focus', onFocus);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('focus', onFocus);
+    };
+  }, [isAuthenticated, apiStatus, loadAllData]);
 
   const login = async (email: string, password: string) => {
     const response = await authApi.login(email, password);
