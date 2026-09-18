@@ -1,4 +1,4 @@
-import reportingService from './reporting.service.js';
+import * as reportingService from './reporting.service.js';
 import { sendSuccess, sendError } from '../../utils/response.js';
 
 class ReportingController {

@@ -41,7 +41,7 @@ import { ValidationError, ConflictError } from '../../utils/errors.js'
 import { listRequisitions } from '../requisitions/requisition.service.js'
 import { listReturns } from '../returns/return.service.js'
 import { listTransfers } from '../transfers/transfer.service.js'
-import { listDisposalRequests } from '../disposals/disposal.service.js'
+import { listDisposalRequests } from '../disposal/disposal.service.js'
 // ASSUMPTION: real file/export not supplied — see SOURCING NOTES above.
 import { listAssets } from '../assets/asset.service.js'
 

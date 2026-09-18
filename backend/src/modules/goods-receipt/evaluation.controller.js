@@ -43,7 +43,8 @@ class EvaluationController {
       const evaluation = await evaluationService.updateDecision(
         req.params.id,
         req.body.decision,
-        req.user.userId
+        req.user.userId,
+        req.body.notes
       );
       return sendSuccess(res, evaluation);
     } catch (error) {

@@ -591,10 +591,12 @@ interface SectionHeaderProps {
   title: string
   subtitle?: string
   actions?: ReactNode
+  action?: ReactNode
   breadcrumb?: BreadcrumbItem[]
 }
 
-export function SectionHeader({ title, subtitle, actions, breadcrumb }: SectionHeaderProps) {
+export function SectionHeader({ title, subtitle, actions, action, breadcrumb }: SectionHeaderProps) {
+  const actionContent = actions || action
   return (
     <div className="flex items-start justify-between mb-6">
       <div>
@@ -602,7 +604,7 @@ export function SectionHeader({ title, subtitle, actions, breadcrumb }: SectionH
         <h1 className="text-xl font-semibold text-[#0F172A] tracking-tight">{title}</h1>
         {subtitle && <p className="text-sm text-[#64748B] mt-0.5">{subtitle}</p>}
       </div>
-      {actions && <div className="flex items-center gap-2">{actions}</div>}
+      {actionContent && <div className="flex items-center gap-2">{actionContent}</div>}
     </div>
   )
 }

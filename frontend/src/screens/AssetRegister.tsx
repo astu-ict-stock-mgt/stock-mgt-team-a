@@ -1,8 +1,9 @@
 import { useState, useEffect, useCallback } from "react"
 import { SectionHeader, Card, Badge, Button, Modal, Input, Tabs, useToast } from "../components/ui"
-import { goodsReceiptApi, assetsApi } from "../services/api"
+import { goodsReceiptApi, assetsApi, assetReturnsApi } from "../services/api"
 import { useApp } from "../context/AppContext"
 import { hasPermission, PERMISSIONS } from "../lib/permissions"
+import GrnSheetModal from "../components/GrnSheetModal"
 
 import { GoodsReceipt } from "../types"
 
@@ -15,7 +16,8 @@ interface FixedAsset {
   purchaseCost?: number
   category?: string
   createdAt: string
-  custodian?: { fullName: string }
+  custodianId?: string
+  custodian?: { id?: string; fullName: string; email?: string }
   location?: { name: string }
   itemId?: string
   grn?: { id: string; goodsReceipt?: { id: string; receiptNumber: string } }
@@ -35,7 +37,7 @@ const defaultAssetForm = () => ({
 
 export default function AssetRegister() {
   const { toast } = useToast()
-  const { userRoles } = useApp()
+  const { userRoles, currentUser } = useApp()
   const canRegister = hasPermission(userRoles, PERMISSIONS.ASSETS_REGISTER)
 
   const [activeTab, setActiveTab] = useState("pending")
@@ -50,6 +52,46 @@ export default function AssetRegister() {
   const [showGrnModal, setShowGrnModal] = useState(false)
   const [selectedReceipt, setSelectedReceipt] = useState<GoodsReceipt | null>(null)
   const [loadingGrnDetails, setLoadingGrnDetails] = useState<string | null>(null)
+
+  // Asset Return States (Directive 1095/2017)
+  const [showReturnModal, setShowReturnModal] = useState(false)
+  const [selectedAssetForReturn, setSelectedAssetForReturn] = useState<FixedAsset | null>(null)
+  const [returnReason, setReturnReason] = useState("Project Completed / No Longer Needed")
+  const [returnNotes, setReturnNotes] = useState("")
+  const [submittingReturn, setSubmittingReturn] = useState(false)
+
+  const openReturnModal = (asset: FixedAsset) => {
+    setSelectedAssetForReturn(asset)
+    setReturnReason("Project Completed / No Longer Needed")
+    setReturnNotes("")
+    setShowReturnModal(true)
+  }
+
+  const handleInitiateReturn = async () => {
+    if (!selectedAssetForReturn) return
+    if (!returnReason.trim()) {
+      toast.error("Return reason is required")
+      return
+    }
+    setSubmittingReturn(true)
+    try {
+      await assetReturnsApi.create({
+        assetId: selectedAssetForReturn.id,
+        reason: returnReason,
+        notes: returnNotes || undefined,
+      })
+      toast.success(
+        `Asset return request initiated for ${selectedAssetForReturn.assetTag || selectedAssetForReturn.name}. Awaiting Technical Evaluation Committee (TEC) inspection.`
+      )
+      setShowReturnModal(false)
+      setSelectedAssetForReturn(null)
+      loadData()
+    } catch (err: any) {
+      toast.error(err.message || "Failed to initiate asset return")
+    } finally {
+      setSubmittingReturn(false)
+    }
+  }
 
   const loadData = useCallback(async () => {
     setLoading(true)
@@ -303,6 +345,12 @@ export default function AssetRegister() {
                             {asset.category && <span className="text-xs text-[#94A3B8]">{asset.category}</span>}
                           </div>
                           {asset.location?.name && <p className="text-xs text-[#94A3B8] mt-0.5">Location: {asset.location.name}</p>}
+                          {asset.custodian?.fullName && (
+                            <p className="text-xs text-[#0284C7] mt-0.5 flex items-center gap-1 font-medium">
+                              <span>👤 Custodian:</span>
+                              <span className="font-semibold">{asset.custodian.fullName}</span>
+                            </p>
+                          )}
                         </div>
                       </div>
                       <div className="text-right flex flex-col items-end gap-1.5">
@@ -310,21 +358,32 @@ export default function AssetRegister() {
                           <p className="text-sm font-semibold text-[#1E293B]">${Number(asset.purchaseCost).toLocaleString()}</p>
                         )}
                         <p className="text-xs text-[#94A3B8]">{new Date(asset.createdAt).toLocaleDateString()}</p>
-                        {(() => {
-                          const grnMatch = asset.notes?.match(/\[Source GRN: ([^\]]+)\]/)
-                          const sourceReceiptId = grnMatch ? grnMatch[1] : null
-                          return sourceReceiptId ? (
+                        <div className="flex items-center gap-1.5 mt-1">
+                          {asset.custodianId && asset.status !== 'DISPOSED' && asset.status !== 'RETIRED' && (
                             <Button
                               variant="outline"
                               size="sm"
-                              loading={loadingGrnDetails === sourceReceiptId}
-                              onClick={() => handleViewGrnPaper(sourceReceiptId)}
-                              className="mt-1"
+                              onClick={() => openReturnModal(asset)}
+                              className="text-amber-700 border-amber-300 hover:bg-amber-50"
                             >
-                              View Source GRN
+                              Return Asset
                             </Button>
-                          ) : null
-                        })()}
+                          )}
+                          {(() => {
+                            const grnMatch = asset.notes?.match(/\[Source GRN: ([^\]]+)\]/)
+                            const sourceReceiptId = grnMatch ? grnMatch[1] : null
+                            return sourceReceiptId ? (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                loading={loadingGrnDetails === sourceReceiptId}
+                                onClick={() => handleViewGrnPaper(sourceReceiptId)}
+                              >
+                                View Source GRN
+                              </Button>
+                            ) : null
+                          })()}
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -368,68 +427,101 @@ export default function AssetRegister() {
           </div>
         </Modal>
       )}
-      {/* GRN DETAILS MODAL */}
-      {showGrnModal && selectedReceipt && (
-        <Modal open={showGrnModal} title={`Goods Receiving Note — ${selectedReceipt.receiptNumber}`} onClose={() => setShowGrnModal(false)} width="max-w-2xl">
+      {/* STANDARDIZED FINAL GRN SHEET MODAL */}
+      <GrnSheetModal
+        open={showGrnModal}
+        onClose={() => setShowGrnModal(false)}
+        receipt={selectedReceipt as any}
+      />
+
+      {/* INITIATE RETURN MODAL (Directive 1095/2017) */}
+      {showReturnModal && selectedAssetForReturn && (
+        <Modal
+          open={showReturnModal}
+          title="Initiate Fixed Asset Return"
+          onClose={() => {
+            setShowReturnModal(false)
+            setSelectedAssetForReturn(null)
+          }}
+        >
           <div className="space-y-4">
-            <div className="border border-[#E2E8F0] rounded-xl p-5 bg-white">
-              <div className="flex items-start justify-between mb-5">
-                <div>
-                  <p className="font-bold text-base text-[#0F172A]">StockManager Enterprise</p>
-                  <p className="text-xs text-[#64748B]">Goods Receiving Note Document</p>
-                </div>
-                <div className="text-right">
-                  <p className="text-sm font-bold font-mono text-[#4F46E5]">{selectedReceipt.receiptNumber}</p>
-                  <p className="text-xs text-[#94A3B8]">Date: {new Date(selectedReceipt.createdAt).toLocaleDateString()}</p>
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4 mb-5 p-4 bg-[#F8FAFC] border border-[#E2E8F0] rounded-lg text-xs">
-                <div>
-                  <p className="text-[#94A3B8] uppercase font-semibold">Supplier</p>
-                  <p className="font-semibold text-[#1E293B] mt-0.5">{selectedReceipt.supplier?.name || 'N/A'}</p>
-                </div>
-                <div>
-                  <p className="text-[#94A3B8] uppercase font-semibold">Warehouse / Destination</p>
-                  <p className="font-semibold text-[#1E293B] mt-0.5">{selectedReceipt.store?.name || 'N/A'}</p>
-                </div>
-              </div>
-              <div>
-                <p className="text-xs font-bold text-[#334155] uppercase mb-2">Received Line Items</p>
-                <div className="border border-[#E2E8F0] rounded-lg overflow-hidden bg-white">
-                  <table className="w-full text-xs">
-                    <thead>
-                      <tr className="bg-[#F8FAFC] border-b border-[#E2E8F0]">
-                        <th className="py-2 px-3 text-left font-semibold text-[#64748B]">Item</th>
-                        <th className="py-2 px-3 text-right font-semibold text-[#64748B]">Quantity</th>
-                        <th className="py-2 px-3 text-right font-semibold text-[#64748B]">Unit Cost</th>
-                        <th className="py-2 px-3 text-right font-semibold text-[#64748B]">Total Cost</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {(selectedReceipt.lines || []).map((line: any, i: number) => (
-                        <tr key={i} className="border-b border-[#F8FAFC]">
-                          <td className="py-2.5 px-3">
-                            <p className="font-medium text-[#1E293B]">{line.item?.name || 'Unknown Item'}</p>
-                            <p className="text-[#94A3B8] font-mono">{line.item?.code}</p>
-                          </td>
-                          <td className="py-2.5 px-3 text-right font-semibold text-[#16A34A]">{line.quantity}</td>
-                          <td className="py-2.5 px-3 text-right font-mono">${Number(line.unitCost || 0).toFixed(2)}</td>
-                          <td className="py-2.5 px-3 text-right font-bold font-mono text-[#1E293B]">${Number(line.quantity * line.unitCost || 0).toFixed(2)}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-              <div className="mt-4 pt-4 border-t border-[#E2E8F0] flex justify-between items-center text-xs">
-                <div>
-                  <span className="text-[#94A3B8]">Status: </span>
-                  <Badge variant="success">Evaluated & Approved</Badge>
-                </div>
-              </div>
+            <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl">
+              <p className="text-xs font-semibold text-amber-800">
+                Property Return to Organization (Directive 1095/2017)
+              </p>
+              <p className="text-xs text-amber-700 mt-1">
+                This asset will be presented for technical inspection by the Technical Evaluation Committee (TEC). Custodianship is officially relieved only upon accepted inspection.
+              </p>
             </div>
-            <div className="flex justify-end gap-2">
-              <Button variant="secondary" onClick={() => setShowGrnModal(false)}>Close</Button>
+
+            <div className="p-3 bg-[#F8FAFC] rounded-xl space-y-1 text-xs text-[#475569]">
+              <p>
+                <span className="font-semibold text-[#1E293B]">Asset:</span> {selectedAssetForReturn.name}
+              </p>
+              <p>
+                <span className="font-semibold text-[#1E293B]">Tag Number:</span>{' '}
+                <span className="font-mono text-[#4F46E5] font-semibold">{selectedAssetForReturn.assetTag || 'N/A'}</span>
+              </p>
+              <p>
+                <span className="font-semibold text-[#1E293B]">Serial Number:</span>{' '}
+                <span className="font-mono">{selectedAssetForReturn.serialNumber || 'N/A'}</span>
+              </p>
+              <p>
+                <span className="font-semibold text-[#1E293B]">Current Custodian:</span>{' '}
+                {selectedAssetForReturn.custodian?.fullName || currentUser?.fullName || 'Assigned User'}
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-[#475569] mb-1">
+                Return Reason *
+              </label>
+              <select
+                value={returnReason}
+                onChange={(e) => setReturnReason(e.target.value)}
+                className="w-full h-9 px-3 rounded-lg border border-[#E2E8F0] text-sm focus:border-[#4F46E5] outline-none"
+              >
+                <option value="Project Completed / No Longer Needed">Project Completed / No Longer Needed</option>
+                <option value="Hardware Defect / Malfunctioning (Needs Repair)">Hardware Defect / Malfunctioning (Needs Repair)</option>
+                <option value="Obsolete / Replacement Issued">Obsolete / Replacement Issued</option>
+                <option value="Leaving Organization / End of Assignment">Leaving Organization / End of Assignment</option>
+                <option value="Other">Other (Specify in notes)</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-[#475569] mb-1">
+                Condition Notes & Handover Details
+              </label>
+              <textarea
+                rows={3}
+                value={returnNotes}
+                onChange={(e) => setReturnNotes(e.target.value)}
+                placeholder="Describe physical condition, included accessories (power cables, chargers, cases), or observed issues..."
+                className="w-full p-2.5 rounded-lg border border-[#E2E8F0] text-sm focus:border-[#4F46E5] outline-none"
+              />
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2 border-t border-[#F1F5F9]">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setShowReturnModal(false)
+                  setSelectedAssetForReturn(null)
+                }}
+                disabled={submittingReturn}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={handleInitiateReturn}
+                loading={submittingReturn}
+              >
+                Submit Return for Inspection
+              </Button>
             </div>
           </div>
         </Modal>

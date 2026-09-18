@@ -18,7 +18,7 @@ export const returnLineSchema = z.object({
     .int('quantityReturned must be an integer')
     .positive('quantityReturned must be greater than zero'),
 
-  remarks: z.string().optional(),
+  remarks: z.string().optional().nullable(),
 })
 
 export const createReturnSchema = z.object({
@@ -34,9 +34,10 @@ export const createReturnSchema = z.object({
     .enum(['UNUSED', 'DEFECTIVE', 'EXPIRED', 'EXCESS', 'WRONG_SPECIFICATION'], {
       errorMap: () => ({ message: 'Invalid return reason code' }),
     })
-    .optional(),
+    .optional()
+    .nullable(),
 
-  notes: z.string().optional(),
+  notes: z.string().optional().nullable(),
 
   lines: z
     .array(returnLineSchema, {
@@ -47,6 +48,7 @@ export const createReturnSchema = z.object({
 
 export const evaluateReturnSchema = z.object({
   remarks: z.string().optional(),
+  recommendation: z.string().optional(),
 })
 
 export const approveReturnSchema = z.object({
@@ -57,4 +59,11 @@ export const approveReturnSchema = z.object({
     .optional(),
   remarks: z.string().optional(),
   isApproved: z.boolean().optional(),
+})
+
+export const assignReturnTecSchema = z.object({
+  tecUserId: z.string().optional(),
+  tecUserIds: z.array(z.string().min(1)).optional(),
+}).refine(data => Boolean(data.tecUserId || (Array.isArray(data.tecUserIds) && data.tecUserIds.length > 0)), {
+  message: 'At least one TEC evaluator must be provided via tecUserId or tecUserIds',
 })

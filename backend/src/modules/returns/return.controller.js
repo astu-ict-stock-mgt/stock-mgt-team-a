@@ -8,6 +8,7 @@ import {
   createReturn,
   getReturnById,
   listReturns,
+  assignReturnTec,
   evaluateReturn,
   approveReturn,
   postReturnStock,
@@ -35,7 +36,7 @@ export const create = async (req, res, next) => {
  */
 export const getById = async (req, res, next) => {
   try {
-    const returnRecord = await getReturnById(req.params.id)
+    const returnRecord = await getReturnById(req.params.id, req.user)
     sendSuccess(res, returnRecord)
   } catch (err) {
     next(err)
@@ -47,7 +48,7 @@ export const getById = async (req, res, next) => {
  */
 export const list = async (req, res, next) => {
   try {
-    const result = await listReturns(req.query)
+    const result = await listReturns(req.query, req.user)
     sendSuccess(res, result.returns, 200, {
       total: result.total,
       page: result.page,
@@ -103,6 +104,28 @@ export const postStock = async (req, res, next) => {
       postingUserId,
     })
     sendSuccess(res, result)
+  } catch (err) {
+    next(err)
+  }
+}
+
+/**
+ * Handle PATCH /api/returns/:id/assign-tec endpoint
+ */
+export const assignTec = async (req, res, next) => {
+  try {
+    const assignedById = req.user?.userId || req.user?.id
+    const tecUserIds = Array.isArray(req.body.tecUserIds) && req.body.tecUserIds.length > 0
+      ? req.body.tecUserIds
+      : req.body.tecUserId ? [req.body.tecUserId] : []
+
+    const result = await assignReturnTec({
+      id: req.params.id,
+      assignedById,
+      tecUserIds,
+      tecUserId: tecUserIds[0],
+    })
+    sendSuccess(res, result, 200, { message: 'TEC evaluator(s) assigned successfully' })
   } catch (err) {
     next(err)
   }

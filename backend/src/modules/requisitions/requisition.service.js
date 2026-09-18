@@ -112,6 +112,14 @@ export async function getRequisitionById(id) {
       departmentApprovedByUser: { select: { id: true, fullName: true } },
       paoApprovedByUser: { select: { id: true, fullName: true } },
       lines: { include: { item: { select: { id: true, name: true, code: true } } } },
+      sivs: {
+        select: {
+          id: true,
+          sivNumber: true,
+          status: true,
+          createdAt: true,
+        },
+      },
     },
   })
 
@@ -152,6 +160,14 @@ export async function listRequisitions(filters = {}) {
         department: { select: { id: true, name: true, code: true } },
         store: { select: { id: true, name: true, code: true } },
         lines: true,
+        sivs: {
+          select: {
+            id: true,
+            sivNumber: true,
+            status: true,
+            createdAt: true,
+          },
+        },
       },
     }),
     prisma.requisition.count({ where }),

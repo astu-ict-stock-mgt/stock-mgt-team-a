@@ -278,6 +278,7 @@ export interface Requisition {
   departmentApprovedByUser?: { id: string; fullName: string }
   paoApprovedByUser?: { id: string; fullName: string }
   lines?: RequisitionLine[]
+  sivs?: Array<{ id: string; sivNumber: string; status: string; createdAt?: string }>
   _count?: { lines: number }
 }
 
@@ -556,6 +557,89 @@ export interface ReconciliationLine {
   variance: number
   adjustmentQuantity: number
   item?: Item
+}
+
+export type AssetReturnStatus =
+  | 'SUBMITTED'
+  | 'PENDING_INSPECTION'
+  | 'UNDER_INSPECTION'
+  | 'ACCEPTED'
+  | 'ACCEPTED_WITH_REPAIR'
+  | 'REJECTED'
+  | 'CANCELLED'
+
+export type AssetReturnDecision =
+  | 'ACCEPT_RETURN'
+  | 'ACCEPT_WITH_REPAIR'
+  | 'REJECT_RETURN'
+  | 'RECOMMEND_DISPOSAL'
+
+export type AssetPhysicalCondition =
+  | 'EXCELLENT'
+  | 'GOOD'
+  | 'FAIR'
+  | 'POOR'
+  | 'DAMAGED'
+
+export type AssetTechnicalCondition =
+  | 'OPERATIONAL'
+  | 'PARTIALLY_OPERATIONAL'
+  | 'NON_OPERATIONAL'
+
+export interface AssetReturnInspection {
+  id: string
+  assetReturnId: string
+  inspectorId: string
+  inspectionDate: string
+  physicalCondition: AssetPhysicalCondition
+  technicalCondition: AssetTechnicalCondition
+  isComplete: boolean
+  serialNumberVerified: boolean
+  assetTagVerified: boolean
+  observedDamage: string | null
+  missingAccessories: string | null
+  remarks: string | null
+  recommendation: string | null
+  decision: AssetReturnDecision
+  createdAt: string
+  inspector?: { id: string; fullName: string; email?: string }
+}
+
+export interface AssetReturnTecMember {
+  id: string
+  assetReturnId: string
+  userId: string
+  assignedAt: string
+  user?: { id: string; fullName: string; email?: string }
+}
+
+export interface AssetReturn {
+  id: string
+  returnNumber: string
+  assetId: string
+  custodianId: string
+  requestedById: string
+  status: AssetReturnStatus
+  reason: string
+  notes: string | null
+  assignedById: string | null
+  assignedAt: string | null
+  disposalRequestId: string | null
+  createdAt: string
+  updatedAt: string
+  asset?: {
+    id: string
+    name: string
+    assetTag?: string
+    serialNumber?: string
+    status?: string
+    notes?: string | null
+  }
+  custodian?: { id: string; fullName: string; email?: string }
+  requestedByUser?: { id: string; fullName: string; email?: string }
+  assignedByUser?: { id: string; fullName: string }
+  assignedTecMembers?: AssetReturnTecMember[]
+  inspection?: AssetReturnInspection | null
 }
 
 export type Screen =

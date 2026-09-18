@@ -45,6 +45,21 @@ export async function createSIV({ requisitionId, storeId, issuedToUserId, prepar
     throw new ConflictError(`SIV cannot be issued for requisition in status '${requisition.status}'. Requisition must be PAO_APPROVED before SIV creation.`)
   }
 
+  // Prevent duplicate SIV generation while an active SIV is already in progress
+  const existingActiveSiv = await prisma.sIV.findFirst({
+    where: {
+      requisitionId,
+      status: { in: ['DRAFT', 'PREPARED', 'APPROVED'] },
+    },
+    select: { id: true, sivNumber: true, status: true },
+  })
+
+  if (existingActiveSiv) {
+    throw new ConflictError(
+      `An active SIV (${existingActiveSiv.sivNumber}) has already been generated for this requisition and is currently '${existingActiveSiv.status}'. Please approve and finalize the existing SIV before generating another.`
+    )
+  }
+
   for (const line of lines) {
     if (!line.itemId || !line.quantityIssued || line.quantityIssued <= 0) {
       throw new ValidationError('Each SIV line requires a valid itemId and positive quantityIssued')

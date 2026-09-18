@@ -4,12 +4,12 @@
  */
 
 import { Router } from 'express'
-import { create, getById, list, evaluate, approve, postStock } from './return.controller.js'
+import { create, getById, list, assignTec, evaluate, approve, postStock } from './return.controller.js'
 import { validateRequest } from '../../middleware/validate.middleware.js'
 import { authenticate } from '../../middleware/auth.middleware.js'
 import { authorize } from '../../middleware/rbac.middleware.js'
 import { PERMISSIONS } from '../../config/rbac.js'
-import { createReturnSchema, evaluateReturnSchema, approveReturnSchema } from './dto/return.dto.js'
+import { createReturnSchema, assignReturnTecSchema, evaluateReturnSchema, approveReturnSchema } from './dto/return.dto.js'
 
 const router = Router()
 
@@ -65,6 +65,33 @@ router.post(
   authorize(PERMISSIONS.RETURNS_CREATE),
   validateRequest({ body: createReturnSchema }),
   create
+)
+
+/**
+ * @openapi
+ * /returns/{id}/assign-tec:
+ *   patch:
+ *     summary: Assign TEC evaluator to material return (PAO / Admin)
+ *     tags:
+ *       - Stock Returns
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: TEC evaluator assigned successfully
+ */
+router.patch(
+  '/:id/assign-tec',
+  authenticate,
+  authorize(PERMISSIONS.RETURNS_APPROVE),
+  validateRequest({ body: assignReturnTecSchema }),
+  assignTec
 )
 
 /**

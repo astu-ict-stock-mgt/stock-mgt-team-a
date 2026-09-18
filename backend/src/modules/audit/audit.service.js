@@ -37,8 +37,18 @@ export const AUDIT_EVENT_TYPES = {
 
   // --- Return Events (BE-150) ---
   RETURN_SUBMITTED: 'RETURN_SUBMITTED',
+  RETURN_TEC_ASSIGNED: 'RETURN_TEC_ASSIGNED',
   RETURN_EVALUATED: 'RETURN_EVALUATED',
   RETURN_APPROVED: 'RETURN_APPROVED',
+
+  // --- Asset Return Events (Directive 1095/2017) ---
+  ASSET_RETURN_CREATED: 'ASSET_RETURN_CREATED',
+  ASSET_RETURN_TEC_ASSIGNED: 'ASSET_RETURN_TEC_ASSIGNED',
+  ASSET_RETURN_INSPECTION_RECORDED: 'ASSET_RETURN_INSPECTION_RECORDED',
+  ASSET_RETURN_ACCEPTED: 'ASSET_RETURN_ACCEPTED',
+  ASSET_RETURN_REJECTED: 'ASSET_RETURN_REJECTED',
+  ASSET_RETURN_ACCEPTED_WITH_REPAIR: 'ASSET_RETURN_ACCEPTED_WITH_REPAIR',
+  ASSET_RETURN_DISPOSAL_RECOMMENDED: 'ASSET_RETURN_DISPOSAL_RECOMMENDED',
 
   // --- Transfer Events (BE-150) ---
   TRANSFER_SUBMITTED: 'TRANSFER_SUBMITTED',
@@ -66,16 +76,24 @@ export const AUDIT_EVENT_TYPES = {
  * @param {Object} eventData - { eventType, userId, details, ipAddress, userAgent }
  * @returns {Promise<Object>} Created audit event
  */
-export const createAuditEvent = async ({ eventType, userId, details, ipAddress, userAgent }) => {
+export const createAuditEvent = async (
+  { eventType, userId, details, ipAddress, userAgent },
+  client = prisma
+) => {
   if (!eventType || !Object.values(AUDIT_EVENT_TYPES).includes(eventType)) {
     throw new ValidationError('Invalid event type')
   }
 
-  const event = await prisma.auditEvent.create({
+  const formattedDetails =
+    typeof details === 'object' && details !== null
+      ? JSON.stringify(details)
+      : details || null
+
+  const event = await client.auditEvent.create({
     data: {
       eventType,
       userId: userId || null,
-      details: details || null,
+      details: formattedDetails,
       ipAddress: ipAddress || null,
       userAgent: userAgent || null,
       timestamp: new Date(),

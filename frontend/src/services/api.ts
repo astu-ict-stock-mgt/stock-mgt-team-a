@@ -40,8 +40,26 @@ class ApiClient {
       headers['Authorization'] = `Bearer ${this.token}`
     }
 
-    const response = await fetch(url, { ...options, headers })
-    const data = await response.json()
+    let response: Response
+    try {
+      response = await fetch(url, { ...options, headers })
+    } catch (err: any) {
+      throw new Error(
+        err.message === 'Failed to fetch'
+          ? 'Cannot connect to backend server. Please verify the server is running.'
+          : err.message || 'Network error'
+      )
+    }
+
+    let data: any = null
+    const text = await response.text()
+    if (text) {
+      try {
+        data = JSON.parse(text)
+      } catch {
+        data = null
+      }
+    }
 
     if (response.status === 401 && this.onUnauthorized) {
       this.token = null
@@ -52,10 +70,10 @@ class ApiClient {
     }
 
     if (!response.ok) {
-      throw new Error(data.error?.message || `HTTP ${response.status}`)
+      throw new Error(data?.error?.message || data?.message || (text && text.length < 200 ? text : `HTTP ${response.status}`))
     }
 
-    return data as T
+    return (data ?? {}) as T
   }
 
   get<T>(endpoint: string): Promise<T> {
@@ -333,6 +351,20 @@ export const goodsReceiptApi = {
     api.post<ApiResponse<GoodsReceipt>>('/goods-receipts', data),
 }
 
+export const grnApi = {
+  getAll: (params?: { status?: string; search?: string }) => {
+    const q = new URLSearchParams()
+    if (params?.status) q.set('status', params.status)
+    if (params?.search) q.set('search', params.search)
+    return api.get<ApiResponse<any[]>>(`/grns?${q.toString()}`)
+  },
+  getById: (id: string) => api.get<ApiResponse<any>>(`/grns/${id}`),
+  create: (data: { goodsReceiptId: string; notes?: string }) =>
+    api.post<ApiResponse<any>>('/grns', data),
+  finalize: (id: string) => api.patch<ApiResponse<any>>(`/grns/${id}/finalize`),
+  cancel: (id: string) => api.patch<ApiResponse<any>>(`/grns/${id}/cancel`),
+}
+
 export const requisitionsApi = {
   getAll: (params?: { status?: string; departmentId?: string; page?: number; limit?: number }) => {
     const q = new URLSearchParams()
@@ -404,7 +436,7 @@ export const evaluationsApi = {
     return api.get<ApiResponse<any[]>>(`/evaluations?${q.toString()}`)
   },
   getById: (id: string) => api.get<ApiResponse<any>>(`/evaluations/${id}`),
-  create: (data: { goodsReceiptId: string; notes?: string }) =>
+  create: (data: { goodsReceiptId: string; evaluatorId?: string; evaluatorIds?: string[]; notes?: string }) =>
     api.post<ApiResponse<any>>('/evaluations', data),
   startEvaluation: (id: string, userId?: string) =>
     api.patch<ApiResponse<any>>(`/evaluations/${id}/start`),
@@ -484,12 +516,67 @@ export const returnsApi = {
   getById: (id: string) => api.get<ApiResponse<any>>(`/returns/${id}`),
   create: (data: { sivId: string; storeId: string; reason: string; notes?: string; lines: Array<{ itemId: string; quantityReturned: number; remarks?: string | null }> }) =>
     api.post<ApiResponse<any>>('/returns', data),
-  evaluate: (id: string, data: { remarks: string }) =>
+  assignTec: (id: string, data: { tecUserId?: string; tecUserIds?: string[] }) =>
+    api.patch<ApiResponse<any>>(`/returns/${id}/assign-tec`, data),
+  evaluate: (id: string, data: { remarks: string; recommendation?: string }) =>
     api.patch<ApiResponse<any>>(`/returns/${id}/evaluate`, data),
   approve: (id: string, data: { disposition: string; remarks?: string; isApproved: boolean }) =>
     api.patch<ApiResponse<any>>(`/returns/${id}/approve`, data),
   postStock: (id: string) =>
     api.post<ApiResponse<any>>(`/returns/${id}/post`),
+}
+
+export const assetReturnsApi = {
+  getAll: (params?: {
+    status?: string
+    assetId?: string
+    custodianId?: string
+    requestedById?: string
+    assignedTecId?: string
+    search?: string
+    page?: number
+    limit?: number
+  }) => {
+    const q = new URLSearchParams()
+    if (params?.status) q.set('status', params.status)
+    if (params?.assetId) q.set('assetId', params.assetId)
+    if (params?.custodianId) q.set('custodianId', params.custodianId)
+    if (params?.requestedById) q.set('requestedById', params.requestedById)
+    if (params?.assignedTecId) q.set('assignedTecId', params.assignedTecId)
+    if (params?.search) q.set('search', params.search)
+    if (params?.page) q.set('page', String(params.page))
+    if (params?.limit) q.set('limit', String(params.limit))
+    return api.get<ApiResponse<any>>(`/asset-returns?${q.toString()}`)
+  },
+  getById: (id: string) => api.get<ApiResponse<any>>(`/asset-returns/${id}`),
+  getMyCustodyAssets: (all?: boolean) =>
+    api.get<ApiResponse<any[]>>(`/asset-returns/my-custody-assets${all ? '?all=true' : ''}`),
+  create: (data: { assetId: string; reason: string; notes?: string }) =>
+    api.post<ApiResponse<any>>('/asset-returns', data),
+  assignTec: (id: string, data: { tecUserIds: string[] }) =>
+    api.post<ApiResponse<any>>(`/asset-returns/${id}/assign-tec`, data),
+  recordInspection: (
+    id: string,
+    data: {
+      physicalCondition: string
+      technicalCondition: string
+      isComplete?: boolean
+      serialNumberVerified?: boolean
+      assetTagVerified?: boolean
+      observedDamage?: string
+      missingAccessories?: string
+      remarks?: string
+      recommendation?: string
+      decision?: string
+    }
+  ) => api.post<ApiResponse<any>>(`/asset-returns/${id}/inspection`, data),
+  approve: (
+    id: string,
+    data: {
+      decision: string
+      approvalNotes?: string
+    }
+  ) => api.patch<ApiResponse<any>>(`/asset-returns/${id}/approve`, data),
 }
 
 export const reportsApi = {

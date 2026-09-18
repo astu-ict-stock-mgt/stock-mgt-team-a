@@ -31,6 +31,11 @@ export const authorize = (requiredPermissions) => {
         || (req.user.roleCode ? [req.user.roleCode] : null)
         || ['REQUESTER']
 
+      // ADMIN & SYSTEM_ADMIN have full system oversight (securityLevel: 100)
+      if (userRoles.includes('ADMIN') || userRoles.includes('SYSTEM_ADMIN')) {
+        return next()
+      }
+
       // 3. Normalize required permissions to string keys
       const rawList = Array.isArray(requiredPermissions)
         ? requiredPermissions

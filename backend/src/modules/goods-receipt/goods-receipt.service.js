@@ -49,18 +49,8 @@ class GoodsReceiptService {
       },
     });
 
-    // Post inventory transactions for each line item
-    if (receiptData.lines && receiptData.lines.length > 0) {
-      for (const line of receiptData.lines) {
-        try {
-          await this.postReceiptTransaction(receipt, line, userId);
-        } catch (err) {
-          console.error('Failed to post receipt transaction:', err.message);
-          throw err;
-        }
-      }
-    }
-
+    // Note: Stock transactions are not posted at creation. Under federal directive,
+    // goods must undergo Technical Evaluation Committee (TEC) inspection and GRN approval before posting.
     return receipt;
   }
 

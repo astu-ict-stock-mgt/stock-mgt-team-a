@@ -2,8 +2,9 @@ import { useState, useEffect, useCallback } from 'react'
 import { Button, Input, Select, Stepper, SectionHeader, Card, Badge, Divider, useToast, ToastContainer, Tabs, Modal } from '../components/ui'
 import { useApp } from '../context/AppContext'
 import { goodsReceiptApi } from '../services/api'
+import GrnSheetModal from '../components/GrnSheetModal'
 
-const steps = ['Supplier & Reference', 'Item Entry', 'Inspection', 'Review & Confirm']
+const steps = ['Supplier & Reference', 'Item Entry', 'Review & Confirm']
 
 interface LineItem {
   id: string
@@ -35,7 +36,6 @@ export default function StockReceiving() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [form, setForm] = useState({ supplierId: '', poReference: '', storeId: '', deliveryDate: '', deliveryNote: '', carrier: '' })
   const [lines, setLines] = useState<LineItem[]>([defaultLine()])
-  const [checklist, setChecklist] = useState({ quantities: false, condition: false, documentation: false, labeling: false, hazmat: false })
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [grnRef, setGrnRef] = useState('')
 
@@ -90,28 +90,20 @@ export default function StockReceiving() {
     return e
   }
 
-  const validateStep2 = () => {
-    const e: Record<string, string> = {}
-    if (!checklist.quantities || !checklist.condition || !checklist.documentation)
-      e.checklist = 'Complete all required inspection checks before proceeding'
-    return e
-  }
-
   const handleNext = async () => {
     let errs: Record<string, string> = {}
     if (step === 0) errs = validateStep0()
     else if (step === 1) errs = validateStep1()
-    else if (step === 2) errs = validateStep2()
     if (Object.keys(errs).length > 0) { setErrors(errs); return }
     setErrors({})
 
-    if (step < 3) {
+    if (step < 2) {
       setStep(s => s + 1)
     } else {
       setIsSubmitting(true)
       try {
-        const ref = 'GRN-' + new Date().toISOString().slice(0, 10).replace(/-/g, '') + '-' + Date.now().toString().slice(-4)
-        await goodsReceiptApi.create({
+        const ref = 'RCV-' + new Date().toISOString().slice(0, 10).replace(/-/g, '') + '-' + Date.now().toString().slice(-4)
+        const res = await goodsReceiptApi.create({
           supplierId: form.supplierId,
           storeId: form.storeId,
           purchaseOrderNumber: form.poReference || undefined,
@@ -123,8 +115,29 @@ export default function StockReceiving() {
             unitCost: Number(l.unitCost),
           })),
         })
-        setGrnRef(ref)
-        toast.success('Stock received and posted to inventory successfully!')
+        const receiptData = res.data as any
+        const actualRef = receiptData?.receiptNumber || receiptData?.grn?.grnNumber || ref
+        setGrnRef(actualRef)
+        setSelectedReceipt({
+          ...receiptData,
+          receiptNumber: actualRef,
+          status: 'PENDING_EVALUATION',
+          supplier: suppliers.find(s => s.id === form.supplierId),
+          store: stores.find(s => s.id === form.storeId),
+          deliveryDate: form.deliveryDate,
+          purchaseOrderNumber: form.poReference,
+          notes: `Delivery note: ${form.deliveryNote || 'N/A'}, Carrier: ${form.carrier || 'N/A'}`,
+          lines: lines.map(l => ({
+            ...l,
+            quantity: Number(l.receivedQty),
+            unitCost: Number(l.unitCost),
+            totalCost: Number(l.receivedQty) * Number(l.unitCost),
+            item: inventoryItems.find(i => i.id === l.itemId),
+            unit: units.find(u => u.id === l.unitId),
+          })),
+          totalAmount: totalValue,
+        })
+        toast.success('ጊዜያዊ የዕቃ መቀበያ ሰነድ ተመዝግቧል! (Provisional Receipt recorded). Sent to PAO to assign Technical Evaluation Committee (TEC).')
         setSubmitted(true)
       } catch (error: any) {
         toast.error(error.message || 'Failed to receive stock')
@@ -146,7 +159,7 @@ export default function StockReceiving() {
     const map: Record<string, any> = {
       PENDING_EVALUATION: { v: 'warning', l: 'Pending Evaluation' },
       EVALUATED: { v: 'success', l: 'Evaluated' },
-      APPROVED: { v: 'success', l: 'Approved' },
+      APPROVED: { v: 'success', l: 'Approved (Model 19)' },
       REJECTED: { v: 'danger', l: 'Rejected' },
     }
     const c = map[status] || { v: 'default', l: status }
@@ -160,39 +173,51 @@ export default function StockReceiving() {
         <SectionHeader title="Stock Receiving" subtitle="Record incoming goods from suppliers" />
         <div className="max-w-2xl mx-auto">
           <Card>
-            <div className="text-center py-8">
-              <div className="w-16 h-16 rounded-full bg-[#F0FDF4] flex items-center justify-center mx-auto mb-4">
-                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#16A34A" strokeWidth="2.5"><path d="M20 6 9 17l-5-5" /></svg>
+            <div className="text-center py-6">
+              <div className="w-14 h-14 rounded-full bg-[#F0FDF4] flex items-center justify-center mx-auto mb-3">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#16A34A" strokeWidth="2.5"><path d="M20 6 9 17l-5-5" /></svg>
               </div>
-              <h2 className="text-xl font-semibold text-[#0F172A]">Goods Received Successfully</h2>
-              <p className="text-sm text-[#64748B] mt-1.5">Reference: <span className="font-mono font-semibold text-[#4F46E5]">{grnRef}</span></p>
+              <h2 className="text-lg font-bold text-[#0F172A]">ጊዜያዊ የዕቃ መቀበያ ሰነድ ተመዝግቧል</h2>
+              <p className="text-xs text-[#64748B] mt-0.5">Provisional Inward Goods Receipt Recorded</p>
+              <p className="text-xs text-[#64748B] mt-1.5">Voucher Reference: <span className="font-mono font-semibold text-[#4F46E5]">{grnRef}</span></p>
             </div>
-            <Divider label="Goods Receiving Note Preview" />
+
+            {/* Directive 1095/2017 Separation Notice */}
+            <div className="mb-4 p-3 bg-amber-50/90 border border-amber-200 rounded-xl text-xs text-amber-950 flex items-start gap-2.5 leading-relaxed">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#D97706" strokeWidth="2" className="shrink-0 mt-0.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+              <div>
+                <p className="font-bold text-amber-900 mb-0.5">ማሳሰቢያ (Directive No. 1095/2017 Notice):</p>
+                <p>ይህ ሰነድ ቴክኒካል ምርመራ ያልተደረገለት <strong>ጊዜያዊ የዕቃ መቀበያ ደረሰኝ (Provisional Receipt)</strong> ነው። ዕቃዎቹ በተሰየመው የቴክኒክ ግምገማ ኮሚቴ (TEC) ተመርምረው በንብረት አስተዳደር ኃላፊው (PAO) <strong>ሞዴል 19</strong> እስካልጸደቁ ድረስ ወደ ስቶክ ካርድ (Stock Card) <strong>አይመዘገቡም</strong>።</p>
+                <p className="mt-1 text-amber-800 italic">(Items remain in quarantine/provisional holding. Ledger posting and Model 19 issuance occur only after TEC inspection and PAO approval.)</p>
+              </div>
+            </div>
+
+            <Divider label="ጊዜያዊ የዕቃ መቀበያ ሰነድ / Provisional Receiving Voucher Preview" />
             <div className="border border-[#E2E8F0] rounded-xl p-5 bg-white shadow-sm">
-              <div className="flex items-start justify-between mb-5">
+              <div className="flex items-start justify-between mb-4 border-b border-[#E2E8F0] pb-3">
                 <div>
-                  <p className="font-semibold text-[#0F172A]">StockManager</p>
-                  <p className="text-xs text-[#64748B]">Goods Receiving Note</p>
+                  <p className="font-bold text-[#0F172A] text-sm">Adama Science & Technology University</p>
+                  <p className="text-xs text-[#64748B]">ጊዜያዊ የዕቃ መቀበያ ሰነድ (Provisional Inward Goods Voucher)</p>
                 </div>
                 <div className="text-right">
                   <p className="text-sm font-semibold font-mono text-[#4F46E5]">{grnRef}</p>
-                  <p className="text-xs text-[#94A3B8]">{form.deliveryDate}</p>
+                  <p className="text-xs text-[#94A3B8]">Date: {form.deliveryDate || new Date().toISOString().slice(0, 10)}</p>
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4 mb-4">
                 <div>
-                  <p className="text-xs font-medium text-[#94A3B8] uppercase tracking-wide mb-1">Supplier</p>
+                  <p className="text-xs font-medium text-[#94A3B8] uppercase tracking-wide mb-0.5">Supplier / አቅራቢ</p>
                   <p className="text-sm font-medium text-[#1E293B]">{supplierName}</p>
                 </div>
                 <div>
-                  <p className="text-xs font-medium text-[#94A3B8] uppercase tracking-wide mb-1">Warehouse</p>
+                  <p className="text-xs font-medium text-[#94A3B8] uppercase tracking-wide mb-0.5">Receiving Store / መጋዘን</p>
                   <p className="text-sm font-medium text-[#1E293B]">{storeName}</p>
                 </div>
               </div>
               <table className="w-full text-xs border-collapse">
                 <thead>
-                  <tr className="border-b border-[#E2E8F0]">
-                    {['Item', 'SKU', 'Qty', 'Unit Cost', 'Total'].map(h => (
+                  <tr className="border-b border-[#E2E8F0] bg-[#F8FAFC]">
+                    {['Item', 'Code', 'Received Qty', 'Unit Cost', 'Total (ETB)'].map(h => (
                       <th key={h} className="py-2 px-2 text-left font-semibold text-[#64748B] uppercase tracking-wide">{h}</th>
                     ))}
                   </tr>
@@ -203,24 +228,50 @@ export default function StockReceiving() {
                       <td className="py-2 px-2 font-medium text-[#1E293B]">{getItemName(l.itemId)}</td>
                       <td className="py-2 px-2 font-mono text-[#64748B]">{getItemCode(l.itemId)}</td>
                       <td className="py-2 px-2 font-semibold text-[#16A34A]">{l.receivedQty} {getUnitSymbol(l.unitId)}</td>
-                      <td className="py-2 px-2 text-[#64748B]">${Number(l.unitCost).toFixed(2)}</td>
-                      <td className="py-2 px-2 font-semibold text-[#1E293B]">${(Number(l.receivedQty) * Number(l.unitCost)).toFixed(2)}</td>
+                      <td className="py-2 px-2 text-[#64748B]">{Number(l.unitCost).toFixed(2)} ETB</td>
+                      <td className="py-2 px-2 font-semibold text-[#1E293B]">{(Number(l.receivedQty) * Number(l.unitCost)).toFixed(2)} ETB</td>
                     </tr>
                   ))}
                 </tbody>
                 <tfoot>
                   <tr>
-                    <td colSpan={4} className="py-2 px-2 text-right font-semibold text-[#334155]">Total Value</td>
-                    <td className="py-2 px-2 font-bold text-[#0F172A]">${totalValue.toFixed(2)}</td>
+                    <td colSpan={4} className="py-2 px-2 text-right font-semibold text-[#334155]">Total Consignment Value</td>
+                    <td className="py-2 px-2 font-bold text-[#0F172A]">{totalValue.toFixed(2)} ETB</td>
                   </tr>
                 </tfoot>
               </table>
-              <div className="mt-4 pt-4 border-t border-[#E2E8F0] flex justify-between text-xs text-[#94A3B8]">
-                <span>Status: <span className="text-[#16A34A] font-medium">Posted to inventory</span></span>
+              <div className="mt-4 pt-3 border-t border-[#E2E8F0] flex justify-between items-center text-xs">
+                <span className="text-[#64748B]">Status:</span>
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-amber-50 text-amber-800 font-medium border border-amber-200">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                  Pending TEC Evaluation (Not posted to inventory)
+                </span>
               </div>
             </div>
-            <div className="flex gap-2 mt-5">
-              <Button variant="primary" className="w-full" onClick={() => { setSubmitted(false); setStep(0); setLines([defaultLine()]); setForm({ supplierId: '', poReference: '', storeId: '', deliveryDate: '', deliveryNote: '', carrier: '' }); setChecklist({ quantities: false, condition: false, documentation: false, labeling: false, hazmat: false }) }}>New receiving</Button>
+            <div className="flex gap-3 mt-5">
+              <Button
+                variant="outline"
+                className="flex-1 flex items-center justify-center gap-2"
+                onClick={() => setShowGrnModal(true)}
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M6 9V2h12v7M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" />
+                  <path d="M6 14h12v8H6z" />
+                </svg>
+                Print Provisional Voucher (ጊዜያዊ ደረሰኝ)
+              </Button>
+              <Button
+                variant="primary"
+                className="flex-1"
+                onClick={() => {
+                  setSubmitted(false)
+                  setStep(0)
+                  setLines([defaultLine()])
+                  setForm({ supplierId: '', poReference: '', storeId: '', deliveryDate: '', deliveryNote: '', carrier: '' })
+                }}
+              >
+                New receiving
+              </Button>
             </div>
           </Card>
         </div>
@@ -322,36 +373,7 @@ export default function StockReceiving() {
 
               {step === 2 && (
                 <div>
-                  <h3 className="text-base font-semibold text-[#0F172A] mb-1">Inspection Checklist</h3>
-                  <p className="text-sm text-[#64748B] mb-5">Complete all required checks before posting to inventory.</p>
-                  {errors.checklist && (
-                    <div className="mb-4 p-3 bg-[#FEF2F2] border border-[#FECACA] rounded-lg text-sm text-[#DC2626]">{errors.checklist}</div>
-                  )}
-                  <div className="space-y-3">
-                    {[
-                      { key: 'quantities', label: 'Quantities verified against delivery note', required: true },
-                      { key: 'condition', label: 'All items inspected — no visible damage or defects', required: true },
-                      { key: 'documentation', label: 'Delivery note and packing list received', required: true },
-                      { key: 'labeling', label: 'Items correctly labeled and identified', required: false },
-                      { key: 'hazmat', label: 'Hazardous materials handling procedures followed (if applicable)', required: false },
-                    ].map(({ key, label, required }) => (
-                      <label key={key} className={`flex items-start gap-3 p-3.5 rounded-xl border cursor-pointer transition-all bg-white
-                        ${checklist[key as keyof typeof checklist] ? 'border-[#4F46E5] bg-[#EEF2FF]' : 'border-[#E2E8F0] hover:border-[#CBD5E1]'}`}>
-                        <input type="checkbox" checked={checklist[key as keyof typeof checklist]}
-                          onChange={e => setChecklist(c => ({ ...c, [key]: e.target.checked }))}
-                          className="mt-0.5 w-4 h-4 rounded border-[#CBD5E1] accent-[#4F46E5]" />
-                        <span className="text-sm text-[#334155]">
-                          {label} {required && <span className="text-[#DC2626]">*</span>}
-                        </span>
-                      </label>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {step === 3 && (
-                <div>
-                  <h3 className="text-base font-semibold text-[#0F172A] mb-4">Review & Confirm</h3>
+                  <h3 className="text-base font-semibold text-[#0F172A] mb-4">Review & Confirm Goods Receipt</h3>
                   <div className="grid grid-cols-2 gap-4 mb-5 p-4 bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl">
                     <div>
                       <p className="text-xs font-medium text-[#94A3B8] uppercase tracking-wide mb-1">Supplier</p>
@@ -396,11 +418,16 @@ export default function StockReceiving() {
                     </table>
                   </div>
                   <div className="mt-4 p-4 bg-[#F8FAFC] rounded-xl flex justify-between items-center border border-[#E2E8F0]">
-                    <span className="text-sm font-medium text-[#64748B]">Total value to post</span>
+                    <span className="text-sm font-medium text-[#64748B]">Total receiving value</span>
                     <span className="text-xl font-bold font-mono text-[#0F172A]">${totalValue.toFixed(2)}</span>
                   </div>
-                  <div className="mt-4 p-3 bg-[#FFFBEB] border border-[#FDE68A] rounded-lg text-xs text-[#92400E]">
-                    Confirming will update inventory quantities and create a permanent GRN record.
+                  <div className="mt-4 p-3.5 bg-[#EEF2FF] border border-[#C7D2FE] rounded-xl text-xs text-[#3730A3] space-y-1">
+                    <p className="font-semibold flex items-center gap-1.5">
+                      <span>⚖️</span> Federal Property Administration Directive 1095/2017
+                    </p>
+                    <p>
+                      Confirming registers this provisional Goods Receipt and routes it to the Property Administration Officer (PAO) to assign the Technical Evaluation Committee (TEC) for inspection before final inventory ledger acceptance.
+                    </p>
                   </div>
                 </div>
               )}
@@ -408,7 +435,7 @@ export default function StockReceiving() {
               <div className="flex items-center justify-between mt-6 pt-5 border-t border-[#E2E8F0]">
                 <Button variant="ghost" onClick={() => setStep(s => Math.max(0, s - 1))} disabled={step === 0}>← Back</Button>
                 <Button variant="primary" onClick={handleNext} disabled={isSubmitting}>
-                  {isSubmitting ? 'Posting...' : step === 3 ? 'Confirm & Post' : 'Continue →'}
+                  {isSubmitting ? 'Recording...' : step === 2 ? 'Confirm & Register Receipt' : 'Continue →'}
                 </Button>
               </div>
             </Card>
@@ -424,112 +451,53 @@ export default function StockReceiving() {
                 <p className="py-12 text-center text-sm text-[#94A3B8]">No past goods receipts recorded</p>
               </Card>
             )}
-            {!loadingHistory && historyReceipts.map(receipt => (
-              <Card key={receipt.id}>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <p className="text-sm font-semibold text-[#1E293B]">{receipt.receiptNumber}</p>
-                      {statusBadge(receipt.status)}
+            {!loadingHistory && historyReceipts.map(receipt => {
+              const isApproved = receipt.status === 'APPROVED'
+              return (
+                <Card key={receipt.id}>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className="text-sm font-semibold text-[#1E293B]">{receipt.receiptNumber}</p>
+                        {statusBadge(receipt.status)}
+                        {isApproved && (
+                          <span className="text-[11px] px-2 py-0.5 rounded bg-amber-100 text-amber-900 border border-amber-300 font-semibold">
+                            🟡 Copy 2 (Storekeeper Yellow) Ready
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-xs text-[#94A3B8] mt-0.5">
+                        Supplier: {receipt.supplier?.name} · Store: {receipt.store?.name} · {new Date(receipt.receivedDate || receipt.createdAt).toLocaleDateString()}
+                      </p>
+                      {receipt.purchaseOrderNumber && (
+                        <p className="text-xs text-[#64748B] font-mono mt-0.5">PO: {receipt.purchaseOrderNumber}</p>
+                      )}
+                      {isApproved && (
+                        <p className="text-xs text-emerald-700 mt-1 font-medium">
+                          ✓ Authorized by PAO · Quantities credited to Stock Card (Model 21) & ready to bin/issue.
+                        </p>
+                      )}
                     </div>
-                    <p className="text-xs text-[#94A3B8] mt-0.5">
-                      Supplier: {receipt.supplier?.name} · Store: {receipt.store?.name} · {new Date(receipt.receivedDate || receipt.createdAt).toLocaleDateString()}
-                    </p>
-                    {receipt.purchaseOrderNumber && (
-                      <p className="text-xs text-[#64748B] font-mono mt-0.5">PO: {receipt.purchaseOrderNumber}</p>
-                    )}
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant={isApproved ? "primary" : "outline"}
+                        size="sm"
+                        loading={loadingGrnDetails === receipt.id}
+                        onClick={() => handleViewGrnPaper(receipt.id)}
+                      >
+                        {isApproved ? 'View Model 19 GRN (Copy 2)' : 'View Provisional Receipt'}
+                      </Button>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      loading={loadingGrnDetails === receipt.id}
-                      onClick={() => handleViewGrnPaper(receipt.id)}
-                    >
-                      View GRN Paper
-                    </Button>
-                  </div>
-                </div>
-              </Card>
-            ))}
+                </Card>
+              )
+            })}
           </div>
         )}
       </div>
 
-      {/* GRN PAPER DETAILS MODAL */}
-      {showGrnModal && selectedReceipt && (
-        <Modal open={showGrnModal} title={`Goods Receiving Note — ${selectedReceipt.receiptNumber}`} onClose={() => setShowGrnModal(false)} width="max-w-2xl">
-          <div className="space-y-4">
-            <div className="border border-[#E2E8F0] rounded-xl p-5 bg-white">
-              <div className="flex items-start justify-between mb-5">
-                <div>
-                  <p className="font-bold text-base text-[#0F172A]">StockManager Enterprise</p>
-                  <p className="text-xs text-[#64748B]">Goods Receiving Note Document</p>
-                </div>
-                <div className="text-right">
-                  <p className="text-sm font-bold font-mono text-[#4F46E5]">{selectedReceipt.receiptNumber}</p>
-                  <p className="text-xs text-[#94A3B8]">Date: {new Date(selectedReceipt.receivedDate || selectedReceipt.createdAt).toLocaleDateString()}</p>
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4 mb-5 p-4 bg-[#F8FAFC] border border-[#E2E8F0] rounded-lg text-xs">
-                <div>
-                  <p className="text-[#94A3B8] uppercase font-semibold">Supplier</p>
-                  <p className="font-semibold text-[#1E293B] mt-0.5">{selectedReceipt.supplier?.name || 'N/A'}</p>
-                  {selectedReceipt.supplier?.code && <p className="text-[#64748B] font-mono mt-0.5">Code: {selectedReceipt.supplier.code}</p>}
-                </div>
-                <div>
-                  <p className="text-[#94A3B8] uppercase font-semibold">Warehouse / Destination</p>
-                  <p className="font-semibold text-[#1E293B] mt-0.5">{selectedReceipt.store?.name || 'N/A'}</p>
-                  {selectedReceipt.store?.code && <p className="text-[#64748B] font-mono mt-0.5">Code: {selectedReceipt.store.code}</p>}
-                </div>
-              </div>
-              <div>
-                <p className="text-xs font-bold text-[#334155] uppercase mb-2">Received Line Items</p>
-                <div className="border border-[#E2E8F0] rounded-lg overflow-hidden bg-white">
-                  <table className="w-full text-xs">
-                    <thead>
-                      <tr className="bg-[#F8FAFC] border-b border-[#E2E8F0]">
-                        <th className="py-2 px-3 text-left font-semibold text-[#64748B]">Item</th>
-                        <th className="py-2 px-3 text-right font-semibold text-[#64748B]">Quantity</th>
-                        <th className="py-2 px-3 text-right font-semibold text-[#64748B]">Unit Cost</th>
-                        <th className="py-2 px-3 text-right font-semibold text-[#64748B]">Total Cost</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {(selectedReceipt.lines || []).map((line: any, i: number) => (
-                        <tr key={i} className="border-b border-[#F8FAFC]">
-                          <td className="py-2.5 px-3">
-                            <p className="font-medium text-[#1E293B]">{line.item?.name || 'Unknown Item'}</p>
-                            <p className="text-[#94A3B8] font-mono">{line.item?.code}</p>
-                          </td>
-                          <td className="py-2.5 px-3 text-right font-semibold text-[#16A34A]">{line.quantity}</td>
-                          <td className="py-2.5 px-3 text-right font-mono">${Number(line.unitCost || 0).toFixed(2)}</td>
-                          <td className="py-2.5 px-3 text-right font-bold font-mono text-[#1E293B]">${Number(line.totalCost || (line.quantity * line.unitCost) || 0).toFixed(2)}</td>
-                        </tr>
-                      ))}
-                      {(!selectedReceipt.lines || selectedReceipt.lines.length === 0) && (
-                        <tr><td colSpan={4} className="py-4 text-center text-[#94A3B8]">No items received on this record</td></tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-              <div className="mt-4 pt-4 border-t border-[#E2E8F0] flex justify-between items-center text-xs">
-                <div>
-                  <span className="text-[#94A3B8]">Document Status: </span>
-                  {statusBadge(selectedReceipt.status)}
-                </div>
-                <div className="font-bold font-mono text-sm text-[#0F172A]">
-                  Total Value: ${Number(selectedReceipt.totalAmount || 0).toFixed(2)}
-                </div>
-              </div>
-            </div>
-            <div className="flex justify-end gap-2">
-              <Button variant="secondary" onClick={() => setShowGrnModal(false)}>Close</Button>
-            </div>
-          </div>
-        </Modal>
-      )}
+      {/* STANDARDIZED GRN SHEET MODAL */}
+      <GrnSheetModal open={showGrnModal} onClose={() => setShowGrnModal(false)} receipt={selectedReceipt} />
     </div>
   )
 }

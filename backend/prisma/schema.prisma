@@ -83,10 +83,12 @@ model User {
   approvedSIVs             SIV[]         @relation("SIVApprovedBy")
   issuedToSIVs             SIV[]         @relation("SIVIssuedTo")
 
-  // BE-114: returns requested / evaluated / approved by this user
-  returnsRequested Return[] @relation("ReturnRequestedBy")
-  returnsEvaluated Return[] @relation("ReturnEvaluatedBy")
-  returnsApproved  Return[] @relation("ReturnApprovedBy")
+  // BE-114: returns requested / evaluated / approved / assigned by this user
+  returnsRequested   Return[] @relation("ReturnRequestedBy")
+  returnsEvaluated   Return[] @relation("ReturnEvaluatedBy")
+  returnsApproved    Return[] @relation("ReturnApprovedBy")
+  returnsAssignedTec Return[] @relation("ReturnAssignedTec")
+  returnTecMembers   ReturnTecMember[] @relation("ReturnTecMembers")
 
   // BE-121: transfers requested / approved by this user
   transfersRequested   TransferRequest[] @relation("TransferRequestedBy")
@@ -118,6 +120,14 @@ model User {
 
   // BE-150: audit events for this user
   auditEvents AuditEvent[]
+
+  // Fixed Asset Returns
+  assetReturnsCustodied     AssetReturn[]           @relation("AssetReturnCustodian")
+  assetReturnsRequested     AssetReturn[]           @relation("AssetReturnRequester")
+  assetReturnsAssigned      AssetReturn[]           @relation("AssetReturnAssignedBy")
+  assetReturnsApproved      AssetReturn[]           @relation("AssetReturnApprovedBy")
+  assetReturnTecAssignments AssetReturnTecMember[]  @relation("AssetReturnTecUser")
+  assetReturnInspections    AssetReturnInspection[] @relation("AssetReturnInspector")
 
   @@map("users")
 }
@@ -1114,6 +1124,8 @@ model Return {
   status           ReturnStatus        @default(DRAFT)
   reason           String
   evaluationResult EvaluationDecision? @map("evaluation_result")
+  assignedTecId    String?             @map("assigned_tec_id")
+  assignedAt       DateTime?           @map("assigned_at")
   evaluatedBy      String?             @map("evaluated_by")
   evaluatedAt      DateTime?           @map("evaluated_at")
   approvedBy       String?             @map("approved_by")
@@ -1128,8 +1140,10 @@ model Return {
   siv             SIV          @relation(fields: [sivId], references: [id], onDelete: Restrict)
   requestedByUser User         @relation("ReturnRequestedBy", fields: [requestedById], references: [id], onDelete: Restrict)
   store           Store        @relation(fields: [storeId], references: [id], onDelete: Restrict)
+  assignedTecUser User?        @relation("ReturnAssignedTec", fields: [assignedTecId], references: [id], onDelete: SetNull)
   evaluatedByUser User?        @relation("ReturnEvaluatedBy", fields: [evaluatedBy], references: [id], onDelete: SetNull)
   approvedByUser  User?        @relation("ReturnApprovedBy", fields: [approvedBy], references: [id], onDelete: SetNull)
+  assignedTecMembers ReturnTecMember[]
   lines           ReturnLine[]
 
   @@index([returnNumber])
@@ -1157,6 +1171,25 @@ model ReturnLine {
   @@index([returnId])
   @@index([itemId])
   @@map("return_lines")
+}
+
+model ReturnTecMember {
+  id             String    @id @default(uuid())
+  returnId       String    @map("return_id")
+  userId         String    @map("user_id")
+  assignedAt     DateTime  @default(now()) @map("assigned_at")
+  isEvaluated    Boolean   @default(false) @map("is_evaluated")
+  evaluatedAt    DateTime? @map("evaluated_at")
+  remarks        String?
+  recommendation String?
+
+  return Return @relation(fields: [returnId], references: [id], onDelete: Cascade)
+  user   User   @relation("ReturnTecMembers", fields: [userId], references: [id], onDelete: Restrict)
+
+  @@unique([returnId, userId], name: "uq_return_tec_member")
+  @@index([returnId])
+  @@index([userId])
+  @@map("return_tec_members")
 }
 
 // ────────────────────────────────────────────────────────────────
@@ -1292,6 +1325,7 @@ model FixedAsset {
   location      Location?      @relation(fields: [locationId], references: [id], onDelete: SetNull)
   sivLines      SIVLine[]
   transferLines TransferLine[]
+  assetReturns  AssetReturn[]
 
   @@index([assetTag])
   @@index([status])
@@ -1299,6 +1333,132 @@ model FixedAsset {
   @@index([custodianId])
   @@index([departmentId])
   @@map("fixed_assets")
+}
+
+// ────────────────────────────────────────────────────────────────
+// Asset Return Models (Directive 1095/2017 & Stock Management Manual)
+//
+// Design notes:
+// - Supports fixed asset return from custodian to organization/property administration.
+// - Technical Evaluation Committee (TEC) assignment and condition inspection.
+// - Return decisions: ACCEPT_RETURN, ACCEPT_WITH_REPAIR, REJECT_RETURN, RECOMMEND_DISPOSAL.
+// ────────────────────────────────────────────────────────────────
+enum AssetReturnStatus {
+  SUBMITTED
+  PENDING_INSPECTION
+  UNDER_INSPECTION
+  ACCEPTED
+  ACCEPTED_WITH_REPAIR
+  REJECTED
+  CANCELLED
+}
+
+enum AssetReturnDecision {
+  ACCEPT_RETURN
+  ACCEPT_WITH_REPAIR
+  REJECT_RETURN
+  RECOMMEND_DISPOSAL
+}
+
+enum AssetPhysicalCondition {
+  EXCELLENT
+  GOOD
+  FAIR
+  POOR
+  DAMAGED
+}
+
+enum AssetTechnicalCondition {
+  OPERATIONAL
+  PARTIALLY_OPERATIONAL
+  NON_OPERATIONAL
+}
+
+model AssetReturn {
+  id                String              @id @default(uuid())
+  returnNumber      String              @unique @map("return_number")
+  assetId           String              @map("asset_id")
+  custodianId       String              @map("custodian_id")
+  requestedById     String              @map("requested_by_id")
+  status            AssetReturnStatus   @default(PENDING_INSPECTION)
+  reason            String
+  notes             String?
+  assignedById      String?             @map("assigned_by_id")
+  assignedAt        DateTime?           @map("assigned_at")
+  disposalRequestId String?             @map("disposal_request_id")
+  approvedById      String?             @map("approved_by_id")
+  approvedAt        DateTime?           @map("approved_at")
+  approvalNotes     String?             @map("approval_notes")
+  finalDecision     AssetReturnDecision? @map("final_decision")
+  createdAt         DateTime            @default(now()) @map("created_at")
+  updatedAt         DateTime            @updatedAt @map("updated_at")
+
+  asset              FixedAsset             @relation(fields: [assetId], references: [id], onDelete: Restrict)
+  custodian          User                   @relation("AssetReturnCustodian", fields: [custodianId], references: [id], onDelete: Restrict)
+  requestedByUser    User                   @relation("AssetReturnRequester", fields: [requestedById], references: [id], onDelete: Restrict)
+  assignedByUser     User?                  @relation("AssetReturnAssignedBy", fields: [assignedById], references: [id], onDelete: SetNull)
+  approvedByUser     User?                  @relation("AssetReturnApprovedBy", fields: [approvedById], references: [id], onDelete: SetNull)
+  assignedTecMembers AssetReturnTecMember[]
+  inspection         AssetReturnInspection?
+  disposalRequest    DisposalRequest?       @relation(fields: [disposalRequestId], references: [id], onDelete: SetNull)
+
+  @@index([returnNumber])
+  @@index([assetId])
+  @@index([custodianId])
+  @@index([status])
+  @@map("asset_returns")
+}
+
+model AssetReturnTecMember {
+  id                   String                   @id @default(uuid())
+  assetReturnId        String                   @map("asset_return_id")
+  userId               String                   @map("user_id")
+  assignedAt           DateTime                 @default(now()) @map("assigned_at")
+  isEvaluated          Boolean                  @default(false) @map("is_evaluated")
+  evaluatedAt          DateTime?                @map("evaluated_at")
+  physicalCondition    AssetPhysicalCondition?  @map("physical_condition")
+  technicalCondition   AssetTechnicalCondition? @map("technical_condition")
+  isComplete           Boolean?                 @default(true) @map("is_complete")
+  serialNumberVerified Boolean?                 @default(true) @map("serial_number_verified")
+  assetTagVerified     Boolean?                 @default(true) @map("asset_tag_verified")
+  observedDamage       String?                  @map("observed_damage")
+  missingAccessories   String?                  @map("missing_accessories")
+  remarks              String?
+  recommendation       AssetReturnDecision?
+
+  assetReturn AssetReturn @relation(fields: [assetReturnId], references: [id], onDelete: Cascade)
+  user        User        @relation("AssetReturnTecUser", fields: [userId], references: [id], onDelete: Restrict)
+
+  @@unique([assetReturnId, userId], name: "uq_asset_return_tec")
+  @@index([assetReturnId])
+  @@index([userId])
+  @@map("asset_return_tec_members")
+}
+
+model AssetReturnInspection {
+  id                   String                  @id @default(uuid())
+  assetReturnId        String                  @unique @map("asset_return_id")
+  inspectorId          String                  @map("inspector_id")
+  inspectionDate       DateTime                @default(now()) @map("inspection_date")
+  physicalCondition    AssetPhysicalCondition  @map("physical_condition")
+  technicalCondition   AssetTechnicalCondition @map("technical_condition")
+  isComplete           Boolean                 @default(true) @map("is_complete")
+  serialNumberVerified Boolean                 @default(true) @map("serial_number_verified")
+  assetTagVerified     Boolean                 @default(true) @map("asset_tag_verified")
+  observedDamage       String?                 @map("observed_damage")
+  missingAccessories   String?                 @map("missing_accessories")
+  remarks              String?
+  recommendation       String?
+  decision             AssetReturnDecision
+  createdAt            DateTime                @default(now()) @map("created_at")
+  updatedAt            DateTime                @updatedAt @map("updated_at")
+
+  assetReturn AssetReturn @relation(fields: [assetReturnId], references: [id], onDelete: Cascade)
+  inspector   User        @relation("AssetReturnInspector", fields: [inspectorId], references: [id], onDelete: Restrict)
+
+  @@index([assetReturnId])
+  @@index([inspectorId])
+  @@map("asset_return_inspections")
 }
 
 // ────────────────────────────────────────────────────────────────
@@ -1412,6 +1572,7 @@ model DisposalRequest {
   approvedByUser  User?                 @relation("DisposalApprovedBy", fields: [approvedBy], references: [id], onDelete: SetNull)
   executedByUser  User?                 @relation("DisposalExecutedBy", fields: [executedBy], references: [id], onDelete: SetNull)
   lines           DisposalRequestLine[]
+  assetReturns    AssetReturn[]
 
   @@index([disposalNumber])
   @@index([status])

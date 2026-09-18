@@ -20,12 +20,18 @@ export const HTTP_STATUS = Object.freeze({
 })
 
 export const sendSuccess = (res, data, statusCode = HTTP_STATUS.OK, meta = null) => {
+  let code = statusCode
+  let metadata = meta
+  if (typeof statusCode === 'string') {
+    metadata = statusCode
+    code = HTTP_STATUS.OK
+  }
   const payload = {
     success: true,
     data,
-    ...(meta && { meta }),
+    ...(metadata && { meta: metadata }),
   }
-  return res.status(statusCode).json(payload)
+  return res.status(code).json(payload)
 }
 
 export const sendCreated = (res, data, meta = null) => {

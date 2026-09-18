@@ -1,9 +1,6 @@
-/**
- * Goods Receiving Note (GRN) Service
- * BE-150: Notification events integrated — all calls are fire-and-forget.
- */
 import { PrismaClient } from '@prisma/client';
 import { NotFoundError, ValidationError } from '../../utils/errors.js';
+import goodsReceiptService from './goods-receipt.service.js';
 import {
   notifyGRNCreated,
   notifyGoodsReceiptEvaluationRequired,
@@ -22,8 +19,8 @@ class GRNService {
       throw new NotFoundError('Goods receipt not found');
     }
 
-    if (receipt.status !== 'APPROVED') {
-      throw new ValidationError('Goods receipt must be APPROVED to create GRN');
+    if (receipt.status !== 'APPROVED' && receipt.status !== 'EVALUATED') {
+      throw new ValidationError('Goods receipt must be EVALUATED or APPROVED to create GRN');
     }
 
     const existingGRN = await prisma.gRN.findUnique({
@@ -41,6 +38,9 @@ class GRNService {
         grnNumber,
         goodsReceiptId: grnData.goodsReceiptId,
         notes: grnData.notes,
+        status: 'FINALIZED',
+        finalizedDate: new Date(),
+        finalizedBy: userId,
       },
       include: {
         goodsReceipt: {
@@ -57,6 +57,27 @@ class GRNService {
         },
       },
     });
+
+    // Update GoodsReceipt status to APPROVED now that PAO has authorized the Model 19 GRN
+    await prisma.goodsReceipt.update({
+      where: { id: grnData.goodsReceiptId },
+      data: { status: 'APPROVED' },
+    });
+
+    // Execute stock card transaction postings now that inspection has passed and GRN is created
+    const fullReceipt = await prisma.goodsReceipt.findUnique({
+      where: { id: grnData.goodsReceiptId },
+      include: { lines: true },
+    });
+    if (fullReceipt?.lines) {
+      for (const line of fullReceipt.lines) {
+        try {
+          await goodsReceiptService.postReceiptTransaction(fullReceipt, line, userId);
+        } catch (err) {
+          console.error('Failed to post receipt transaction during GRN creation:', err.message);
+        }
+      }
+    }
 
     // BE-150: Notify STOREKEEPER + ACCOUNTANT of new GRN — fire-and-forget
     notifyGRNCreated({

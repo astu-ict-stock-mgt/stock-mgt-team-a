@@ -170,6 +170,7 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
   // PAO: Property Administration Officer — supervision, approvals, master data per SRS Appendix C
   // PAO does NOT manage users — user management is ADMIN-only
   PAO: [
+    PERMISSIONS.USERS_READ,
     PERMISSIONS.STORES_MANAGE,
     PERMISSIONS.STORES_READ,
     PERMISSIONS.DEPARTMENTS_MANAGE,
