@@ -1,0 +1,952 @@
+// Stock Management System — DBML for dbdiagram.io
+// Docs: https://dbdiagram.io/docs
+// Generated from Prisma schema.prisma
+
+// ────────────────────────────────────────────────────
+// ENUMS
+// ────────────────────────────────────────────────────
+
+Enum UserStatus {
+  ACTIVE
+  INACTIVE
+}
+
+Enum CategoryStatus {
+  ACTIVE
+  INACTIVE
+}
+
+Enum UnitStatus {
+  ACTIVE
+  INACTIVE
+}
+
+Enum SupplierStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+}
+
+Enum SupplierType {
+  COMPANY
+  DONOR
+  GOVERNMENT
+  NGO
+}
+
+Enum ItemStatus {
+  ACTIVE
+  INACTIVE
+  DISCONTINUED
+}
+
+Enum StoreType {
+  MAIN_STORE
+  DEPARTMENT_STORE
+  WAREHOUSE
+  TRANSIT_STORE
+  QUARANTINE_STORE
+  CAFE_STORE
+}
+
+Enum StoreStatus {
+  ACTIVE
+  INACTIVE
+}
+
+Enum DepartmentStatus {
+  ACTIVE
+  INACTIVE
+}
+
+Enum LocationType {
+  STORE
+  AREA
+  SHELF
+  RACK
+  BIN
+}
+
+Enum LocationStatus {
+  ACTIVE
+  INACTIVE
+}
+
+Enum GoodsReceiptStatus {
+  DRAFT
+  PENDING_EVALUATION
+  EVALUATED
+  APPROVED
+  REJECTED
+}
+
+Enum EvaluationStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+}
+
+Enum EvaluationDecision {
+  APPROVED
+  REJECTED
+  CONDITIONAL
+}
+
+Enum GRNStatus {
+  DRAFT
+  APPROVED
+  FINALIZED
+  CANCELLED
+}
+
+Enum TransactionType {
+  RECEIPT
+  ISSUE
+  TRANSFER
+  TRANSFER_IN
+  TRANSFER_OUT
+  ADJUSTMENT
+  RETURN
+  DISPOSAL
+}
+
+Enum RequisitionStatus {
+  DRAFT
+  SUBMITTED
+  DEPARTMENT_APPROVED
+  DEPARTMENT_REJECTED
+  PAO_APPROVED
+  PAO_REJECTED
+  CANCELLED
+  COMPLETED
+  PARTIALLY_ISSUED
+}
+
+Enum SIVStatus {
+  DRAFT
+  PREPARED
+  APPROVED
+  FINALIZED
+  CANCELLED
+}
+
+Enum ReturnStatus {
+  DRAFT
+  SUBMITTED
+  UNDER_EVALUATION
+  APPROVED
+  REJECTED
+  RECEIVED
+  DISPOSITIONED
+  CLOSED
+}
+
+Enum ReturnDisposition {
+  RESTOCK
+  QUARANTINE
+  REPAIR
+  DISPOSAL
+  REPLACEMENT
+}
+
+Enum TransferType {
+  STORE_TO_STORE
+  DEPARTMENT_TO_DEPARTMENT
+  WAREHOUSE_TO_STORE
+}
+
+Enum TransferStatus {
+  DRAFT
+  PENDING_APPROVAL
+  APPROVED
+  IN_TRANSIT
+  COMPLETED
+  CANCELLED
+}
+
+Enum AssetStatus {
+  REGISTERED
+  IN_USE
+  UNDER_REPAIR
+  RETIRED
+  DISPOSED
+}
+
+Enum ShelfLifeStatus {
+  HEALTHY
+  APPROACHING_EXPIRY
+  EXPIRED
+  DISPOSED
+}
+
+Enum DisposalMethod {
+  DESTRUCTION
+  DONATION
+  SALE
+  RECYCLING
+  OTHER
+}
+
+Enum DisposalStatus {
+  DRAFT
+  UNDER_EVALUATION
+  APPROVED
+  REJECTED
+  EXECUTED
+  COMPLETED
+}
+
+Enum ReconciliationStatus {
+  DRAFT
+  SUBMITTED
+  PENDING_APPROVAL
+  APPROVED
+  REJECTED
+  POSTED
+  CANCELLED
+}
+
+Enum StockTakeStatus {
+  PLANNED
+  IN_PROGRESS
+  COMPLETED
+  RECONCILED
+  CANCELLED
+}
+
+// ────────────────────────────────────────────────────
+// TABLES
+// ────────────────────────────────────────────────────
+
+Table system_settings {
+  id UUID [pk]
+  key VARCHAR [unique, not null]
+  value VARCHAR [not null]
+  created_at TIMESTAMP
+  updated_at TIMESTAMP
+}
+
+Table users {
+  id UUID [pk]
+  email VARCHAR [unique, not null]
+  password_hash VARCHAR [not null]
+  full_name VARCHAR [not null]
+  status UserStatus [default: 'ACTIVE']
+  created_at TIMESTAMP
+  updated_at TIMESTAMP
+}
+
+Table categories {
+  id UUID [pk]
+  code VARCHAR [unique, not null]
+  name VARCHAR [not null]
+  parent_id UUID
+  status CategoryStatus [default: 'ACTIVE']
+  description VARCHAR
+  created_at TIMESTAMP
+  updated_at TIMESTAMP
+}
+
+Table units {
+  id UUID [pk]
+  code VARCHAR [unique, not null]
+  name VARCHAR [not null]
+  symbol VARCHAR [not null]
+  conversion_factor FLOAT
+  status UnitStatus [default: 'ACTIVE']
+  description VARCHAR
+  created_at TIMESTAMP
+  updated_at TIMESTAMP
+}
+
+Table suppliers {
+  id UUID [pk]
+  code VARCHAR [unique, not null]
+  name VARCHAR [not null]
+  type SupplierType [default: 'COMPANY']
+  status SupplierStatus [default: 'ACTIVE']
+  contact_person VARCHAR
+  email VARCHAR
+  phone VARCHAR
+  address VARCHAR
+  tax_id VARCHAR
+  payment_terms VARCHAR
+  lead_time_days INT
+  rating FLOAT
+  notes VARCHAR
+  created_at TIMESTAMP
+  updated_at TIMESTAMP
+}
+
+Table items {
+  id UUID [pk]
+  code VARCHAR [unique, not null]
+  name VARCHAR [not null]
+  description VARCHAR
+  category_id UUID
+  unit_id UUID [not null]
+  supplier_id UUID
+  status ItemStatus [default: 'ACTIVE']
+  minimum_stock INT
+  maximum_stock INT
+  reorder_point INT
+  unit_cost DECIMAL
+  weight VARCHAR
+  dimensions VARCHAR
+  barcode VARCHAR
+  created_at TIMESTAMP
+  updated_at TIMESTAMP
+}
+
+Table roles {
+  id UUID [pk]
+  code VARCHAR [unique, not null]
+  name VARCHAR [not null]
+  description VARCHAR
+  security_level INT [default: 10]
+  created_at TIMESTAMP
+  updated_at TIMESTAMP
+}
+
+Table user_roles {
+  id UUID [pk]
+  user_id UUID [not null]
+  role_id UUID [not null]
+  assigned_by UUID
+  assigned_at TIMESTAMP
+  created_at TIMESTAMP
+  updated_at TIMESTAMP
+}
+
+Table permissions {
+  id UUID [pk]
+  code VARCHAR [unique, not null]
+  name VARCHAR [not null]
+  description VARCHAR
+  created_at TIMESTAMP
+  updated_at TIMESTAMP
+}
+
+Table role_permissions {
+  id UUID [pk]
+  role_id UUID [not null]
+  permission_id UUID [not null]
+  created_at TIMESTAMP
+}
+
+Table stores {
+  id UUID [pk]
+  code VARCHAR [unique, not null]
+  name VARCHAR [not null]
+  type StoreType [default: 'MAIN_STORE']
+  status StoreStatus [default: 'ACTIVE']
+  description VARCHAR
+  address VARCHAR
+  responsible_officer_id UUID
+  created_at TIMESTAMP
+  updated_at TIMESTAMP
+}
+
+Table departments {
+  id UUID [pk]
+  code VARCHAR [unique, not null]
+  name VARCHAR [not null]
+  status DepartmentStatus [default: 'ACTIVE']
+  description VARCHAR
+  head_user_id UUID
+  created_at TIMESTAMP
+  updated_at TIMESTAMP
+}
+
+Table store_departments {
+  id UUID [pk]
+  store_id UUID [not null]
+  department_id UUID [not null]
+  is_primary BOOLEAN [default: false]
+  created_at TIMESTAMP
+  updated_at TIMESTAMP
+}
+
+Table locations {
+  id UUID [pk]
+  code VARCHAR [unique, not null]
+  name VARCHAR [not null]
+  type LocationType [default: 'BIN']
+  store_id UUID [not null]
+  parent_id UUID
+  status LocationStatus [default: 'ACTIVE']
+  capacity INT
+  description VARCHAR
+  created_at TIMESTAMP
+  updated_at TIMESTAMP
+}
+
+Table goods_receipts {
+  id UUID [pk]
+  receipt_number VARCHAR [unique, not null]
+  supplier_id UUID [not null]
+  store_id UUID [not null]
+  department_id UUID
+  purchase_order_number VARCHAR
+  status GoodsReceiptStatus [default: 'DRAFT']
+  received_date TIMESTAMP
+  received_by UUID [not null]
+  notes VARCHAR
+  total_amount DECIMAL
+  currency VARCHAR [default: 'ETB']
+  created_at TIMESTAMP
+  updated_at TIMESTAMP
+}
+
+Table goods_receipt_lines {
+  id UUID [pk]
+  goods_receipt_id UUID [not null]
+  item_id UUID [not null]
+  unit_id UUID [not null]
+  location_id UUID
+  quantity INT [not null]
+  unit_cost DECIMAL [not null]
+  total_cost DECIMAL [not null]
+  condition VARCHAR
+  batch_number VARCHAR
+  expiry_date TIMESTAMP
+  notes VARCHAR
+  created_at TIMESTAMP
+  updated_at TIMESTAMP
+}
+
+Table technical_evaluations {
+  id UUID [pk]
+  goods_receipt_id UUID [not null]
+  evaluator_id UUID [not null]
+  status EvaluationStatus [default: 'PENDING']
+  decision EvaluationDecision
+  decision_date TIMESTAMP
+  notes VARCHAR
+  created_at TIMESTAMP
+  updated_at TIMESTAMP
+}
+
+Table grns {
+  id UUID [pk]
+  grn_number VARCHAR [unique, not null]
+  goods_receipt_id UUID [unique, not null]
+  status GRNStatus [default: 'DRAFT']
+  approved_by UUID
+  approved_at TIMESTAMP
+  finalized_date TIMESTAMP
+  finalized_by UUID
+  notes VARCHAR
+  created_at TIMESTAMP
+  updated_at TIMESTAMP
+}
+
+Table stock_cards {
+  id UUID [pk]
+  item_id UUID [not null]
+  store_id UUID [not null]
+  quantity INT [default: 0]
+  reserved_qty INT [default: 0]
+  available_qty INT [default: 0]
+  average_cost DECIMAL
+  last_movement_at TIMESTAMP
+  created_at TIMESTAMP
+  updated_at TIMESTAMP
+}
+
+Table stock_card_transactions {
+  id UUID [pk]
+  stock_card_id UUID [not null]
+  transaction_type TransactionType [not null]
+  quantity INT [not null]
+  balance_after INT
+  reference_type VARCHAR
+  reference_id VARCHAR
+  reference_number VARCHAR
+  notes VARCHAR
+  created_by UUID [not null]
+  created_at TIMESTAMP
+}
+
+Table stock_batches {
+  id UUID [pk]
+  stock_card_id UUID [not null]
+  receipt_line_id UUID
+  original_qty INT [not null]
+  remaining_qty INT [not null]
+  unit_cost DECIMAL [not null]
+  received_at TIMESTAMP
+  created_at TIMESTAMP
+  updated_at TIMESTAMP
+}
+
+Table bin_cards {
+  id UUID [pk]
+  item_id UUID [not null]
+  location_id UUID [not null]
+  quantity INT [default: 0]
+  last_movement_at TIMESTAMP
+  created_at TIMESTAMP
+  updated_at TIMESTAMP
+}
+
+Table bin_transactions {
+  id UUID [pk]
+  bin_card_id UUID [not null]
+  transaction_type TransactionType [not null]
+  quantity INT [not null]
+  reference_type VARCHAR
+  reference_id VARCHAR
+  reference_number VARCHAR
+  notes VARCHAR
+  created_by UUID [not null]
+  created_at TIMESTAMP
+}
+
+Table requisitions {
+  id UUID [pk]
+  requisition_number VARCHAR [unique, not null]
+  requester_id UUID [not null]
+  department_id UUID [not null]
+  store_id UUID [not null]
+  status RequisitionStatus [default: 'DRAFT']
+  purpose VARCHAR [not null]
+  rejection_reason VARCHAR
+  department_approved_at TIMESTAMP
+  department_approved_by UUID
+  pao_approved_at TIMESTAMP
+  pao_approved_by UUID
+  created_at TIMESTAMP
+  updated_at TIMESTAMP
+}
+
+Table requisition_lines {
+  id UUID [pk]
+  requisition_id UUID [not null]
+  item_id UUID [not null]
+  requested_quantity INT [not null]
+  approved_quantity INT
+  issued_quantity INT [default: 0]
+  remarks VARCHAR
+  created_at TIMESTAMP
+  updated_at TIMESTAMP
+}
+
+Table sivs {
+  id UUID [pk]
+  siv_number VARCHAR [unique, not null]
+  requisition_id UUID [not null]
+  store_id UUID [not null]
+  issued_to_user_id UUID [not null]
+  status SIVStatus [default: 'DRAFT']
+  issue_date TIMESTAMP
+  prepared_by UUID [not null]
+  approved_by UUID
+  notes VARCHAR
+  created_at TIMESTAMP
+  updated_at TIMESTAMP
+}
+
+Table siv_lines {
+  id UUID [pk]
+  siv_id UUID [not null]
+  item_id UUID [not null]
+  quantity_issued INT [not null]
+  unit_cost DECIMAL
+  total_cost DECIMAL
+  remarks VARCHAR
+  created_at TIMESTAMP
+  updated_at TIMESTAMP
+}
+
+Table returns {
+  id UUID [pk]
+  return_number VARCHAR [unique, not null]
+  siv_id UUID [not null]
+  requested_by UUID [not null]
+  store_id UUID [not null]
+  status ReturnStatus [default: 'DRAFT']
+  reason VARCHAR [not null]
+  evaluation_result EvaluationDecision
+  evaluated_by UUID
+  evaluated_at TIMESTAMP
+  approved_by UUID
+  approved_at TIMESTAMP
+  rejection_reason VARCHAR
+  disposition ReturnDisposition
+  received_at TIMESTAMP
+  notes VARCHAR
+  created_at TIMESTAMP
+  updated_at TIMESTAMP
+}
+
+Table return_lines {
+  id UUID [pk]
+  return_id UUID [not null]
+  item_id UUID [not null]
+  returned_quantity INT [not null]
+  accepted_quantity INT
+  remarks VARCHAR
+  created_at TIMESTAMP
+  updated_at TIMESTAMP
+}
+
+Table transfer_requests {
+  id UUID [pk]
+  transfer_number VARCHAR [unique, not null]
+  transfer_type TransferType [default: 'STORE_TO_STORE']
+  status TransferStatus [default: 'DRAFT']
+  source_store_id UUID [not null]
+  destination_store_id UUID [not null]
+  source_location_id UUID
+  destination_location_id UUID
+  requested_by UUID [not null]
+  approved_by UUID
+  approved_at TIMESTAMP
+  notes VARCHAR
+  created_at TIMESTAMP
+  updated_at TIMESTAMP
+}
+
+Table transfer_lines {
+  id UUID [pk]
+  transfer_id UUID [not null]
+  item_id UUID [not null]
+  quantity_requested INT [not null]
+  quantity_transferred INT [default: 0]
+  remarks VARCHAR
+  created_at TIMESTAMP
+  updated_at TIMESTAMP
+}
+
+Table fixed_assets {
+  id UUID [pk]
+  asset_tag VARCHAR [unique, not null]
+  name VARCHAR [not null]
+  item_id UUID
+  grn_id UUID
+  serial_number VARCHAR
+  category VARCHAR
+  status AssetStatus [default: 'REGISTERED']
+  custodian_id UUID
+  department_id UUID
+  location_id UUID
+  purchase_date TIMESTAMP
+  purchase_cost DECIMAL
+  current_value DECIMAL
+  notes VARCHAR
+  created_at TIMESTAMP
+  updated_at TIMESTAMP
+}
+
+Table shelflife_records {
+  id UUID [pk]
+  item_id UUID [not null]
+  batch_number VARCHAR [not null]
+  quantity INT [not null]
+  expiry_date TIMESTAMP [not null]
+  alert_days_before_expiry INT [default: 30]
+  status ShelfLifeStatus [default: 'HEALTHY']
+  store_id UUID
+  location_id UUID
+  notes VARCHAR
+  created_at TIMESTAMP
+  updated_at TIMESTAMP
+}
+
+Table disposal_requests {
+  id UUID [pk]
+  disposal_number VARCHAR [unique, not null]
+  disposal_method DisposalMethod [not null]
+  status DisposalStatus [default: 'DRAFT']
+  store_id UUID
+  requested_by UUID [not null]
+  evaluated_by UUID
+  evaluated_at TIMESTAMP
+  approved_by UUID
+  approved_at TIMESTAMP
+  executed_by UUID
+  executed_at TIMESTAMP
+  reason VARCHAR
+  notes VARCHAR
+  created_at TIMESTAMP
+  updated_at TIMESTAMP
+}
+
+Table disposal_request_lines {
+  id UUID [pk]
+  disposal_request_id UUID [not null]
+  item_id UUID [not null]
+  location_id UUID
+  quantity INT [not null]
+  unit_cost DECIMAL
+  total_cost DECIMAL
+  condition VARCHAR
+  batch_number VARCHAR
+  expiry_date TIMESTAMP
+  remarks VARCHAR
+  status VARCHAR [default: 'PENDING']
+  created_at TIMESTAMP
+  updated_at TIMESTAMP
+}
+
+Table reconciliations {
+  id UUID [pk]
+  reconciliation_no VARCHAR [unique, not null]
+  store_id UUID [not null]
+  status ReconciliationStatus [default: 'DRAFT']
+  count_date TIMESTAMP
+  reason VARCHAR
+  notes VARCHAR
+  initiated_by UUID [not null]
+  approved_by UUID
+  approved_at TIMESTAMP
+  posted_by UUID
+  posted_at TIMESTAMP
+  created_at TIMESTAMP
+  updated_at TIMESTAMP
+}
+
+Table reconciliation_lines {
+  id UUID [pk]
+  reconciliation_id UUID [not null]
+  item_id UUID [not null]
+  location_id UUID
+  system_quantity INT [not null]
+  physical_count INT [not null]
+  variance INT [default: 0]
+  unit_cost DECIMAL
+  variance_value DECIMAL
+  remarks VARCHAR
+  created_at TIMESTAMP
+  updated_at TIMESTAMP
+}
+
+Table stock_takes {
+  id UUID [pk]
+  stock_take_number VARCHAR [unique, not null]
+  store_id UUID [not null]
+  status StockTakeStatus [default: 'PLANNED']
+  scheduled_date TIMESTAMP [not null]
+  started_at TIMESTAMP
+  completed_at TIMESTAMP
+  reconciled_at TIMESTAMP
+  initiated_by UUID [not null]
+  completed_by UUID
+  reconciled_by UUID
+  notes VARCHAR
+  created_at TIMESTAMP
+  updated_at TIMESTAMP
+}
+
+Table stock_take_lines {
+  id UUID [pk]
+  stock_take_id UUID [not null]
+  item_id UUID [not null]
+  location_id UUID
+  book_quantity INT [not null]
+  physical_count INT
+  variance INT [default: 0]
+  variance_reason VARCHAR
+  counted_by UUID
+  counted_at TIMESTAMP
+  created_at TIMESTAMP
+  updated_at TIMESTAMP
+}
+
+Table notifications {
+  id UUID [pk]
+  user_id UUID [not null]
+  title VARCHAR [not null]
+  message VARCHAR [not null]
+  type VARCHAR [default: 'INFO']
+  priority VARCHAR [default: 'MEDIUM']
+  reference_id VARCHAR
+  reference_type VARCHAR
+  is_read BOOLEAN [default: false]
+  read_at TIMESTAMP
+  created_at TIMESTAMP
+}
+
+Table audit_events {
+  id UUID [pk]
+  event_type VARCHAR [not null]
+  user_id UUID
+  details VARCHAR
+  ip_address VARCHAR
+  user_agent VARCHAR
+  timestamp TIMESTAMP
+  created_at TIMESTAMP
+}
+
+// ────────────────────────────────────────────────────
+// RELATIONSHIPS
+// ────────────────────────────────────────────────────
+
+// --- Category hierarchy ---
+Ref: categories.parent_id > categories.id
+
+// --- Item relationships ---
+Ref: items.category_id > categories.id
+Ref: items.unit_id > units.id
+Ref: items.supplier_id > suppliers.id
+
+// --- User-Role join ---
+Ref: user_roles.user_id > users.id
+Ref: user_roles.role_id > roles.id
+Ref: user_roles.assigned_by > users.id
+
+// --- Role-Permission join ---
+Ref: role_permissions.role_id > roles.id
+Ref: role_permissions.permission_id > permissions.id
+
+// --- Store relationships ---
+Ref: stores.responsible_officer_id > users.id
+
+// --- Department relationships ---
+Ref: departments.head_user_id > users.id
+
+// --- Store-Department join ---
+Ref: store_departments.store_id > stores.id
+Ref: store_departments.department_id > departments.id
+
+// --- Location hierarchy ---
+Ref: locations.store_id > stores.id
+Ref: locations.parent_id > locations.id
+
+// --- Goods Receipt ---
+Ref: goods_receipts.supplier_id > suppliers.id
+Ref: goods_receipts.store_id > stores.id
+Ref: goods_receipts.department_id > departments.id
+Ref: goods_receipts.received_by > users.id
+
+// --- Goods Receipt Lines ---
+Ref: goods_receipt_lines.goods_receipt_id > goods_receipts.id
+Ref: goods_receipt_lines.item_id > items.id
+Ref: goods_receipt_lines.unit_id > units.id
+Ref: goods_receipt_lines.location_id > locations.id
+
+// --- Technical Evaluation ---
+Ref: technical_evaluations.goods_receipt_id > goods_receipts.id
+Ref: technical_evaluations.evaluator_id > users.id
+
+// --- GRN ---
+Ref: grns.goods_receipt_id > goods_receipts.id
+Ref: grns.approved_by > users.id
+Ref: grns.finalized_by > users.id
+
+// --- Stock Cards ---
+Ref: stock_cards.item_id > items.id
+Ref: stock_cards.store_id > stores.id
+
+// --- Stock Card Transactions ---
+Ref: stock_card_transactions.stock_card_id > stock_cards.id
+Ref: stock_card_transactions.created_by > users.id
+
+// --- Stock Batches ---
+Ref: stock_batches.stock_card_id > stock_cards.id
+
+// --- Bin Cards ---
+Ref: bin_cards.item_id > items.id
+Ref: bin_cards.location_id > locations.id
+
+// --- Bin Transactions ---
+Ref: bin_transactions.bin_card_id > bin_cards.id
+Ref: bin_transactions.created_by > users.id
+
+// --- Requisition ---
+Ref: requisitions.requester_id > users.id
+Ref: requisitions.department_id > departments.id
+Ref: requisitions.store_id > stores.id
+Ref: requisitions.department_approved_by > users.id
+Ref: requisitions.pao_approved_by > users.id
+
+// --- Requisition Lines ---
+Ref: requisition_lines.requisition_id > requisitions.id
+Ref: requisition_lines.item_id > items.id
+
+// --- SIV ---
+Ref: sivs.requisition_id > requisitions.id
+Ref: sivs.store_id > stores.id
+Ref: sivs.issued_to_user_id > users.id
+Ref: sivs.prepared_by > users.id
+Ref: sivs.approved_by > users.id
+
+// --- SIV Lines ---
+Ref: siv_lines.siv_id > sivs.id
+Ref: siv_lines.item_id > items.id
+
+// --- Returns ---
+Ref: returns.siv_id > sivs.id
+Ref: returns.requested_by > users.id
+Ref: returns.store_id > stores.id
+Ref: returns.evaluated_by > users.id
+Ref: returns.approved_by > users.id
+
+// --- Return Lines ---
+Ref: return_lines.return_id > returns.id
+Ref: return_lines.item_id > items.id
+
+// --- Transfer Requests ---
+Ref: transfer_requests.source_store_id > stores.id
+Ref: transfer_requests.destination_store_id > stores.id
+Ref: transfer_requests.source_location_id > locations.id
+Ref: transfer_requests.destination_location_id > locations.id
+Ref: transfer_requests.requested_by > users.id
+Ref: transfer_requests.approved_by > users.id
+
+// --- Transfer Lines ---
+Ref: transfer_lines.transfer_id > transfer_requests.id
+Ref: transfer_lines.item_id > items.id
+
+// --- Fixed Assets ---
+Ref: fixed_assets.item_id > items.id
+Ref: fixed_assets.grn_id > grns.id
+Ref: fixed_assets.custodian_id > users.id
+Ref: fixed_assets.department_id > departments.id
+Ref: fixed_assets.location_id > locations.id
+
+// --- Shelf Life ---
+Ref: shelflife_records.item_id > items.id
+Ref: shelflife_records.store_id > stores.id
+Ref: shelflife_records.location_id > locations.id
+
+// --- Disposal Requests ---
+Ref: disposal_requests.store_id > stores.id
+Ref: disposal_requests.requested_by > users.id
+Ref: disposal_requests.evaluated_by > users.id
+Ref: disposal_requests.approved_by > users.id
+Ref: disposal_requests.executed_by > users.id
+
+// --- Disposal Lines ---
+Ref: disposal_request_lines.disposal_request_id > disposal_requests.id
+Ref: disposal_request_lines.item_id > items.id
+Ref: disposal_request_lines.location_id > locations.id
+
+// --- Reconciliation ---
+Ref: reconciliations.store_id > stores.id
+Ref: reconciliations.initiated_by > users.id
+Ref: reconciliations.approved_by > users.id
+Ref: reconciliations.posted_by > users.id
+
+// --- Reconciliation Lines ---
+Ref: reconciliation_lines.reconciliation_id > reconciliations.id
+Ref: reconciliation_lines.item_id > items.id
+Ref: reconciliation_lines.location_id > locations.id
+
+// --- Stock Takes ---
+Ref: stock_takes.store_id > stores.id
+Ref: stock_takes.initiated_by > users.id
+Ref: stock_takes.completed_by > users.id
+Ref: stock_takes.reconciled_by > users.id
+
+// --- Stock Take Lines ---
+Ref: stock_take_lines.stock_take_id > stock_takes.id
+Ref: stock_take_lines.item_id > items.id
+Ref: stock_take_lines.location_id > locations.id
+
+// --- Notifications ---
+Ref: notifications.user_id > users.id
+
+// --- Audit Events ---
+Ref: audit_events.user_id > users.id

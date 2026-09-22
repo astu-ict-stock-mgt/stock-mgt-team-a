@@ -18,7 +18,7 @@ export default defineConfig({
     port: 5173,
     allowedHosts: true,
     headers: {
-      'Content-Security-Policy': "script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline';"
+      'Content-Security-Policy': "script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; connect-src 'self' http://localhost:3001 http://10.103.201.221:3001 ws://localhost:5173;"
     },
     proxy: {
       '/api': {

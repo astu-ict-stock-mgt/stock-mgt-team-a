@@ -8,6 +8,7 @@ import Inventory from "./screens/Inventory";
 import Categories from "./screens/Categories";
 import Units from "./screens/Units";
 import Stores from "./screens/Stores";
+import Departments from "./screens/Departments";
 import Suppliers from "./screens/Suppliers";
 import StockReceiving from "./screens/StockReceiving";
 import StockIssuing from "./screens/StockIssuing";
@@ -33,6 +34,7 @@ type Screen =
   | "categories"
   | "units"
   | "stores"
+  | "departments"
   | "stock-receiving"
   | "material-evaluation"
   | "stock-issuing"
@@ -75,6 +77,7 @@ const navGroups: NavGroup[] = [
       { id: "categories", label: "Categories", icon: Icons.dashboard },
       { id: "units", label: "Units", icon: Icons.dashboard },
       { id: "stores", label: "Stores", icon: Icons.dashboard },
+      { id: "departments", label: "Departments", icon: Icons.dashboard },
       { id: "suppliers", label: "Suppliers", icon: Icons.suppliers },
     ],
   },
@@ -124,6 +127,7 @@ const screenTitles: Record<Screen, string> = {
   "stock-tracking": "Stock Tracking",
   "stock-taking": "Stock Taking",
   "disposal-requests": "Material Disposal",
+  departments: "Department Management",
   returns: "Material Returns",
   users: "User Management",
   roles: "Roles & Permissions",
@@ -136,6 +140,7 @@ const screenTitles: Record<Screen, string> = {
 function LoginScreen({ onLogin }: { onLogin: (email: string, password: string) => Promise<void> }) {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -153,44 +158,76 @@ function LoginScreen({ onLogin }: { onLogin: (email: string, password: string) =
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#F8FAFC]">
-      <div className="w-full max-w-md p-8 bg-white rounded-2xl shadow-lg">
+    <div className="relative min-h-screen flex items-center justify-center overflow-hidden">
+      <div
+        className="absolute inset-0 bg-cover bg-center bg-no-repeat"
+        style={{ backgroundImage: "url('/login-bg.jpg')" }}
+      />
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
+      <div className="relative z-10 w-full max-w-md p-8 bg-[#0B1A2E]/80 backdrop-blur-md rounded-2xl shadow-2xl border border-[#1E3A5F]/50">
         <div className="text-center mb-8">
           <img src="/stock-management-logo.svg" alt="StockManager" className="w-12 h-12 mx-auto mb-4" />
-          <h1 className="text-2xl font-bold text-[#0F172A]">StockManager</h1>
-          <p className="text-sm text-[#64748B] mt-1">Sign in to your account</p>
+          <h1 className="text-2xl font-bold text-white">StockManager</h1>
+          <p className="text-sm text-[#8EACC8] mt-1">Sign in to your account</p>
         </div>
         {error && (
-          <div className="mb-5 p-3.5 bg-red-50 border border-red-200 text-red-600 rounded-xl text-xs font-medium flex items-center gap-2.5">
-            <span className="text-base shrink-0">⚠️</span>
+          <div className={`mb-5 p-3.5 rounded-xl text-xs font-medium flex items-center gap-2.5 ${
+            error.includes('connect') || error.includes('Network') || error.includes('server')
+              ? 'bg-amber-900/40 border border-amber-500/40 text-amber-300'
+              : 'bg-red-900/40 border border-red-500/40 text-red-300'
+          }`}>
+            <span className="text-base shrink-0">
+              {error.includes('connect') || error.includes('Network') || error.includes('server') ? '🌐' : '⚠️'}
+            </span>
             <span>{error}</span>
           </div>
         )}
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="text-sm font-medium text-[#334155]">Email</label>
+            <label className="text-sm font-medium text-[#B0C9E0]">Email</label>
             <input
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="admin@stockmgt.gov.et"
-              className="w-full h-10 mt-1.5 px-3 rounded-lg border border-[#E2E8F0] text-sm focus:border-[#4F46E5] focus:ring-2 focus:ring-[#C7D2FE] outline-none"
+              className="w-full h-10 mt-1.5 px-3 rounded-lg border border-[#1E3A5F] bg-[#0D2240]/60 text-white placeholder-[#4A6A8A] text-sm focus:border-[#00B4D8] focus:ring-2 focus:ring-[#00B4D8]/30 outline-none transition-colors"
             />
           </div>
           <div>
-            <label className="text-sm font-medium text-[#334155]">Password</label>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="Enter your password"
-              className="w-full h-10 mt-1.5 px-3 rounded-lg border border-[#E2E8F0] text-sm focus:border-[#4F46E5] focus:ring-2 focus:ring-[#C7D2FE] outline-none"
-            />
+            <label className="text-sm font-medium text-[#B0C9E0]">Password</label>
+            <div className="relative">
+              <input
+                type={showPassword ? "text" : "password"}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Enter your password"
+                className="w-full h-10 mt-1.5 px-3 pr-10 rounded-lg border border-[#1E3A5F] bg-[#0D2240]/60 text-white placeholder-[#4A6A8A] text-sm focus:border-[#00B4D8] focus:ring-2 focus:ring-[#00B4D8]/30 outline-none transition-colors"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-[#5A8AAE] hover:text-[#00B4D8] transition-colors"
+              >
+                {showPassword ? (
+                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94" />
+                    <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19" />
+                    <path d="M14.12 14.12a3 3 0 1 1-4.24-4.24" />
+                    <line x1="1" y1="1" x2="23" y2="23" />
+                  </svg>
+                ) : (
+                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                    <circle cx="12" cy="12" r="3" />
+                  </svg>
+                )}
+              </button>
+            </div>
           </div>
           <button
             type="submit"
             disabled={loading}
-            className="w-full h-10 bg-[#4F46E5] text-white font-medium rounded-lg hover:bg-[#4338CA] transition-colors disabled:opacity-50"
+            className="w-full h-10 bg-[#00B4D8] text-[#0B1A2E] font-semibold rounded-lg hover:bg-[#00D4FF] transition-colors disabled:opacity-50 shadow-lg shadow-[#00B4D8]/20"
           >
             {loading ? "Signing in..." : "Sign In"}
           </button>
@@ -228,6 +265,8 @@ export default function App() {
             return hasPermission(userRoles, PERMISSIONS.UNITS_READ) || hasPermission(userRoles, PERMISSIONS.UNITS_MANAGE)
           case 'stores':
             return hasPermission(userRoles, PERMISSIONS.STORES_READ) || hasPermission(userRoles, PERMISSIONS.STORES_MANAGE)
+          case 'departments':
+            return hasPermission(userRoles, PERMISSIONS.DEPARTMENTS_READ) || hasPermission(userRoles, PERMISSIONS.DEPARTMENTS_MANAGE)
           case 'suppliers':
             return hasPermission(userRoles, PERMISSIONS.SUPPLIERS_MANAGE)
           case 'stock-receiving':
@@ -672,6 +711,7 @@ export default function App() {
             {screen === "categories" && (hasPermission(userRoles, PERMISSIONS.CATEGORIES_READ) || hasPermission(userRoles, PERMISSIONS.CATEGORIES_MANAGE)) && <Categories />}
             {screen === "units" && (hasPermission(userRoles, PERMISSIONS.UNITS_READ) || hasPermission(userRoles, PERMISSIONS.UNITS_MANAGE)) && <Units />}
             {screen === "stores" && (hasPermission(userRoles, PERMISSIONS.STORES_READ) || hasPermission(userRoles, PERMISSIONS.STORES_MANAGE)) && <Stores />}
+            {screen === "departments" && (hasPermission(userRoles, PERMISSIONS.DEPARTMENTS_READ) || hasPermission(userRoles, PERMISSIONS.DEPARTMENTS_MANAGE)) && <Departments />}
             {screen === "suppliers" && hasPermission(userRoles, PERMISSIONS.SUPPLIERS_MANAGE) && <Suppliers />}
             {screen === "stock-receiving" && (hasPermission(userRoles, PERMISSIONS.RECEIPTS_CREATE) || hasPermission(userRoles, PERMISSIONS.GOODS_RECEIPT_CREATE)) && <StockReceiving />}
             {screen === "material-evaluation" && (hasPermission(userRoles, PERMISSIONS.EVALUATIONS_DECIDE) || hasPermission(userRoles, PERMISSIONS.EVALUATIONS_CREATE)) && <MaterialEvaluation />}

@@ -97,6 +97,7 @@ class GRNService {
             store: { select: { id: true, code: true, name: true } },
           },
         },
+        approvedByUser: { select: { id: true, fullName: true } },
         finalizedByUser: { select: { id: true, fullName: true } },
       },
       orderBy: { createdAt: 'desc' },
@@ -122,6 +123,7 @@ class GRNService {
           },
         },
         finalizedByUser: { select: { id: true, fullName: true } },
+        approvedByUser: { select: { id: true, fullName: true } },
       },
     });
 
@@ -141,8 +143,8 @@ class GRNService {
       throw new NotFoundError('GRN not found');
     }
 
-    if (grn.status !== 'DRAFT') {
-      throw new ValidationError('GRN must be in DRAFT status to finalize');
+    if (grn.status !== 'APPROVED') {
+      throw new ValidationError('GRN must be APPROVED before finalization');
     }
 
     const updated = await prisma.gRN.update({
@@ -169,6 +171,45 @@ class GRNService {
     }).catch(() => {});
 
     return updated;
+  }
+
+  async approve(id, userId) {
+    const grn = await prisma.gRN.findUnique({
+      where: { id },
+    });
+
+    if (!grn) {
+      throw new NotFoundError('GRN not found');
+    }
+
+    if (grn.status !== 'DRAFT') {
+      throw new ValidationError('GRN must be in DRAFT status to approve');
+    }
+
+    return prisma.gRN.update({
+      where: { id },
+      data: {
+        status: 'APPROVED',
+        approvedBy: userId,
+        approvedAt: new Date(),
+      },
+      include: {
+        goodsReceipt: {
+          include: {
+            supplier: { select: { id: true, code: true, name: true } },
+            store: { select: { id: true, code: true, name: true } },
+            lines: {
+              include: {
+                item: { select: { id: true, code: true, name: true } },
+                unit: { select: { id: true, code: true, symbol: true } },
+              },
+            },
+          },
+        },
+        approvedByUser: { select: { id: true, fullName: true } },
+        finalizedByUser: { select: { id: true, fullName: true } },
+      },
+    });
   }
 
   async cancel(id) {

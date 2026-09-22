@@ -20,17 +20,16 @@ export default function StockTracking() {
   const [selectedMovement, setSelectedMovement] = useState<any | null>(null)
 
   const getMovementInfo = (m: typeof stockMovements[0]) => {
-    const card = stockCards.find(sc => sc.id === m.stockCardId)
-    const item = card ? inventoryItems.find(i => i.id === card.itemId) : null
-    const store = card ? stores.find(s => s.id === card.storeId) : null
-    const unit = item ? units.find(u => u.id === item.unitId) : null
-    return { card, item, store, unit }
+    const item = m.stockCard?.item || inventoryItems.find(i => i.id === m.stockCard?.item?.id) || null
+    const store = m.stockCard?.store || null
+    const unit = item && 'unitId' in item ? units.find(u => u.id === (item as any).unitId) : null
+    return { item, store, unit }
   }
 
   const enrichedMovements = useMemo(() => stockMovements.map(m => ({
     ...m,
     ...getMovementInfo(m),
-  })), [stockMovements, stockCards, inventoryItems, stores, units])
+  })), [stockMovements, inventoryItems, units])
 
   const filteredMovements = enrichedMovements.filter(m => {
     const itemName = m.item?.name || ''

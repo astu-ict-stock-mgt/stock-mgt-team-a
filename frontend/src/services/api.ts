@@ -40,10 +40,24 @@ class ApiClient {
       headers['Authorization'] = `Bearer ${this.token}`
     }
 
-    const response = await fetch(url, { ...options, headers })
-    const data = await response.json()
+    let response: Response
+    try {
+      response = await fetch(url, { ...options, headers })
+    } catch (err: any) {
+      if (err.name === 'TypeError' && err.message === 'Failed to fetch') {
+        throw new Error('Unable to connect to server. Please check your internet connection or try again later.')
+      }
+      throw new Error('Network error. Please check your connection and try again.')
+    }
 
-    if (response.status === 401 && this.onUnauthorized) {
+    let data: any
+    try {
+      data = await response.json()
+    } catch {
+      throw new Error('Server returned an invalid response. Please try again.')
+    }
+
+    if (response.status === 401 && this.onUnauthorized && !endpoint.includes('/auth/login')) {
       this.token = null
       localStorage.removeItem('sms_token')
       localStorage.removeItem('sms_user')
@@ -304,6 +318,21 @@ export const goodsReceiptApi = {
   getById: (id: string) => api.get<ApiResponse<GoodsReceipt>>(`/goods-receipts/${id}`),
   create: (data: { supplierId: string; storeId: string; purchaseOrderNumber?: string; notes?: string; lines: Array<{ itemId: string; unitId: string; quantity: number; unitCost: number }> }) =>
     api.post<ApiResponse<GoodsReceipt>>('/goods-receipts', data),
+}
+
+export const grnApi = {
+  getAll: (params?: { status?: string; search?: string }) => {
+    const q = new URLSearchParams()
+    if (params?.status) q.set('status', params.status)
+    if (params?.search) q.set('search', params.search)
+    return api.get<ApiResponse<any[]>>(`/grns?${q.toString()}`)
+  },
+  getById: (id: string) => api.get<ApiResponse<any>>(`/grns/${id}`),
+  create: (data: { goodsReceiptId: string; notes?: string }) =>
+    api.post<ApiResponse<any>>('/grns', data),
+  approve: (id: string) => api.patch<ApiResponse<any>>(`/grns/${id}/approve`),
+  finalize: (id: string) => api.patch<ApiResponse<any>>(`/grns/${id}/finalize`),
+  cancel: (id: string) => api.patch<ApiResponse<any>>(`/grns/${id}/cancel`),
 }
 
 export const requisitionsApi = {

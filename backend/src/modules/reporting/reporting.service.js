@@ -41,7 +41,7 @@ import { ValidationError, ConflictError } from '../../utils/errors.js'
 import { listRequisitions } from '../requisitions/requisition.service.js'
 import { listReturns } from '../returns/return.service.js'
 import { listTransfers } from '../transfers/transfer.service.js'
-import { listDisposalRequests } from '../disposals/disposal.service.js'
+import { listDisposalRequests } from '../disposal/disposal.service.js'
 // ASSUMPTION: real file/export not supplied — see SOURCING NOTES above.
 import { listAssets } from '../assets/asset.service.js'
 
@@ -315,4 +315,17 @@ export async function getStockTakeReport() {
   throw new ConflictError(
     'Stock-take reporting is unavailable: BE-144 (Stock-Taking Service/API) has not been implemented yet.'
   )
+}
+
+export default {
+  getStockLevelsReport,
+  getStockMovementReport,
+  getBinMovementReport,
+  getValuationReport,
+  getRequisitionIssueReport,
+  getReturnsReport,
+  getTransfersReport,
+  getAssetsReport,
+  getDisposalReport,
+  getStockTakeReport,
 }

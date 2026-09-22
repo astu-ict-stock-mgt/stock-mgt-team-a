@@ -38,6 +38,15 @@ class GRNController {
     }
   }
 
+  async approve(req, res, next) {
+    try {
+      const grn = await grnService.approve(req.params.id, req.user.userId);
+      return sendSuccess(res, grn);
+    } catch (error) {
+      return sendError(res, error);
+    }
+  }
+
   async cancel(req, res, next) {
     try {
       const grn = await grnService.cancel(req.params.id);

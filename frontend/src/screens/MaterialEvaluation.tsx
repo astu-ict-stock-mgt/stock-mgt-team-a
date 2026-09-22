@@ -304,8 +304,8 @@ export default function MaterialEvaluation() {
                           <p className="text-[#94A3B8] font-mono">{line.item?.code}</p>
                         </td>
                         <td className="px-3 py-2.5 text-right text-[#1E293B]">{line.quantity}</td>
-                        <td className="px-3 py-2.5 text-right text-[#1E293B]">${line.unitCost?.toFixed(2)}</td>
-                        <td className="px-3 py-2.5 text-right font-semibold text-[#1E293B]">${(line.quantity * line.unitCost)?.toFixed(2)}</td>
+                        <td className="px-3 py-2.5 text-right text-[#1E293B]">${Number(line.unitCost || 0).toFixed(2)}</td>
+                        <td className="px-3 py-2.5 text-right font-semibold text-[#1E293B]">${(Number(line.quantity || 0) * Number(line.unitCost || 0)).toFixed(2)}</td>
                       </tr>
                     ))}
                     {(!selectedReceipt.lines || selectedReceipt.lines.length === 0) && (

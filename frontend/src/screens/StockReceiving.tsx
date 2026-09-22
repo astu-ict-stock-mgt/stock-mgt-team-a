@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Button, Input, Select, Stepper, SectionHeader, Card, Badge, Divider, useToast, ToastContainer, Tabs, Modal } from '../components/ui'
 import { useApp } from '../context/AppContext'
-import { goodsReceiptApi } from '../services/api'
+import { goodsReceiptApi, grnApi } from '../services/api'
 
 const steps = ['Supplier & Reference', 'Item Entry', 'Inspection', 'Review & Confirm']
 
@@ -29,6 +29,7 @@ export default function StockReceiving() {
   const [selectedReceipt, setSelectedReceipt] = useState<any | null>(null)
   const [showGrnModal, setShowGrnModal] = useState(false)
   const [loadingGrnDetails, setLoadingGrnDetails] = useState<string | null>(null)
+  const [grnActions, setGrnActions] = useState<Record<string, any>>({})
 
   const [step, setStep] = useState(0)
   const [submitted, setSubmitted] = useState(false)
@@ -43,7 +44,14 @@ export default function StockReceiving() {
     setLoadingHistory(true)
     try {
       const res = await goodsReceiptApi.getAll()
-      setHistoryReceipts(res.data || [])
+      const receipts = res.data || []
+      setHistoryReceipts(receipts)
+      // Load GRN status for each approved receipt
+      const grnRes = await grnApi.getAll()
+      const grns = grnRes.data || []
+      const grnMap: Record<string, any> = {}
+      grns.forEach((g: any) => { grnMap[g.goodsReceiptId] = g })
+      setGrnActions(grnMap)
     } catch {
       toast.error('Failed to load goods receiving history')
     } finally {
@@ -69,6 +77,36 @@ export default function StockReceiving() {
       loadHistory()
     }
   }, [activeTab, loadHistory])
+
+  const handleCreateGrn = async (receiptId: string) => {
+    try {
+      await grnApi.create({ goodsReceiptId: receiptId })
+      toast.success('GRN created successfully')
+      loadHistory()
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to create GRN')
+    }
+  }
+
+  const handleApproveGrn = async (grnId: string) => {
+    try {
+      await grnApi.approve(grnId)
+      toast.success('GRN approved by TEC')
+      loadHistory()
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to approve GRN')
+    }
+  }
+
+  const handleFinalizeGrn = async (grnId: string) => {
+    try {
+      await grnApi.finalize(grnId)
+      toast.success('GRN finalized — items added to stock')
+      loadHistory()
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to finalize GRN')
+    }
+  }
 
   const validateStep0 = () => {
     const e: Record<string, string> = {}
@@ -424,13 +462,21 @@ export default function StockReceiving() {
                 <p className="py-12 text-center text-sm text-[#94A3B8]">No past goods receipts recorded</p>
               </Card>
             )}
-            {!loadingHistory && historyReceipts.map(receipt => (
+            {!loadingHistory && historyReceipts.map(receipt => {
+              const grn = grnActions[receipt.id]
+              const grnStatus = grn?.status
+              return (
               <Card key={receipt.id}>
                 <div className="flex items-center justify-between">
                   <div>
                     <div className="flex items-center gap-2">
                       <p className="text-sm font-semibold text-[#1E293B]">{receipt.receiptNumber}</p>
                       {statusBadge(receipt.status)}
+                      {grnStatus && (
+                        <Badge variant={grnStatus === 'FINALIZED' ? 'success' : grnStatus === 'APPROVED' ? 'primary' : 'warning'}>
+                          GRN: {grnStatus}
+                        </Badge>
+                      )}
                     </div>
                     <p className="text-xs text-[#94A3B8] mt-0.5">
                       Supplier: {receipt.supplier?.name} · Store: {receipt.store?.name} · {new Date(receipt.receivedDate || receipt.createdAt).toLocaleDateString()}
@@ -440,6 +486,21 @@ export default function StockReceiving() {
                     )}
                   </div>
                   <div className="flex items-center gap-2">
+                    {receipt.status === 'APPROVED' && !grn && (
+                      <Button variant="primary" size="sm" onClick={() => handleCreateGrn(receipt.id)}>
+                        Create GRN
+                      </Button>
+                    )}
+                    {grnStatus === 'DRAFT' && (
+                      <Button variant="primary" size="sm" onClick={() => handleApproveGrn(grn.id)}>
+                        Approve GRN (TEC)
+                      </Button>
+                    )}
+                    {grnStatus === 'APPROVED' && (
+                      <Button variant="primary" size="sm" onClick={() => handleFinalizeGrn(grn.id)}>
+                        Finalize GRN
+                      </Button>
+                    )}
                     <Button
                       variant="outline"
                       size="sm"
@@ -451,7 +512,8 @@ export default function StockReceiving() {
                   </div>
                 </div>
               </Card>
-            ))}
+              )
+            })}
           </div>
         )}
       </div>

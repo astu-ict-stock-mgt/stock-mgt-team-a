@@ -643,7 +643,7 @@ export default function StockIssuing() {
                   <div key={idx} className="p-3 bg-[#F8FAFC] rounded-lg border border-[#E2E8F0] space-y-2">
                     <div className="flex gap-2 items-center">
                       <Select
-                        options={availableItemOptions.filter(opt => !nonStockedItems.includes(opt.value))}
+                        options={availableItemOptions}
                         value={line.itemId}
                         onChange={e => setReqLines(ls => ls.map((l, i) => i === idx ? { ...l, itemId: e.target.value } : l))}
                         className="flex-1"

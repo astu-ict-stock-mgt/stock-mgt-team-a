@@ -68,6 +68,7 @@ model User {
 
   // BE-077: GRNs finalized by this user
   grnsFinalized GRN[] @relation("GRNFinalizedBy")
+  grnsApproved  GRN[] @relation("GRNApprovedBy")
 
   // BE-082: stock card transactions created by this user
   stockTransactionsCreated StockCardTransaction[] @relation("StockTransactionCreatedBy")
@@ -735,6 +736,7 @@ enum EvaluationDecision {
 // ────────────────────────────────────────────────────────────────
 enum GRNStatus {
   DRAFT
+  APPROVED
   FINALIZED
   CANCELLED
 }
@@ -744,6 +746,8 @@ model GRN {
   grnNumber      String    @unique @map("grn_number")
   goodsReceiptId String    @map("goods_receipt_id")
   status         GRNStatus @default(DRAFT)
+  approvedBy     String?   @map("approved_by")
+  approvedAt     DateTime? @map("approved_at")
   finalizedDate  DateTime? @map("finalized_date")
   finalizedBy    String?   @map("finalized_by")
   notes          String?
@@ -752,6 +756,7 @@ model GRN {
 
   // Relationships
   goodsReceipt    GoodsReceipt @relation(fields: [goodsReceiptId], references: [id], onDelete: Restrict)
+  approvedByUser  User?        @relation("GRNApprovedBy", fields: [approvedBy], references: [id], onDelete: SetNull)
   finalizedByUser User?        @relation("GRNFinalizedBy", fields: [finalizedBy], references: [id], onDelete: SetNull)
 
   // BE-129: fixed assets from this GRN

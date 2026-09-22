@@ -15,11 +15,12 @@ import {
   transfersApi,
   stockTakesApi,
   requisitionsApi,
+  departmentsApi,
 } from '../services/api';
 import type {
   User, Role, Store, Category, Unit, Supplier, Item,
   StockCard, StockTransaction, AuditEvent, Notification,
-  TransferRequest, StockTake, Requisition,
+  TransferRequest, StockTake, Requisition, Department,
 } from '../types';
 
 interface AppContextType {
@@ -32,6 +33,7 @@ interface AppContextType {
   stores: Store[]
   categories: Category[]
   units: Unit[]
+  departments: Department[]
   auditLogs: AuditEvent[]
   notifications: Notification[]
   unreadCount: number
@@ -63,6 +65,10 @@ interface AppContextType {
   addStore: (store: Store) => Promise<void>
   updateStore: (id: string, updates: Partial<Store>) => Promise<void>
   deleteStore: (id: string) => Promise<void>
+
+  addDepartment: (department: Department) => Promise<void>
+  updateDepartment: (id: string, updates: Partial<Department>) => Promise<void>
+  deleteDepartment: (id: string) => Promise<void>
 
   addUnit: (unit: Unit) => Promise<void>
   updateUnit: (id: string, updates: Partial<Unit>) => Promise<void>
@@ -128,6 +134,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [stores, setStores] = useState<Store[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [units, setUnits] = useState<Unit[]>([]);
+  const [departments, setDepartments] = useState<Department[]>([]);
   const [auditLogs, setAuditLogs] = useState<AuditEvent[]>([]);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState<number>(0);
@@ -145,7 +152,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     try {
       const [
         itemsData, suppliersData, usersData, rolesData, storesData,
-        categoriesData, unitsData, logsData, notifsData, transfersData, stockTakesData, requisitionsData, stockMovementsData,
+        categoriesData, unitsData, departmentsData, logsData, notifsData, transfersData, stockTakesData, requisitionsData, stockMovementsData,
       ] = await Promise.all([
         fetchIf(hasAnyPermission(perms, [PERMISSIONS.ITEMS_READ, PERMISSIONS.ITEMS_MANAGE]), itemsApi.getAll),
         fetchIf(hasAnyPermission(perms, [PERMISSIONS.SUPPLIERS_READ, PERMISSIONS.SUPPLIERS_MANAGE]), suppliersApi.getAll),
@@ -154,6 +161,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         fetchIf(hasAnyPermission(perms, [PERMISSIONS.STORES_READ, PERMISSIONS.STORES_MANAGE]), storesApi.getAll),
         fetchIf(hasAnyPermission(perms, [PERMISSIONS.CATEGORIES_READ, PERMISSIONS.CATEGORIES_MANAGE]), categoriesApi.getAll),
         fetchIf(hasAnyPermission(perms, [PERMISSIONS.UNITS_READ, PERMISSIONS.UNITS_MANAGE]), unitsApi.getAll),
+        fetchIf(hasAnyPermission(perms, [PERMISSIONS.DEPARTMENTS_READ, PERMISSIONS.DEPARTMENTS_MANAGE]), departmentsApi.getAll),
         fetchIf(hasAnyPermission(perms, [PERMISSIONS.AUDIT_READ]), () => auditApi.getRecent(50)),
         fetchIf(true, () => notificationsApi.getAll({ limit: 50 })), // always fetch for authenticated calls
         fetchIf(hasAnyPermission(perms, [PERMISSIONS.TRANSFERS_READ, PERMISSIONS.TRANSFERS_CREATE, PERMISSIONS.TRANSFERS_APPROVE, PERMISSIONS.TRANSFERS_EXECUTE]), () => transfersApi.getAll({ limit: 50 })),
@@ -169,6 +177,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       if (storesData) setStores(storesData);
       if (categoriesData) setCategories(categoriesData);
       if (unitsData) setUnits(unitsData);
+      if (departmentsData) setDepartments(departmentsData);
       if (logsData) setAuditLogs(logsData);
       if (notifsData) {
         setNotifications(notifsData);
@@ -180,11 +189,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
       if (stockMovementsData) setStockMovements(stockMovementsData);
 
       if (hasAnyPermission(perms, [PERMISSIONS.INVENTORY_READ]) && storesData && storesData.length > 0) {
-        const firstStore = storesData[0];
         try {
-          const stockRes = await inventoryApi.getStockByStore(firstStore.id);
-          setStockCards(stockRes.data);
-        } catch { /* store may have no stock */ }
+          const allStockCards: any[] = [];
+          for (const store of storesData) {
+            try {
+              const stockRes = await inventoryApi.getStockByStore(store.id);
+              if (stockRes.data) allStockCards.push(...stockRes.data);
+            } catch { /* store may have no stock */ }
+          }
+          setStockCards(allStockCards);
+        } catch { /* ignore */ }
       }
     } catch (error) {
       console.error('Failed to load data:', error);
@@ -259,7 +273,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
         throw new Error('Failed to decode authentication token');
       }
     } else {
-      throw new Error('Login failed');
+      const msg = (!response.success ? 'Login failed. Please check your credentials.' : 'Login failed');
+      throw new Error(msg);
     }
   };
 
@@ -345,6 +360,21 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const deleteStore = async (id: string) => {
     await storesApi.delete(id);
     setStores(prev => prev.filter(s => s.id !== id));
+  };
+
+  const addDepartment = async (department: Department) => {
+    await departmentsApi.create(department as any);
+    const res = await departmentsApi.getAll();
+    setDepartments(res.data as Department[]);
+  };
+  const updateDepartment = async (id: string, updates: Partial<Department>) => {
+    await departmentsApi.update(id, updates);
+    const res = await departmentsApi.getAll();
+    setDepartments(res.data as Department[]);
+  };
+  const deleteDepartment = async (id: string) => {
+    await departmentsApi.delete(id);
+    setDepartments(prev => prev.filter(d => d.id !== id));
   };
 
   const addUnit = async (unit: Unit) => {
@@ -445,13 +475,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
   return (
     <AppContext.Provider value={{
       inventoryItems, stockCards, suppliers, stockMovements, users, roles,
-      stores, categories, units, auditLogs, notifications, unreadCount, transfers, stockTakes, requisitions,
+      stores, categories, units, departments, auditLogs, notifications, unreadCount, transfers, stockTakes, requisitions,
       setRequisitions, setTransfers, setStockTakes,
       isAuthenticated, currentUser, userRoles, login, logout,
       addInventoryItem, updateInventoryItem, deleteInventoryItem,
       addSupplier, updateSupplier, deleteSupplier,
       addCategory, updateCategory, deleteCategory,
       addStore, updateStore, deleteStore,
+      addDepartment, updateDepartment, deleteDepartment,
       addUnit, updateUnit, deleteUnit,
       addStockMovement,
       addUser, updateUser, deleteUser,

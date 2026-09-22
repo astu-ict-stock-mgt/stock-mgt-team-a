@@ -79,6 +79,11 @@ export interface Department {
   id: string
   code: string
   name: string
+  status?: 'ACTIVE' | 'INACTIVE'
+  description?: string | null
+  headUserId?: string | null
+  createdAt?: string
+  updatedAt?: string
 }
 
 export interface Location {
@@ -185,6 +190,11 @@ export interface StockTransaction {
   notes: string | null
   createdBy: string
   createdAt: string
+  stockCard?: {
+    item?: { id: string; code: string; name: string }
+    store?: { id: string; code: string; name: string }
+  }
+  createdByUser?: { id: string; fullName: string }
 }
 
 export interface GoodsReceipt {

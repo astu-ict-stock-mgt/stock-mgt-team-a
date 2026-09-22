@@ -234,7 +234,7 @@ export async function notifyMaterialDecision({ entityType, decision, entityId, e
   const userIds = await getUserIdsByRoles(['STOREKEEPER', 'PAO'])
   if (userIds.length === 0) return { created: 0, usersNotified: 0 }
 
-  const isAccepted = decision === 'ACCEPTED'
+  const isAccepted = decision === 'APPROVED'
   const notifications = buildNotifications(userIds, {
     title: `Material ${isAccepted ? 'Accepted' : 'Rejected'}: ${entityNumber || entityId}`,
     message: `${entityType} ${entityNumber || entityId} has been ${decision.toLowerCase()} by the technical evaluation committee.`,
